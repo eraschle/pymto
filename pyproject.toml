@@ -1,0 +1,41 @@
+[project]
+name = "dxfto"
+version = "0.1.0"
+description = "DXF processor for pipes and shafts with Revit export"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "click>=8.2.1",
+    "ezdxf>=1.4.2",
+    "lxml>=5.4.0",
+    "numpy>=2.3.1",
+    "scipy>=1.16.0",
+]
+
+[dependency-groups]
+dev = [
+    "isort>=6.0.1",
+    "pyright>=1.1.402",
+    "pytest>=8.4.1",
+    "ruff>=0.12.0",
+]
+
+[tool.pyright]
+stubsPath = "/mnt/c/Users/ErichRaschle/OneDrive/x_Backup"
+
+[tool.ruff]
+line-length = 110
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "T20"]
+ignore = ["E501"]
+
+# [tool.pyright]
+# python-version = "3.13"
+# strict = ["src"]
+# exclude = ["tests"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
