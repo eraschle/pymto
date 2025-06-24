@@ -33,7 +33,7 @@ class TestExtractPointsFromEntity:
         # Mock isinstance to return True for Line
         with patch("dxfto.process.entity_handler.isinstance") as mock_isinstance:
 
-            def isinstance_side_effect(obj, cls):
+            def isinstance_side_effect(_, cls):
                 from ezdxf.entities.line import Line
 
                 return cls == Line
@@ -55,7 +55,7 @@ class TestExtractPointsFromEntity:
         # Mock isinstance to return True for Circle
         with patch("dxfto.process.entity_handler.isinstance") as mock_isinstance:
 
-            def isinstance_side_effect(obj, cls):
+            def isinstance_side_effect(_, cls):
                 from ezdxf.entities.circle import Circle
 
                 return cls == Circle
@@ -127,7 +127,7 @@ class TestIsRectangularShape:
             Point3D(east=10.0, north=5.0, altitude=0.0),
             Point3D(east=0.0, north=5.0, altitude=0.0),
         ]
-        assert is_rectangular_shape(points) == True
+        assert is_rectangular_shape(points)
 
     def test_non_rectangle(self):
         """Test non-rectangular shape."""
@@ -137,7 +137,7 @@ class TestIsRectangularShape:
             Point3D(east=8.0, north=8.0, altitude=0.0),
             Point3D(east=2.0, north=6.0, altitude=0.0),
         ]
-        assert is_rectangular_shape(points) == False
+        assert not is_rectangular_shape(points)
 
     def test_wrong_number_of_points(self):
         """Test with wrong number of points."""
@@ -146,7 +146,7 @@ class TestIsRectangularShape:
             Point3D(east=10.0, north=0.0, altitude=0.0),
             Point3D(east=10.0, north=5.0, altitude=0.0),
         ]
-        assert is_rectangular_shape(points) == False
+        assert not is_rectangular_shape(points)
 
 
 class TestIsNearCircularShape:
@@ -163,7 +163,7 @@ class TestIsNearCircularShape:
             y = center.north + radius * math.sin(angle)
             points.append(Point3D(east=x, north=y, altitude=0.0))
 
-        assert is_near_circular_shape(points) == True
+        assert is_near_circular_shape(points)
 
     def test_irregular_polygon(self):
         """Test irregular polygon (should not be circular)."""
@@ -175,7 +175,7 @@ class TestIsNearCircularShape:
             Point3D(east=-2.0, north=4.0, altitude=0.0),
             Point3D(east=-5.0, north=1.0, altitude=0.0),
         ]
-        assert is_near_circular_shape(points) == False
+        assert not is_near_circular_shape(points)
 
     def test_too_few_points(self):
         """Test with too few points."""
@@ -184,7 +184,7 @@ class TestIsNearCircularShape:
             Point3D(east=10.0, north=0.0, altitude=0.0),
             Point3D(east=10.0, north=5.0, altitude=0.0),
         ]
-        assert is_near_circular_shape(points) == False
+        assert not is_near_circular_shape(points)
 
 
 class TestAreCrossingDiagonals:
@@ -195,21 +195,21 @@ class TestAreCrossingDiagonals:
         line1 = ((0.0, 0.0), (10.0, 10.0))  # Diagonal from bottom-left to top-right
         line2 = ((0.0, 10.0), (10.0, 0.0))  # Diagonal from top-left to bottom-right
 
-        assert are_crossing_diagonals(line1, line2) == True
+        assert are_crossing_diagonals(line1, line2) is True
 
     def test_parallel_lines(self):
         """Test parallel lines (should not be crossing)."""
         line1 = ((0.0, 0.0), (10.0, 0.0))  # Horizontal line
         line2 = ((0.0, 5.0), (10.0, 5.0))  # Parallel horizontal line
 
-        assert are_crossing_diagonals(line1, line2) == False
+        assert are_crossing_diagonals(line1, line2) is False
 
     def test_vertical_lines(self):
         """Test vertical lines."""
         line1 = ((0.0, 0.0), (0.0, 10.0))  # Vertical line
         line2 = ((5.0, 0.0), (5.0, 10.0))  # Parallel vertical line
 
-        assert are_crossing_diagonals(line1, line2) == False
+        assert are_crossing_diagonals(line1, line2) is False
 
 
 class TestCalculateBoundingBoxDimensions:
@@ -319,21 +319,21 @@ class TestIsElementEntity:
         entity = Mock()
         entity.dxftype.return_value = "INSERT"
 
-        assert is_element_entity(entity) == True
+        assert is_element_entity(entity) is True
 
     def test_circle_entity_is_element(self):
         """Test that CIRCLE entities are always elements."""
         entity = Mock()
         entity.dxftype.return_value = "CIRCLE"
 
-        assert is_element_entity(entity) == True
+        assert is_element_entity(entity) is True
 
     def test_line_entity_is_not_element(self):
         """Test that LINE entities are not elements."""
         entity = Mock()
         entity.dxftype.return_value = "LINE"
 
-        assert is_element_entity(entity) == False
+        assert is_element_entity(entity) is False
 
     def test_complex_polyline_is_element(self):
         """Test that complex polylines are elements."""
@@ -344,10 +344,10 @@ class TestIsElementEntity:
         # Mock extract_points_from_entity to return 4+ points
         with pytest.MonkeyPatch().context() as m:
             m.setattr(
-                "dxfto.process.entity_handler.extract_points_from_entity", lambda e: [Point3D(0, 0, 0)] * 5
+                "dxfto.process.entity_handler.extract_points_from_entity", lambda _: [Point3D(0, 0, 0)] * 5
             )
 
-            assert is_element_entity(entity) == True
+            assert is_element_entity(entity) is True
 
     def test_simple_polyline_is_not_element(self):
         """Test that simple polylines are not elements."""
@@ -358,7 +358,7 @@ class TestIsElementEntity:
         # Mock extract_points_from_entity to return few points
         with pytest.MonkeyPatch().context() as m:
             m.setattr(
-                "dxfto.process.entity_handler.extract_points_from_entity", lambda e: [Point3D(0, 0, 0)] * 2
+                "dxfto.process.entity_handler.extract_points_from_entity", lambda _: [Point3D(0, 0, 0)] * 2
             )
 
-            assert is_element_entity(entity) == False
+            assert is_element_entity(entity) is False

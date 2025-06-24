@@ -54,7 +54,7 @@ class TestObjectDataFactory:
 
         with patch("dxfto.process.objectdata_factory.isinstance") as mock_isinstance:
 
-            def isinstance_side_effect(obj, cls):
+            def isinstance_side_effect(_, cls):
                 from ezdxf.entities.circle import Circle
 
                 return cls == Circle
@@ -260,7 +260,7 @@ class TestObjectDataFactoryInsertEntity:
         """Create ObjectDataFactory with block definitions."""
         return ObjectDataFactory(mock_doc_with_blocks)
 
-    def test_create_from_insert_round_block(self, factory_with_blocks):
+    def test_create_from_insert_round_block(self, factory_with_blocks: ObjectDataFactory):
         """Test creation from INSERT entity with round block."""
         # Mock INSERT entity
         entity = Mock()
@@ -308,7 +308,7 @@ class TestObjectDataFactoryInsertEntity:
 
         with patch("dxfto.process.objectdata_factory.isinstance") as mock_isinstance:
 
-            def isinstance_side_effect(obj, cls):
+            def isinstance_side_effect(_, cls):
                 from ezdxf.entities.circle import Circle
                 from ezdxf.entities.insert import Insert
 
@@ -355,7 +355,7 @@ class TestObjectDataFactoryInsertEntity:
 
         with patch("dxfto.process.objectdata_factory.isinstance") as mock_isinstance:
 
-            def isinstance_side_effect(obj, cls):
+            def isinstance_side_effect(_, cls):
                 from ezdxf.entities.circle import Circle
 
                 return cls == Circle
@@ -385,7 +385,7 @@ class TestObjectDataFactoryInsertEntity:
         entity = Mock()
         entity.dxf.name = "RECT_DISTRIBUTOR"
 
-        dimensions, points = factory_with_blocks._default_block_dimensions(entity)
+        dimensions, _ = factory_with_blocks._default_block_dimensions(entity)
 
         assert isinstance(dimensions, RectangularDimensions)
         assert dimensions.length == 600.0

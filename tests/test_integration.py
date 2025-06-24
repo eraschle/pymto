@@ -188,7 +188,7 @@ class TestIntegration:
                 if block_entities:
                     analysis = factory._analyze_block_shape(entity, block_entities)
                     assert analysis is not None
-                    dimensions, geometry_points = analysis
+                    dimensions, _ = analysis
                     assert dimensions is not None
 
     def test_color_extraction(self, factory, dxf_doc):

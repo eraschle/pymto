@@ -1,0 +1,305 @@
+{
+    "Hauptleitung": {
+        "Leitung": {
+            "Shape": "Round",
+            "Geometrie": [
+                {
+                    "Name": "Leitung--Hauptleitungen-",
+                    "Farbe": [
+                        255,
+                        0,
+                        0
+                    ]
+                },
+                {
+                    "Name": "Haltung--T-",
+                    "Farbe": [
+                        169,
+                        0,
+                        230
+                    ]
+                },
+                {
+                    "Name": "Haltung--T-",
+                    "Farbe": [
+                        0,
+                        0,
+                        255
+                    ]
+                }
+            ],
+            "Text": [
+                {
+                    "Name": "Material-Durchmesser-Hauptleitu",
+                    "Farbe": [
+                        255,
+                        0,
+                        0
+                    ]
+                },
+                {
+                    "Name": "Haltung--L-",
+                    "Farbe": [
+                        255,
+                        0,
+                        0
+                    ]
+                }
+            ]
+        },
+        "Element": {
+            "Shape": "Round",
+            "Geometrie": [
+                {
+                    "Name": "Normschacht--T-",
+                    "Farbe": "Farbe 13"
+                }
+            ],
+            "Text": [
+                {
+                    "Name": "Normschacht-Nummer--L-",
+                    "Farbe": [
+                        255,
+                        0,
+                        0
+                    ]
+                }
+            ]
+        }
+    },
+    "Nebenleitung": {
+        "Leitung": {
+            "Shape": "Round",
+            "Geometrie": [
+                {
+                    "Name": "Leitung--Nebenleitungen-",
+                    "Farbe": [
+                        0,
+                        72,
+                        255
+                    ]
+                }
+            ],
+            "Text": [
+                {
+                    "Name": "Material-Durchmesser-Nebenleitu",
+                    "Farbe": [
+                        0,
+                        72,
+                        255
+                    ]
+                },
+                {
+                    "Name": "Haltung--L-",
+                    "Farbe": [
+                        0,
+                        0,
+                        255
+                    ]
+                }
+            ]
+        },
+        "Element": {
+            "Shape": "Round",
+            "Geometrie": [
+                {
+                    "Name": "Normschacht--T-",
+                    "Farbe": "blau"
+                }
+            ],
+            "Text": [
+                {
+                    "Name": "Normschacht-Nummer--L-",
+                    "Farbe": [
+                        0,
+                        0,
+                        255
+                    ]
+                }
+            ]
+        }
+    },
+    "Abwasser_Orange": {
+        "Leitung": {
+            "Shape": "Round",
+            "Geometrie": [
+                {
+                    "Name": "Haltung--T-",
+                    "Farbe": [
+                        255,
+                        130,
+                        130
+                    ]
+                }
+            ],
+            "Text": [
+                {
+                    "Name": "Haltung--L-",
+                    "Farbe": [
+                        255,
+                        0,
+                        0
+                    ]
+                }
+            ]
+        },
+        "Element": {
+            "Shape": "Round",
+            "Geometrie": [
+                {
+                    "Name": "Normschacht--T-",
+                    "Farbe": "blau"
+                }
+            ],
+            "Text": [
+                {
+                    "Name": "Normschacht-Nummer--L-",
+                    "Farbe": [
+                        0,
+                        0,
+                        255
+                    ]
+                }
+            ]
+        }
+    },
+    "Abwasser_Violett": {
+        "Leitung": {
+            "Shape": "Round",
+            "Geometrie": [
+                {
+                    "Name": "Haltung--T-",
+                    "Farbe": [
+                        130,
+                        130,
+                        255
+                    ]
+                }
+            ],
+            "Text": [
+                {
+                    "Name": "Haltung--L-",
+                    "Farbe": [
+                        0,
+                        0,
+                        230
+                    ]
+                }
+            ]
+        },
+        "Element": {
+            "Shape": "Round",
+            "Geometrie": [
+                {
+                    "Name": "Normschacht--T-",
+                    "Farbe": "Farbe 173"
+                }
+            ],
+            "Text": [
+                {
+                    "Name": "Normschacht-Nummer--L-",
+                    "Farbe": [
+                        0,
+                        0,
+                        255
+                    ]
+                }
+            ]
+        }
+    },
+    "Abwasser_Magenta": {
+        "Leitung": {
+            "Shape": "Round",
+            "Geometrie": [
+                {
+                    "Name": "Haltung--T-",
+                    "Farbe": [
+                        169,
+                        0,
+                        230
+                    ]
+                },
+                {
+                    "Name": "Haltung--T-",
+                    "Farbe": [
+                        169,
+                        130,
+                        230
+                    ]
+                }
+            ],
+            "Text": [
+                {
+                    "Name": "Haltung--L-",
+                    "Farbe": [
+                        169,
+                        0,
+                        230
+                    ]
+                }
+            ]
+        },
+        "Element": {
+            "Shape": "Round",
+            "Geometrie": [
+                {
+                    "Name": "Normschacht--T-",
+                    "Farbe": "Farbe 203"
+                }
+            ],
+            "Text": [
+                {
+                    "Name": "Normschacht-Nummer--L-",
+                    "Farbe": [
+                        169,
+                        0,
+                        230
+                    ]
+                }
+            ]
+        }
+    },
+    "Abwasser_Grün": {
+        "Leitung": {
+            "Shape": "Round",
+            "Geometrie": [
+                {
+                    "Name": "Haltung--T-",
+                    "Farbe": [
+                        85,
+                        255,
+                        0
+                    ]
+                }
+            ],
+            "Text": [
+                {
+                    "Name": "Haltung--L-",
+                    "Farbe": [
+                        0,
+                        0,
+                        255
+                    ]
+                }
+            ]
+        },
+        "Element": {
+            "Geometrie": [
+                {
+                    "Name": "Normschacht--T-",
+                    "Farbe": "Farbe 80"
+                }
+            ],
+            "Text": [
+                {
+                    "Name": "Normschacht-Nummer--L-",
+                    "Farbe": [
+                        0,
+                        0,
+                        255
+                    ]
+                }
+            ]
+        }
+    }
+}

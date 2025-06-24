@@ -31,7 +31,6 @@ from ..models import (
     Point3D,
     RectangularDimensions,
     RoundDimensions,
-    ShapeType,
 )
 
 log = logging.getLogger(__name__)
@@ -150,7 +149,7 @@ class DXFReader:
 
         # For polylines, check if they form complex shapes (4+ points)
         if entity_type in ("POLYLINE", "LWPOLYLINE"):
-            if hasattr(entity, "is_closed") and entity.is_closed:
+            if isinstance(entity, LWPolyline | Polyline) and entity.is_closed:
                 return True
             points = self._extract_points_from(entity)
             # Complex polylines with 4+ points are likely rectangular shafts
@@ -192,7 +191,7 @@ class DXFReader:
             length, width = self._get_rect_dimension(points)
         else:
             length, width = self._get_bbox_dimension(points)
-        return  RectangularDimensions(length=length, width=width, angle=0.0)
+        return RectangularDimensions(length=length, width=width, angle=0.0)
 
     def _get_rectangular_center(self, points: list[Point3D]) -> Point3D:
         center_x = sum(p.east for p in points) / len(points)
@@ -299,7 +298,6 @@ class DXFReader:
             # Try to determine shape from block geometry or attributes
             block_geometry = self._extract_block_points(entity)
             if self._is_round_block_geometry(entity):
-                diameters
                 dimensions = RoundDimensions(diameter=800.0)
             dimensions = self._analyze_block_shape(entity, block_geometry)
 
@@ -318,6 +316,7 @@ class DXFReader:
         except Exception as e:
             log.error(f"Failed to process INSERT entity '{entity.dxf.name}': {e}")
             return None
+
     def _get_block_geometry_entities(self, insert_entity: Insert) -> list[DXFEntity]:
         if self._doc is None:
             return []
@@ -345,8 +344,7 @@ class DXFReader:
         block_entities = self._get_block_geometry_entities(insert_entity)
         entity_types = {entity.dxftype() for entity in block_entities}
         round_types = ("CIRCLE", "ARC", "ELLIPSE")
-        return all( e_type in round_types for e_type in entity_types)
-
+        return all(e_type in round_types for e_type in entity_types)
 
     def _extract_block_points(self, insert_entity: Insert) -> list[Point3D]:
         """Extract geometry from a block definition.
@@ -361,32 +359,34 @@ class DXFReader:
         list[Point3D]
             List of points representing the block geometry
         """
-        block_def = self._get_block_geometry_entities(insert_entity)
-        if self._is_round_block_geometry(insert_entity):
-            round_object = None
-            max_diameter = 0.0
-            for entity in block_def:
-                object_data = self._create_round_from(entity)
-                if object_data is None:
-                    continue
-                if round_object is None:
-                    round_object = object_data
-                    continue
-                dimension = object_data.dimensions
-                if not isinstance(dimension, RoundDimensions):
-                    continue
-                if max_diameter > dimension.diameter:
-                    continue
-                max_diameter = dimension.diameter
-                round_objects = object_data
-            return round_object
-        geometry_points = []
+        try:
+            block_def = self._get_block_geometry_entities(insert_entity)
+            if self._is_round_block_geometry(insert_entity):
+                round_object = None
+                max_diameter = 0.0
+                for entity in block_def:
+                    object_data = self._create_round_from(entity)
+                    if object_data is None:
+                        continue
+                    if round_object is None:
+                        round_object = object_data
+                        continue
+                    dimension = object_data.dimensions
+                    if not isinstance(dimension, RoundDimensions):
+                        continue
+                    if max_diameter > dimension.diameter:
+                        continue
+                    max_diameter = dimension.diameter
+                    round_objects = object_data
+                return round_object
 
-        # Extract geometry from block entities
-        for block_entity in block_def:
-            if block_entity.dxftype() in ("LINE", "POLYLINE", "LWPOLYLINE", "CIRCLE"):
-                entity_points = self._extract_points_from(block_entity)
-                geometry_points.extend(entity_points)
+            geometry_points = []
+
+            # Extract geometry from block entities
+            for block_entity in block_def:
+                if block_entity.dxftype() in ("LINE", "POLYLINE", "LWPOLYLINE", "CIRCLE"):
+                    entity_points = self._extract_points_from(block_entity)
+                    geometry_points.extend(entity_points)
 
             # Apply transformation (scale, rotation, translation)
             transformed_points = self._apply_block_transformation(geometry_points, insert_entity)
@@ -443,7 +443,6 @@ class DXFReader:
         rectangular_names = ["rect", "square", "eckig"]
         return any(name in block_name.lower() for name in rectangular_names)
 
-
     def _analyze_block_shape(
         self, insert_entity: Insert, geometry: list[Point3D]
     ) -> RoundDimensions | RectangularDimensions:
@@ -466,7 +465,7 @@ class DXFReader:
 
         block_name = insert_entity.dxf.name.lower()
         if self._is_rectangular_name(block_name):
-            return  RectangularDimensions(length=600.0, width=600.0, angle=0.0)
+            return RectangularDimensions(length=600.0, width=600.0, angle=0.0)
         return RoundDimensions(diameter=800.0)
 
     def _create_round_from(self, entity: DXFEntity) -> ObjectData | None:
@@ -512,7 +511,6 @@ class DXFReader:
                     positions=[position],
                     color=color,
                 )
-            if
         except Exception:
             return None
 

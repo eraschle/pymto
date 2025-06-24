@@ -177,9 +177,6 @@ class JsonExporter:
 
             return dim_data
 
-        else:
-            raise ValueError(f"Unknown dimension type: {type(dimensions)}")
-
     def _export_text(self, text: DxfText) -> dict[str, Any]:
         """Export a text element to dictionary format.
 
