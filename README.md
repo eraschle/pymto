@@ -340,6 +340,174 @@ uv run python -m dxfto.cli [OPTIONS] DXF_FILE
 uv run python -m dxfto.cli create-config config.json
 ```
 
+## Spezialfälle und erweiterte Funktionen
+
+### Block-Referenzen (INSERT Entities)
+
+Das Tool unterstützt die Verarbeitung von DXF Block-Referenzen (INSERT Entities), die häufig für standardisierte Elemente wie Schächte verwendet werden.
+
+#### Unterstützte Block-Typen
+
+- **Runde Schächte**: Blocks mit "round", "circle" oder "rund" im Namen
+- **Rechteckige Schächte**: Blocks mit "rect", "square" oder "eckig" im Namen
+- **Generische Blocks**: Werden als runde Schächte mit Standardmaßen behandelt
+
+#### Block-Verarbeitung
+
+```bash
+# DXF mit Block-Referenzen verarbeiten
+uv run python -m dxfto.cli input_with_blocks.dxf --verbose
+```
+
+Das Tool:
+1. **Erkennt INSERT Entities** automatisch als Elemente (nicht als Linien)
+2. **Extrahiert Block-Geometrie** aus den Block-Definitionen
+3. **Wendet Transformationen an** (Position, Maßstab, Rotation)
+4. **Analysiert Block-Namen** für automatische Typ-Erkennung
+5. **Erstellt punkt-basierte Elemente** mit Positions-Informationen
+
+#### Block-Namenskonventionen
+
+Für optimale Erkennung sollten Block-Namen beschreibende Begriffe enthalten:
+
+```
+# Runde Schächte
+SCHACHT_RUND_600    → RoundDimensions(diameter=600.0)
+ROUND_MANHOLE       → RoundDimensions(diameter=600.0)
+KREIS_SCHACHT       → RoundDimensions(diameter=600.0)
+
+# Rechteckige Schächte
+SCHACHT_ECKIG_80x80 → RectangularDimensions(length=600.0, width=600.0)
+RECT_SHAFT          → RectangularDimensions(length=600.0, width=600.0)
+QUADRAT_SCHACHT     → RectangularDimensions(length=600.0, width=600.0)
+
+# Unbekannte Blocks
+CUSTOM_BLOCK        → RoundDimensions(diameter=800.0) # Fallback
+```
+
+### Kreis-Entities (CIRCLE)
+
+Kreise werden automatisch als runde Schächte erkannt:
+
+```python
+# Automatische Konvertierung
+CIRCLE Entity → ObjectData(
+    shape=ShapeType.ROUND,
+    dimensions=RoundDimensions(diameter=radius*2),
+    positions=[center_point]
+)
+```
+
+### Komplexe Polylinien
+
+Polylinien mit 4 oder mehr Punkten werden als rechteckige Elemente klassifiziert:
+
+```python
+# Klassifizierung
+POLYLINE mit >= 4 Punkten → Rechteckiges Element
+POLYLINE mit < 4 Punkten  → Linien-Element
+LINE Entity              → Linien-Element
+```
+
+### Element vs. Linien Klassifizierung
+
+Das Tool unterscheidet automatisch zwischen:
+
+| Entity Typ | Bedingung | Klassifizierung | Verarbeitung |
+|------------|-----------|-----------------|-------------|
+| INSERT | Immer | Element | Point-basiert |
+| CIRCLE | Immer | Element | Point-basiert |
+| POLYLINE | ≥4 Punkte | Element | Point-basiert |
+| POLYLINE | <4 Punkte | Linie | Line-basiert |
+| LINE | Immer | Linie | Line-basiert |
+
+### Textzuordnung für verschiedene Element-Typen
+
+#### Point-basierte Elemente (Schächte)
+```python
+# Zuordnung basiert auf Distanz zu Element-Position
+distance = text_position.distance_2d(element.positions[0])
+if distance <= max_distance:
+    element.assigned_text = text
+```
+
+#### Line-basierte Elemente (Rohrleitungen)
+```python
+# Zuordnung basiert auf Distanz zu Liniensegmenten
+for segment in element_segments:
+    distance = point_to_line_distance(text_position, segment)
+    if distance <= max_distance:
+        element.assigned_text = text
+```
+
+### Konfiguration für spezielle Fälle
+
+#### Block-spezifische Konfiguration
+
+```json
+{
+  "Schachtmedium": {
+    "Schacht": {
+      "Layer": "SCHACHT_LAYER",
+      "Farbe": [255, 0, 0],
+      "BlockNamen": ["SCHACHT_*", "MANHOLE_*"]
+    }
+  }
+}
+```
+
+#### Erweiterte Optionen
+
+```bash
+# Angepasste Distanzen für verschiedene Element-Typen
+uv run python -m dxfto.cli input.dxf \
+  --max-text-distance 30.0 \
+  --zone-buffer 10.0        # Nur für ZoneBasedTextAssigner
+```
+
+### Debugging und Entwicklung
+
+#### Block-Verarbeitung debuggen
+
+```bash
+# Verbose Mode für detaillierte Block-Informationen
+uv run python -m dxfto.cli input.dxf --verbose 2>&1 | grep -i block
+```
+
+#### Logs analysieren
+
+```python
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
+# Detaillierte Logs für:
+# - Block-Definition-Extraktion
+# - Geometrie-Transformation
+# - Element-Klassifizierung
+```
+
+#### Neue Block-Typen hinzufügen
+
+```python
+# In _analyze_block_shape() erweitern:
+block_name = insert_entity.dxf.name.lower()
+if 'custom_type' in block_name:
+    return ShapeType.ROUND, RoundDimensions(diameter=1000.0)
+```
+
+### Performance-Optimierung
+
+- **Block-Definitionen werden gecacht** für mehrfache Verwendung
+- **Geometrie-Extraktion erfolgt lazy** nur bei Bedarf
+- **Transformation wird nur einmal berechnet** pro Block-Instanz
+
+### Limitierungen
+
+1. **Verschachtelte Blocks**: Werden derzeit nicht vollständig unterstützt
+2. **Komplexe Transformationen**: Nur Translation implementiert (TODO: Scaling/Rotation)
+3. **Attribut-Extraktion**: Vereinfacht implementiert
+4. **3D-Geometrie**: Z-Koordinaten werden auf 0.0 gesetzt
+
 ## Troubleshooting
 
 ### Häufige Probleme

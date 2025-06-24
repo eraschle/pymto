@@ -9,27 +9,34 @@ from pathlib import Path
 
 import click
 
-from .io.dxf_reader import DXFReader
-from .groupers import ColorBasedGrouper, LayerBasedGrouper
-from .exporter import JSONExporter, RevitJSONExporter
-from .io.landxml_reader import LandXMLReader
+from dxfto.config import ConfigurationHandler
+
 from .assigners import SpatialTextAssigner, ZoneBasedTextAssigner
+from .io.dxf_reader import DXFReader
+from .io.json_exporter import AsIsDataJsonExporter, JsonExporter
+from .io.landxml_reader import LandXMLReader
 
 
 @click.command()
-@click.argument("dxf_file", type=click.Path(exists=True, path_type=Path))
+@click.argument(
+    "dxf_file",
+    type=click.Path(exists=True, path_type=Path),
+)
+@click.argument(
+    "config",
+    type=click.Path(exists=True, path_type=Path),
+)
 @click.option(
     "--landxml",
     "-l",
     type=click.Path(exists=True, path_type=Path),
     help="LandXML file for elevation data (DGM)",
 )
-@click.option("--output", "-o", type=click.Path(path_type=Path), help="Output JSON file path")
 @click.option(
-    "--config",
-    "-c",
-    type=click.Path(exists=True, path_type=Path),
-    help="JSON configuration file for layer-based grouping",
+    "--output",
+    "-o",
+    type=click.Path(path_type=Path),
+    help="Output JSON file path",
 )
 @click.option(
     "--grouping",
@@ -46,19 +53,31 @@ from .assigners import SpatialTextAssigner, ZoneBasedTextAssigner
 @click.option(
     "--max-text-distance",
     type=float,
-    default=50.0,
+    default=1.0,
     help="Maximum distance for text-to-pipe assignment",
 )
 @click.option(
-    "--color-tolerance", type=float, default=30.0, help="Color tolerance for color-based grouping"
+    "--color-tolerance",
+    type=float,
+    default=30.0,
+    help="Color tolerance for color-based grouping",
 )
-@click.option("--revit-format", is_flag=True, help="Export in Revit-specific JSON format")
-@click.option("--verbose", "-v", is_flag=True, help="Verbose output")
+@click.option(
+    "--revit-format",
+    is_flag=True,
+    help="Export in Revit-specific JSON format",
+)
+@click.option(
+    "--verbose",
+    "-v",
+    is_flag=True,
+    help="Verbose output",
+)
 def process_dxf(
     dxf_file: Path,
+    config: Path,
     landxml: Path | None,
     output: Path | None,
-    config: Path | None,
     grouping: str,
     text_assignment: str,
     max_text_distance: float,
@@ -70,9 +89,11 @@ def process_dxf(
 
     This tool processes DXF files containing pipes and shafts, extracts
     geometry information, groups elements by medium, assigns texts to pipes,
-    ad exports the data in JSON format suitable for Revit import.
+    and exports the data in JSON format suitable for Revit import.
 
-    DXF_FILE: Path to the DXF file to process
+    Arguments:
+        DXF_FILE: Path to the DXF file to process
+        CONFIG: JSON configuration with assignment rules
     """
     if verbose:
         click.echo(f"Processing DXF file: {dxf_file}")
@@ -82,6 +103,10 @@ def process_dxf(
         output = dxf_file.with_suffix(".json")
 
     try:
+        # Load configuration file
+        handler = ConfigurationHandler(config)
+        handler.load_config()
+
         # Load and process DXF file
         if verbose:
             click.echo("Loading DXF file...")
@@ -89,12 +114,11 @@ def process_dxf(
         dxf_reader = DXFReader(dxf_file)
         dxf_reader.load_file()
 
-        pipes = dxf_reader.extract_pipes()
-        shafts = dxf_reader.extract_shafts()
-        texts = dxf_reader.extract_texts()
+        dxf_reader.extract_data(handler.medium_configs)
 
         if verbose:
-            click.echo(f"Extracted {len(pipes)} pipes, {len(shafts)} shafts, {len(texts)} texts")
+            click.echo(f"{len(handler.medium_configs)}: Verschiedene Mediums gefunden")
+            click.echo(f"Extracted {handler.element_count} Elements, {handler.text_count} Text")
 
         # Process LandXML if provided
         if landxml:
@@ -105,37 +129,40 @@ def process_dxf(
             landxml_reader.load_file()
 
             # Update Z coordinates for all elements
-            for pipe in pipes:
-                pipe.points = landxml_reader.update_points_elevation(pipe.points)
+            for medium in handler.medium_configs.values():
+                # Update elements points/positions
+                for element in medium.element_data.elements:
+                    if element.points:
+                        element.points = landxml_reader.update_points_elevation(element.points)
+                    if element.positions:
+                        element.positions = landxml_reader.update_points_elevation(element.positions)
 
-            for shaft in shafts:
-                shaft.position = landxml_reader.update_points_elevation([shaft.position])[0]
+                for element in medium.line_data.elements:
+                    if element.points:
+                        element.points = landxml_reader.update_points_elevation(element.points)
+                    if element.positions:
+                        element.positions = landxml_reader.update_points_elevation(element.positions)
 
-            for text in texts:
-                text.position = landxml_reader.update_points_elevation([text.position])[0]
+                # Update text positions
+                for text in medium.element_data.texts:
+                    text.position = landxml_reader.update_points_elevation([text.position])[0]
+
+                for text in medium.line_data.texts:
+                    text.position = landxml_reader.update_points_elevation([text.position])[0]
 
             if verbose:
                 click.echo("Updated Z coordinates from LandXML")
 
-        # Group elements by medium
+        # Group elements by medium (already handled by config loading)
         if verbose:
-            click.echo(f"Grouping elements using {grouping} strategy...")
+            click.echo("Using configuration-based grouping...")
 
-        if grouping.lower() == "layer":
-            if config is None:
-                raise click.ClickException("Layer-based grouping requires --config option")
-
-            grouper = LayerBasedGrouper(config)
-            grouper.load_config()
-        else:
-            grouper = ColorBasedGrouper(color_tolerance=color_tolerance)
-
-        media = grouper.group_elements(pipes, shafts, texts)
+        media = list(handler.medium_configs.values())
 
         if verbose:
-            click.echo(f"Created {len(media)} media groups")
+            click.echo(f"Found {len(media)} configured media groups")
 
-        # Assign texts to pipes
+        # Assign texts to elements
         if verbose:
             click.echo(f"Assigning texts using {text_assignment} strategy...")
 
@@ -145,12 +172,31 @@ def process_dxf(
             text_assigner = SpatialTextAssigner(max_distance=max_text_distance)
 
         for medium in media:
-            medium.pipes = text_assigner.assign_texts_to_pipes(medium.pipes, medium.texts)
+            # Assign texts to elements
+            assigned_elements = text_assigner.assign_texts_to_point_based(
+                medium.element_data.elements,
+                medium.element_data.texts,
+            )
+            medium.element_data.elements.clear()
+            medium.element_data.elements.extend(assigned_elements)
+
+            # Assign texts to lines (pipes)
+            assigned_lines = text_assigner.assign_texts_to_line_based(
+                medium.line_data.elements,
+                medium.line_data.texts,
+            )
+            medium.line_data.elements.clear()
+            medium.line_data.elements.extend(assigned_lines)
 
         # Count successful text assignments
-        total_assigned = sum(
-            sum(1 for pipe in medium.pipes if pipe.assigned_text is not None) for medium in media
-        )
+        total_assigned = 0
+        for medium in media:
+            total_assigned += sum(
+                1 for element in medium.element_data.elements if element.assigned_text is not None
+            )
+            total_assigned += sum(
+                1 for element in medium.line_data.elements if element.assigned_text is not None
+            )
 
         if verbose:
             click.echo(f"Assigned {total_assigned} texts to pipes")
@@ -160,9 +206,9 @@ def process_dxf(
             click.echo(f"Exporting to JSON: {output}")
 
         if revit_format:
-            exporter = RevitJSONExporter(output)
+            exporter = AsIsDataJsonExporter(output)
         else:
-            exporter = JSONExporter(output)
+            exporter = JsonExporter(output)
 
         exporter.export_media(media)
 
@@ -173,8 +219,8 @@ def process_dxf(
         click.echo(f"Processed {dxf_file}")
         click.echo(f"Output: {output}")
         click.echo(f"Media: {len(media)}")
-        click.echo(f"Pipes: {sum(len(m.pipes) for m in media)}")
-        click.echo(f"Shafts: {sum(len(m.shafts) for m in media)}")
+        click.echo(f"Lines: {sum(len(m.line_data.elements) for m in media)}")
+        click.echo(f"Elements: {sum(len(m.element_data.elements) for m in media)}")
         click.echo(f"Text assignments: {total_assigned}")
 
     except Exception as e:
@@ -202,14 +248,67 @@ def create_config(config_file: Path) -> None:
     """
     sample_config = {
         "Abwasserleitung": {
-            "Leitung": {"Layer": "PIPE_SEWER", "Farbe": [255, 0, 0]},
-            "Schacht": {"Layer": "SHAFT_SEWER", "Farbe": [200, 0, 0]},
-            "Text": {"Layer": "TEXT_SEWER", "Farbe": [255, 100, 100]},
+            "Leitung": {
+                "Geometrie": [
+                    {
+                        "Name": "PIPE_SEWER",
+                        "Farbe": "Braun",
+                    },
+                    {
+                        "Name": "SHAFT_SEWER_2",
+                        "Farbe": "Farbe 15",
+                    },
+                ],
+                "Text": [
+                    {
+                        "Name": "TEXT_PIPE_DIMENSION",
+                        "Farbe": [255, 100, 100],
+                    }
+                ],
+            },
+            "Element": {
+                "Geometrie": [
+                    {
+                        "Name": "SHAFT_SEWER",
+                        "Farbe": [200, 0, 0],
+                    },
+                    {
+                        "Name": "SHAFT_SEWER_2",
+                        "Farbe": "Farbe 15",
+                    },
+                ],
+                "Text": [
+                    {
+                        "Name": "TEXT_SEWER",
+                        "Farbe": [255, 100, 100],
+                    }
+                ],
+            },
         },
         "Wasserleitung": {
-            "Leitung": {"Layer": "PIPE_WATER", "Farbe": [0, 0, 255]},
-            "Schacht": {"Layer": "SHAFT_WATER", "Farbe": [0, 0, 200]},
-            "Text": {"Layer": "TEXT_WATER", "Farbe": [100, 100, 255]},
+            "Leitung": {
+                "Geometrie": [
+                    {
+                        "Layer": "PIPE_WATER",
+                        "Farbe": [0, 0, 255],
+                    }
+                ],
+                "Text": [
+                    {
+                        "Layer": "TEXT_WATER",
+                        "Farbe": [100, 100, 255],
+                    }
+                ],
+            },
+            "Element": {
+                "Geometrie": [
+                    {
+                        "Layer": "SHAFT_WATER",
+                        "Farbe": [0, 0, 200],
+                    }
+                ],
+                "Text": [],
+            },
         },
     }
 

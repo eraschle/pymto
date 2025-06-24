@@ -5,22 +5,36 @@ extracting the relevant geometric entities (lines, polylines, circles,
 rectangles, and text elements).
 """
 
+import logging
 from pathlib import Path
 
-from ezdxf.entities.dxfentity import DXFEntity
 import ezdxf.filemanagement as ezdxf
 from ezdxf.document import Drawing
+from ezdxf.entities.circle import Circle
+from ezdxf.entities.dxfentity import DXFEntity
+from ezdxf.entities.insert import Insert
+from ezdxf.entities.line import Line
+from ezdxf.entities.lwpolyline import LWPolyline
+from ezdxf.entities.mtext import MText
+from ezdxf.entities.polyline import Polyline
+from ezdxf.entities.text import Text
 from ezdxf.lldxf.const import DXFError
+from ezdxf.query import EntityQuery
 
 from ..models import (
-    DXFText,
-    Pipe,
+    AssignmentConfig,
+    AssingmentData,
+    DxfText,
+    LayerData,
+    Medium,
+    ObjectData,
     Point3D,
     RectangularDimensions,
     RoundDimensions,
-    Shaft,
     ShapeType,
 )
+
+log = logging.getLogger(__name__)
 
 
 class DXFReader:
@@ -60,83 +74,175 @@ class DXFReader:
         except DXFError as e:
             raise DXFError(f"Cannot read DXF file {self.dxf_path}: {e}") from e
 
-    def extract_pipes(self) -> list[Pipe]:
-        """Extract pipe geometries from DXF file.
-
-        Pipes are identified as LINE and POLYLINE entities.
-        Shape and dimensions are inferred from the geometry.
-
-        Returns
-        -------
-        list[Pipe]
-            List of extracted pipes
-        """
+    def _query_modelspace(self, layers: list[LayerData]) -> EntityQuery:
         if self._doc is None:
             raise RuntimeError("DXF file not loaded. Call load_file() first.")
 
-        pipes = []
+        layer_names = [layer.name for layer in layers]
+        query = '*[layer=="' + '" | layer=="'.join(layer_names) + '"]'
+        return self._doc.modelspace().query(query)
 
-        for entity in self._doc.modelspace():
-            if entity.dxftype() in ("LINE", "POLYLINE", "LWPOLYLINE"):
-                pipe = self._create_pipe_from_entity(entity)
-                if pipe:
-                    pipes.append(pipe)
+    def extract_data(self, mediums: dict[str, Medium]) -> None:
+        """Extract geometries from DXF file.
 
-        return pipes
+        Elements are identified as LINE and POLYLINE entities.
+        Shape and dimensions are inferred from the geometry.
+        """
 
-    def extract_shafts(self) -> list[Shaft]:
+        for medium in mediums.values():
+            medium.element_data = self._create_assignment(medium.elements)
+            medium.line_data = self._create_assignment(medium.lines)
+
+    def _create_assignment(self, config: AssignmentConfig) -> AssingmentData:
+        """Create assignment data for elements and texts based on configuration."""
+        return AssingmentData(
+            elements=self._extract_elements(config),
+            texts=self._extract_texts(config),
+        )
+
+    def _extract_elements(self, config: AssignmentConfig) -> list[ObjectData]:
         """Extract shaft geometries from DXF file.
 
-        Shafts are identified as CIRCLE and rectangular entities
-        (POLYLINE forming rectangles, or INSERT blocks).
-
-        Returns
-        -------
-        list[Shaft]
-            List of extracted shafts
+        Processes various DXF entity types and classifies them as elements
+        (shafts, complex geometries) based on their characteristics.
         """
         if self._doc is None:
             raise RuntimeError("DXF file not loaded. Call load_file() first.")
 
-        shafts = []
+        elements = []
+        for entity in self._query_modelspace(config.geometry):
+            # Check if entity should be processed as an element
+            if not self._should_process_as_element(entity):
+                continue
 
-        for entity in self._doc.modelspace():
-            if entity.dxftype() == "CIRCLE":
-                shaft = self._create_round_shaft_from_circle(entity)
-                if shaft:
-                    shafts.append(shaft)
-            elif entity.dxftype() in ("POLYLINE", "LWPOLYLINE"):
-                shaft = self._create_rectangular_shaft_from_polyline(entity)
-                if shaft:
-                    shafts.append(shaft)
+            element = self._create_element_from_entity(entity)
+            if element is None:
+                log.error(f"_create_elements: Failed to create object from entity: {entity.dxftype()}")
+                continue
+            elements.append(element)
+        return elements
 
-        return shafts
+    def _should_process_as_element(self, entity: DXFEntity) -> bool:
+        """Determine if a DXF entity should be processed as an element.
 
-    def extract_texts(self) -> list[DXFText]:
-        """Extract text elements from DXF file.
+        Elements are typically shafts or complex geometries that should be
+        processed as point-based objects rather than line-based objects.
 
-        Text elements contain dimension information for pipes
-        and are spatially assigned to them.
+        Parameters
+        ----------
+        entity : DXFEntity
+            DXF entity to classify
 
         Returns
         -------
-        list[DXFText]
-            List of extracted text elements
+        bool
+            True if entity should be processed as element, False otherwise
         """
-        if self._doc is None:
-            raise RuntimeError("DXF file not loaded. Call load_file() first.")
+        entity_type = entity.dxftype()
 
-        texts = []
+        # Block references (INSERT) are always elements (typically shafts)
+        if entity_type == "INSERT":
+            return True
 
-        for entity in self._doc.modelspace():
-            if entity.dxftype() in ("TEXT", "MTEXT"):
-                text = self._create_text_from_entity(entity)
-                if text:
-                    texts.append(text)
+        # Circles are always elements (round shafts)
+        if entity_type == "CIRCLE":
+            return True
 
-        return texts
+        # For polylines, check if they form complex shapes (4+ points)
+        if entity_type in ("POLYLINE", "LWPOLYLINE"):
+            if hasattr(entity, "is_closed") and entity.is_closed:
+                return True
+            points = self._extract_points_from(entity)
+            # Complex polylines with 4+ points are likely rectangular shafts
+            if len(points) >= 4:
+                return True
 
-    def _create_pipe_from_entity(self, entity: DXFEntity) -> Pipe | None:
+        # Simple lines and short polylines are typically pipes/lines
+        if entity_type in ("LINE", "POLYLINE", "LWPOLYLINE"):
+            return False
+
+        # Other entity types - skip for now
+        return False
+
+    def _is_rectangular_shape(self, points: list[Point3D]) -> bool:
+        if len(points) != 4:
+            return False
+        diagonal1 = points[0].distance_2d(points[2])
+        diagonal2 = points[1].distance_2d(points[3])
+        return abs(diagonal1 - diagonal2) < 1e-6  # Allow
+
+    def _get_bbox_dimension(self, points: list[Point3D]) -> tuple[float, float]:
+        east_min = min(p.east for p in points)
+        east_max = max(p.east for p in points)
+        north_min = min(p.north for p in points)
+        north_max = max(p.north for p in points)
+        length = east_max - east_min
+        width = north_max - north_min
+        return length, width
+
+    def _get_rect_dimension(self, points: list[Point3D]) -> tuple[float, float]:
+        first_side = points[0].distance_2d(points[1])
+        second_side = points[1].distance_2d(points[2])
+        length = max(first_side, second_side)
+        width = min(first_side, second_side)
+        return length, width
+
+    def _get_rectangular_dimension(self, points: list[Point3D]) -> RectangularDimensions:
+        if len(points) == 4:
+            length, width = self._get_rect_dimension(points)
+        else:
+            length, width = self._get_bbox_dimension(points)
+        return  RectangularDimensions(length=length, width=width, angle=0.0)
+
+    def _get_rectangular_center(self, points: list[Point3D]) -> Point3D:
+        center_x = sum(p.east for p in points) / len(points)
+        center_y = sum(p.north for p in points) / len(points)
+        return Point3D(east=center_x, north=center_y, altitude=0.0)
+
+    def _create_element_from_entity(self, entity: DXFEntity) -> ObjectData | None:
+        """Create an ObjectData element from various DXF entity types.
+
+        This method routes different entity types to appropriate creation methods
+        and applies intelligent shape detection.
+
+        Parameters
+        ----------
+        entity : DXFEntity
+            DXF entity to process
+
+        Returns
+        -------
+        ObjectData | None
+            Created object data or None if processing failed
+        """
+        entity_type = entity.dxftype()
+
+        try:
+            # Handle block references (INSERT entities)
+            if entity_type == "INSERT":
+                return self._create_object_from_insert(entity)
+
+            # Handle circles (round shafts)
+            elif entity_type == "CIRCLE":
+                return self._create_round_from(entity)
+
+            points = self._extract_points_from(entity)
+            if self._is_rectangular_shape(points):
+                return self._create_rectangular_from(entity)
+
+            # Handle complex polylines (rectangular shafts)
+            elif entity_type in ("POLYLINE", "LWPOLYLINE"):
+                if len(points) >= 4:
+                    return self._create_rectangular_from(entity)
+
+            # Fallback to generic line-based processing
+            return self._create_object_from(entity)
+
+        except Exception as e:
+            log.error(f"_create_element_from_entity: Failed to create element from {entity_type}: {e}")
+            return None
+
+    def _create_object_from(self, entity: DXFEntity) -> ObjectData | None:
         """Create a Pipe object from a DXF line/polyline entity.
 
         Parameters
@@ -150,177 +256,291 @@ class DXFReader:
             Pipe object or None if entity cannot be processed
         """
         try:
-            points = self._extract_points_from_entity(entity)
+            points = self._extract_points_from(entity)
             if not points:
                 return None
 
-            # For now, assume round pipes with default diameter
-            # In a real implementation, this would be determined from
-            # text assignments or other DXF attributes
             dimensions = RoundDimensions(diameter=200.0)  # Default 200mm
-
             color = self._get_entity_color(entity)
             layer = entity.dxf.layer if hasattr(entity.dxf, "layer") else "0"
 
-            return Pipe(
-                shape=ShapeType.ROUND,
-                points=points,
+            return ObjectData(
                 dimensions=dimensions,
                 layer=layer,
+                points=points,
                 color=color,
             )
         except Exception:
             return None
 
-    def _create_round_shaft_from_circle(self, entity: DXFEntity) -> Shaft | None:
-        """Create a round Shaft object from a DXF circle entity.
+    def _create_object_from_insert(self, entity: DXFEntity) -> ObjectData | None:
+        """Create an ObjectData from an INSERT entity (block reference).
+
+        Processes block references which typically represent shafts or
+        other standardized elements in civil engineering drawings.
 
         Parameters
         ----------
         entity : DXFEntity
-            DXF CIRCLE entity
+            INSERT entity representing a block reference
 
         Returns
         -------
-        Shaft | None
-            Shaft object or None if entity cannot be processed
+        ObjectData | None
+            Created object or None if processing failed
         """
+        if not isinstance(entity, Insert):
+            return None
         try:
+            # Get insertion point
+            insert_pnt = entity.dxf.insert
+            position = Point3D(east=insert_pnt.x, north=insert_pnt.y, altitude=0.0)
+
+            # Try to determine shape from block geometry or attributes
+            block_geometry = self._extract_block_points(entity)
+            if self._is_round_block_geometry(entity):
+                diameters
+                dimensions = RoundDimensions(diameter=800.0)
+            dimensions = self._analyze_block_shape(entity, block_geometry)
+
+            color = self._get_entity_color(entity)
+            layer = entity.dxf.layer if hasattr(entity.dxf, "layer") else "0"
+
+            # Create ObjectData with position for point-based elements
+            return ObjectData(
+                dimensions=dimensions,
+                layer=layer,
+                positions=[position],  # Block references are point-based
+                points=block_geometry,  # Store extracted geometry for reference
+                color=color,
+            )
+
+        except Exception as e:
+            log.error(f"Failed to process INSERT entity '{entity.dxf.name}': {e}")
+            return None
+    def _get_block_geometry_entities(self, insert_entity: Insert) -> list[DXFEntity]:
+        if self._doc is None:
+            return []
+
+        block_name = insert_entity.dxf.name
+        if block_name not in self._doc.blocks:
+            log.warning(f"Block definition '{block_name}' not found")
+            return []
+
+        return list(self._doc.blocks[block_name])
+
+    def _is_round_block_geometry(self, insert_entity: Insert) -> bool:
+        """Check if the block geometry represents a round shape.
+
+        Parameters
+        ----------
+        insert_entity : Insert
+            INSERT entity to check
+
+        Returns
+        -------
+        bool
+            True if block geometry is round, False otherwise
+        """
+        block_entities = self._get_block_geometry_entities(insert_entity)
+        entity_types = {entity.dxftype() for entity in block_entities}
+        round_types = ("CIRCLE", "ARC", "ELLIPSE")
+        return all( e_type in round_types for e_type in entity_types)
+
+
+    def _extract_block_points(self, insert_entity: Insert) -> list[Point3D]:
+        """Extract geometry from a block definition.
+
+        Parameters
+        ----------
+        insert_entity : Insert
+            INSERT entity to extract geometry from
+
+        Returns
+        -------
+        list[Point3D]
+            List of points representing the block geometry
+        """
+        block_def = self._get_block_geometry_entities(insert_entity)
+        if self._is_round_block_geometry(insert_entity):
+            round_object = None
+            max_diameter = 0.0
+            for entity in block_def:
+                object_data = self._create_round_from(entity)
+                if object_data is None:
+                    continue
+                if round_object is None:
+                    round_object = object_data
+                    continue
+                dimension = object_data.dimensions
+                if not isinstance(dimension, RoundDimensions):
+                    continue
+                if max_diameter > dimension.diameter:
+                    continue
+                max_diameter = dimension.diameter
+                round_objects = object_data
+            return round_object
+        geometry_points = []
+
+        # Extract geometry from block entities
+        for block_entity in block_def:
+            if block_entity.dxftype() in ("LINE", "POLYLINE", "LWPOLYLINE", "CIRCLE"):
+                entity_points = self._extract_points_from(block_entity)
+                geometry_points.extend(entity_points)
+
+            # Apply transformation (scale, rotation, translation)
+            transformed_points = self._apply_block_transformation(geometry_points, insert_entity)
+
+            return transformed_points
+
+        except Exception as e:
+            log.error(f"Failed to extract block geometry: {e}")
+            return []
+
+    def _apply_block_transformation(self, points: list[Point3D], insert_entity: Insert) -> list[Point3D]:
+        """Apply block transformation to geometry points.
+
+        Parameters
+        ----------
+        points : list[Point3D]
+            Original points from block definition
+        insert_entity : Insert
+            INSERT entity with transformation parameters
+
+        Returns
+        -------
+        list[Point3D]
+            Transformed points
+        """
+        if not points:
+            return points
+
+        try:
+            # Get transformation parameters
+            insert_point = insert_entity.dxf.insert
+            # Note: scale_x, scale_y, rotation could be used for full transformation
+            # For now, implement basic translation
+            # TODO: Add proper scaling and rotation if needed
+            transformed_points = []
+            for point in points:
+                new_point = Point3D(
+                    east=point.east + insert_point.x,
+                    north=point.north + insert_point.y,
+                    altitude=point.altitude,
+                )
+                transformed_points.append(new_point)
+            return transformed_points
+
+        except Exception as e:
+            log.error(f"Failed to apply block transformation: {e}")
+            return points
+
+    def _is_round_name(self, block_name: str) -> bool:
+        round_names = ["round", "circle", "rund"]
+        return any(name in block_name.lower() for name in round_names)
+
+    def _is_rectangular_name(self, block_name: str) -> bool:
+        rectangular_names = ["rect", "square", "eckig"]
+        return any(name in block_name.lower() for name in rectangular_names)
+
+
+    def _analyze_block_shape(
+        self, insert_entity: Insert, geometry: list[Point3D]
+    ) -> RoundDimensions | RectangularDimensions:
+        """Analyze block geometry to determine shape type and dimensions.
+
+        Parameters
+        ----------
+        insert_entity : Insert
+            INSERT entity to analyze
+        geometry : list[Point3D]
+            Extracted geometry points
+
+        Returns
+        -------
+        tuple[ShapeType, RoundDimensions | RectangularDimensions]
+            Detected shape type and dimensions
+        """
+        if self._is_rectangular_shape(geometry):
+            return self._get_rectangular_dimension(geometry)
+
+        block_name = insert_entity.dxf.name.lower()
+        if self._is_rectangular_name(block_name):
+            return  RectangularDimensions(length=600.0, width=600.0, angle=0.0)
+        return RoundDimensions(diameter=800.0)
+
+    def _create_round_from(self, entity: DXFEntity) -> ObjectData | None:
+        """Create a round Shaft object from a DXF circle entity."""
+        try:
+            if not isinstance(entity, Circle):
+                return None
+
             center = entity.dxf.center
             radius = entity.dxf.radius
 
-            position = Point3D(x=center.x, y=center.y, z=0.0)  # Z will be filled from LandXML
+            position = Point3D(east=center.x, north=center.y, altitude=0.0)
             dimensions = RoundDimensions(diameter=radius * 2)
 
             color = self._get_entity_color(entity)
             layer = entity.dxf.layer if hasattr(entity.dxf, "layer") else "0"
 
-            return Shaft(
-                shape=ShapeType.ROUND,
-                position=position,
+            return ObjectData(
                 dimensions=dimensions,
                 layer=layer,
+                positions=[position],
                 color=color,
             )
         except Exception:
             return None
 
-    def _create_rectangular_shaft_from_polyline(self, entity: DXFEntity) -> Shaft | None:
-        """Create a rectangular Shaft object from a closed polyline.
-
-        Parameters
-        ----------
-        entity : DXFEntity
-            DXF POLYLINE or LWPOLYLINE entity
-
-        Returns
-        -------
-        Shaft | None
-            Shaft object or None if entity is not a valid rectangle
-        """
+    def _create_rectangular_from(self, entity: DXFEntity) -> ObjectData | None:
+        """Create a rectangular Shaft object from a closed polyline."""
         try:
-            points = self._extract_points_from_entity(entity)
+            points = self._extract_points_from(entity)
             if len(points) < 4:
                 return None
 
-            # Simple rectangular detection - check if closed and has 4 corners
-            if not entity.is_closed or len(points) != 4:
-                return None
-
-            # Calculate center point
-            center_x = sum(p.x for p in points) / len(points)
-            center_y = sum(p.y for p in points) / len(points)
-            position = Point3D(x=center_x, y=center_y, z=0.0)
-
-            # Calculate dimensions (simplified)
-            width = abs(points[1].x - points[0].x)
-            length = abs(points[2].y - points[1].y)
-
-            dimensions = RectangularDimensions(
-                length=length,
-                width=width,
-                angle=0.0,  # Simplified - assume no rotation
-            )
-
             color = self._get_entity_color(entity)
             layer = entity.dxf.layer if hasattr(entity.dxf, "layer") else "0"
 
-            return Shaft(
-                shape=ShapeType.RECTANGULAR,
-                position=position,
-                dimensions=dimensions,
-                layer=layer,
-                color=color,
-            )
+            if self._is_rectangular_shape(points):
+                position = self._get_rectangular_center(points)
+                dimensions = self._get_rectangular_dimension(points)
+                return ObjectData(
+                    dimensions=dimensions,
+                    layer=layer,
+                    positions=[position],
+                    color=color,
+                )
+            if
         except Exception:
             return None
 
-    def _create_text_from_entity(self, entity: DXFEntity) -> DXFText | None:
-        """Create a DXFText object from a DXF text entity.
-
-        Parameters
-        ----------
-        entity : DXFEntity
-            DXF TEXT or MTEXT entity
-
-        Returns
-        -------
-        DXFText | None
-            DXFText object or None if entity cannot be processed
-        """
-        try:
-            text_content = entity.dxf.text if hasattr(entity.dxf, "text") else ""
-            if not text_content:
-                return None
-
-            insert_point = entity.dxf.insert if hasattr(entity.dxf, "insert") else (0, 0, 0)
-            position = Point3D(x=insert_point[0], y=insert_point[1], z=0.0)
-
-            color = self._get_entity_color(entity)
-            layer = entity.dxf.layer if hasattr(entity.dxf, "layer") else "0"
-
-            return DXFText(content=text_content, position=position, layer=layer, color=color)
-        except Exception:
-            return None
-
-    def _extract_points_from_entity(self, entity: DXFEntity) -> list[Point3D]:
-        """Extract points from a DXF entity.
-
-        Parameters
-        ----------
-        entity : DXFEntity
-            DXF entity to extract points from
-
-        Returns
-        -------
-        list[Point3D]
-            List of 3D points (Z coordinate set to 0.0)
-        """
+    def _extract_points_from(self, entity: DXFEntity) -> list[Point3D]:
+        """Extract points from a DXF entity."""
         points = []
 
-        if entity.dxftype() == "LINE":
+        if isinstance(entity, Line):
             start = entity.dxf.start
             end = entity.dxf.end
-            points = [Point3D(x=start.x, y=start.y, z=0.0), Point3D(x=end.x, y=end.y, z=0.0)]
-        elif entity.dxftype() in ("POLYLINE", "LWPOLYLINE"):
-            for vertex in entity.vertices:
-                points.append(Point3D(x=vertex[0], y=vertex[1], z=0.0))
-
+            points = [
+                Point3D(east=start.x, north=start.y, altitude=0.0),
+                Point3D(east=end.x, north=end.y, altitude=0.0),
+            ]
+        elif isinstance(entity, Polyline):
+            for point in entity.points():
+                points.append(Point3D(east=point.x, north=point.y, altitude=0.0))
+        elif isinstance(entity, LWPolyline):
+            for point in entity.get_points("xy"):
+                points.append(Point3D(east=point[0], north=point[1], altitude=0.0))
+        elif isinstance(entity, Circle):
+            # For circles, return center point
+            center = entity.dxf.center
+            points = [Point3D(east=center.x, north=center.y, altitude=0.0)]
         return points
 
     def _get_entity_color(self, entity: DXFEntity) -> tuple[int, int, int]:
-        """Get RGB color of a DXF entity.
-
-        Parameters
-        ----------
-        entity : DXFEntity
-            DXF entity to get color from
-
-        Returns
-        -------
-        tuple[int, int, int]
-            RGB color values (default: black if not specified)
-        """
+        """Get RGB color of a DXF entity."""
         try:
             # This is a simplified color extraction
             # In reality, DXF color handling is more complex
@@ -341,3 +561,47 @@ class DXFReader:
             return color_map.get(color_index, (0, 0, 0))
         except Exception:
             return (0, 0, 0)  # Default to black
+
+    def _extract_texts(self, config: AssignmentConfig) -> list[DxfText]:
+        """Extract text elements from DXF file."""
+        if self._doc is None:
+            raise RuntimeError("DXF file not loaded. Call load_file() first.")
+
+        texts = []
+        for entity in self._query_modelspace(config.text):
+            if entity.dxftype() not in ("TEXT", "MTEXT"):
+                continue
+            text = self._create_text_from_entity(entity)
+            if text is None:
+                log.error(f"_extract_texts: Failed to create text from entity: {entity.dxftype()}")
+                continue
+            texts.append(text)
+
+        return texts
+
+    def _create_text_from_entity(self, entity: DXFEntity) -> DxfText | None:
+        """Create a DxfText object from a DXF text entity."""
+        if not isinstance(entity, (Text | MText)):
+            return None
+        try:
+            text_content = None
+            point = None
+            if isinstance(entity, MText):
+                lines = entity.plain_text()
+                text_content = "".join(lines)
+            else:
+                text_content = entity.dxf.text
+            if not text_content:
+                log.error(f"Text content is empty for entity: {entity.dxftype()}")
+                return None
+
+            point = entity.dxf.insert if hasattr(entity.dxf, "insert") else (0, 0, 0)
+            position = Point3D(east=point[0], north=point[1], altitude=0.0)
+
+            color = self._get_entity_color(entity)
+            layer = entity.dxf.layer if hasattr(entity.dxf, "layer") else "0"
+
+            return DxfText(content=text_content, position=position, layer=layer, color=color)
+        except Exception:
+            log.error(f"_create_text_from_entity:Failed to create text data: {entity.dxftype()}")
+            return None

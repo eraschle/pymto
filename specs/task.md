@@ -13,16 +13,16 @@ Prozessierung:
      { 
         "Abwasserleitung": {
           "Leitung": {
-            "Layer": <LayerLeitung>,
-            "Farbe": <RGB> (OPTIONAL)
+            "Layer": [<LayerLeitung>],
+            "Farbe": [<RGB> (OPTIONAL)]
           },
           "Schacht": {
-            "Layer": <LayerLeitung>,
-            "Farbe": <RGB> (OPTIONAL)
+            "Layer": [<LayerLeitung>],
+            "Farbe": [<RGB> (OPTIONAL)]
           },
           "Text": {
-            "Layer": <LayerLeitung>,
-            "Farbe": <RGB> (OPTIONAL)
+            "Layer": [<LayerLeitung>],
+            "Farbe": [<RGB> (OPTIONAL)]
           }
         },
         "<Anderes_Medium>": {

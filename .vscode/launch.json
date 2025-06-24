@@ -1,0 +1,23 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "DXF TO",
+            "type": "debugpy",
+            "request": "launch",
+            "args": [
+                "process-dxf", "/mnt/c/workspace/sersa/projekte/1000161406_RhB_Ardez/41_Grundlagen/Werkleitungen/Perimeter_Ardez_LK_abw_was_erdw.dxf",
+                "../dxf-config.json",
+                "-l",
+                "/mnt/c/workspace/sersa/projekte/1000161406_RhB_Ardez/41_Grundlagen/DGM/DGM_Autovermascht_reduziert.xml",
+                "-o", "./revit_data.json",
+                "-v",
+            ],
+            "cwd": "${workspaceFolder}/src",
+            "module": "dxfto.main"
+        }
+    ]
+}

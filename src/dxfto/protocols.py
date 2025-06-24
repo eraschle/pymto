@@ -7,7 +7,7 @@ easily interchangeable following SOLID principles.
 
 from typing import Protocol, runtime_checkable
 
-from .models import DXFText, Medium, Pipe, Shaft
+from .models import DxfText, Medium, ObjectData
 
 
 @runtime_checkable
@@ -18,18 +18,14 @@ class IGroupingStrategy(Protocol):
     logical media (e.g., "Abwasserleitung", "Wasserleitung").
     """
 
-    def group_elements(
-        self, pipes: list[Pipe], shafts: list[Shaft], texts: list[DXFText]
-    ) -> list[Medium]:
+    def group_elements(self, elements: list[ObjectData], texts: list[DxfText]) -> list[Medium]:
         """Group DXF elements into media.
 
         Parameters
         ----------
-        pipes : list[Pipe]
-            List of pipes from DXF file
-        shafts : list[Shaft]
-            List of shafts from DXF file
-        texts : list[DXFText]
+        elements : list[ObjectData]
+            List of elements from DXF file
+        texts : list[DxfText]
             List of texts from DXF file
 
         Returns
@@ -48,19 +44,41 @@ class ITextAssignmentStrategy(Protocol):
     spatial proximity and validity rules.
     """
 
-    def assign_texts_to_pipes(self, pipes: list[Pipe], texts: list[DXFText]) -> list[Pipe]:
-        """Assign texts to pipes based on spatial proximity.
+    def assign_texts_to_line_based(
+        self, elements: list[ObjectData], texts: list[DxfText]
+    ) -> list[ObjectData]:
+        """Assign texts to elements based on spatial proximity.
 
         Parameters
         ----------
-        pipes : list[Pipe]
-            List of pipes to assign texts to
-        texts : list[DXFText]
+        elements : list[ObjectData]
+            List of line based elements to assign texts to
+        texts : list[DxfText]
             List of available texts for assignment
 
         Returns
         -------
-        list[Pipe]
-            List of pipes with assigned texts where applicable
+        list[ObjectData]
+            List of elements with assigned texts where applicable
         """
+        ...
+
+    def assign_texts_to_point_based(
+        self, elements: list[ObjectData], texts: list[DxfText]
+    ) -> list[ObjectData]:
+        """Assign texts to elements based on spatial proximity.
+
+        Parameters
+        ----------
+        elements : list[ObjectData]
+            List of point based elements to assign texts to
+        texts : list[DxfText]
+            List of available texts for assignment
+
+        Returns
+        -------
+        list[ObjectData]
+            List of elements with assigned texts where applicable
+        """
+
         ...

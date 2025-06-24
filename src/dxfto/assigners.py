@@ -9,7 +9,7 @@ import numpy as np
 
 from dxfto.protocols import ITextAssignmentStrategy
 
-from .models import DXFText, Pipe, Point3D
+from .models import DxfText, ObjectData, Point3D
 
 
 class SpatialTextAssigner(ITextAssignmentStrategy):
@@ -30,7 +30,117 @@ class SpatialTextAssigner(ITextAssignmentStrategy):
         """
         self.max_distance = max_distance
 
-    def assign_texts_to_pipes(self, pipes: list[Pipe], texts: list[DXFText]) -> list[Pipe]:
+    def _create_copy_of(self, elements: list[ObjectData]) -> list[ObjectData]:
+        """Create a copy of ObjectData elements with reset assignments.
+        Parameters
+        ----------
+        elements : list[ObjectData]
+            List of ObjectData elements to copy
+        Returns
+        -------
+        list[ObjectData]
+            List of copied ObjectData elements with reset assignments
+        """
+        copied_elements = []
+        for element in elements:
+            # Create a new ObjectData with all required fields
+            new_element = ObjectData(
+                dimensions=element.dimensions,
+                layer=element.layer,
+                points=element.points.copy() if element.points else [],
+                positions=element.positions.copy() if element.positions else [],
+                color=element.color,
+                assigned_text=None,  # Reset any existing assignments
+            )
+            copied_elements.append(new_element)
+        return copied_elements
+
+    def assign_texts_to_point_based(
+        self, elements: list[ObjectData], texts: list[DxfText]
+    ) -> list[ObjectData]:
+        """Assign texts to point-based elements based on spatial proximity.
+
+        For point-based elements, texts are assigned to the closest element
+        position within the maximum distance threshold.
+
+        Parameters
+        ----------
+        elements : list[ObjectData]
+            List of point-based elements to assign texts to
+        texts : list[DxfText]
+            List of available texts for assignment
+
+        Returns
+        -------
+        list[ObjectData]
+            List of elements with assigned texts where applicable
+        """
+        if not elements or not texts:
+            return elements
+
+        assigned_elements = self._create_copy_of(elements)
+
+        # For each text, find the closest element position
+        for text in texts:
+            closest_element_idx, distance = self._find_closest_element_position(
+                text.position, assigned_elements
+            )
+
+            # Assign text if within maximum distance and element doesn't have text yet
+            if (
+                distance <= self.max_distance
+                and closest_element_idx is not None
+                and assigned_elements[closest_element_idx].assigned_text is None
+            ):
+                assigned_elements[closest_element_idx].assigned_text = text
+
+        return assigned_elements
+
+    def _find_closest_element_position(
+        self, text_position: Point3D, elements: list[ObjectData]
+    ) -> tuple[int | None, float]:
+        """Find the closest element position to a text position.
+
+        Parameters
+        ----------
+        text_position : Point3D
+            Position of the text element
+        elements : list[ObjectData]
+            List of elements to search in
+
+        Returns
+        -------
+        tuple[int | None, float]
+            (element_index, distance) of closest element position,
+            or (None, inf) if no valid positions exist
+        """
+        if not elements:
+            return None, float("inf")
+
+        min_distance = float("inf")
+        closest_element_idx = None
+
+        for element_idx, element in enumerate(elements):
+            if element.positions:
+                # For point-based elements, check all positions
+                for position in element.positions:
+                    distance = text_position.distance_2d(position)
+                    if distance < min_distance:
+                        min_distance = distance
+                        closest_element_idx = element_idx
+            elif element.points:
+                # For line-based elements, use the first point as reference
+                if element.points:
+                    distance = text_position.distance_2d(element.points[0])
+                    if distance < min_distance:
+                        min_distance = distance
+                        closest_element_idx = element_idx
+
+        return closest_element_idx, min_distance
+
+    def assign_texts_to_line_based(
+        self, elements: list[ObjectData], texts: list[DxfText]
+    ) -> list[ObjectData]:
         """Assign texts to pipes based on spatial proximity.
 
         Each text can be assigned to at most one pipe segment.
@@ -41,7 +151,7 @@ class SpatialTextAssigner(ITextAssignmentStrategy):
         ----------
         pipes : list[Pipe]
             List of pipes to assign texts to
-        texts : list[DXFText]
+        texts : list[DxfText]
             List of available texts for assignment
 
         Returns
@@ -49,98 +159,87 @@ class SpatialTextAssigner(ITextAssignmentStrategy):
         list[Pipe]
             List of pipes with assigned texts where applicable
         """
-        if not pipes or not texts:
-            return pipes
+        if not elements or not texts:
+            return elements
 
-        # Create a copy of pipes to avoid modifying the original list
-        assigned_pipes = [
-            Pipe(
-                shape=pipe.shape,
-                points=pipe.points.copy(),
-                dimensions=pipe.dimensions,
-                layer=pipe.layer,
-                color=pipe.color,
-                assigned_text=None,  # Reset any existing assignments
-            )
-            for pipe in pipes
-        ]
+        # Create a copy of elements to avoid modifying the original list
+        assigned_elements = self._create_copy_of(elements)
 
-        # Build spatial index for pipe segments
-        pipe_segments = []
-        segment_to_pipe = []
+        # Build spatial index for element segments (only for elements with points)
+        element_segments = []
+        segment_to_element = []
 
-        for pipe_idx, pipe in enumerate(assigned_pipes):
-            for i in range(len(pipe.points) - 1):
-                start_point = pipe.points[i]
-                end_point = pipe.points[i + 1]
+        for element_idx, element in enumerate(assigned_elements):
+            if element.points and len(element.points) >= 2:
+                for idx in range(len(element.points) - 1):
+                    start_point = element.points[idx]
+                    end_point = element.points[idx + 1]
 
-                # Store segment as (start_point, end_point, pipe_index, segment_index)
-                pipe_segments.append((start_point, end_point))
-                segment_to_pipe.append((pipe_idx, i))
+                    # Store segment as (start_point, end_point, element_index, segment_index)
+                    element_segments.append((start_point, end_point))
+                    segment_to_element.append((element_idx, idx))
 
-        if not pipe_segments:
-            return assigned_pipes
+        if not element_segments:
+            return assigned_elements
 
-        # For each text, find the closest pipe segment
+        # For each text, find the closest element segment
         for text in texts:
-            closest_pipe_idx, closest_segment_idx, distance = self._find_closest_pipe_segment(
-                text.position, pipe_segments, segment_to_pipe
+            closest_element_idx, closest_segment_idx, distance = self._find_closest_element_segment(
+                text.position, element_segments, segment_to_element
             )
 
-            # Assign text if within maximum distance and pipe doesn't have text yet
+            # Assign text if within maximum distance and element doesn't have text yet
             if (
                 distance <= self.max_distance
-                and closest_pipe_idx is not None
-                and assigned_pipes[closest_pipe_idx].assigned_text is None
+                and closest_element_idx is not None
+                and assigned_elements[closest_element_idx].assigned_text is None
             ):
-                assigned_pipes[closest_pipe_idx].assigned_text = text
+                assigned_elements[closest_element_idx].assigned_text = text
 
-        return assigned_pipes
+        return assigned_elements
 
-    def _find_closest_pipe_segment(
+    def _find_closest_element_segment(
         self,
         text_position: Point3D,
-        pipe_segments: list[tuple[Point3D, Point3D]],
-        segment_to_pipe: list[tuple[int, int]],
+        element_segments: list[tuple[Point3D, Point3D]],
+        segment_to_element: list[tuple[int, int]],
     ) -> tuple[int | None, int | None, float]:
-        """Find the closest pipe segment to a text position.
+        """Find the closest element segment to a text position.
 
         Parameters
         ----------
         text_position : Point3D
             Position of the text element
-        pipe_segments : list[tuple[Point3D, Point3D]]
-            List of pipe segments as (start_point, end_point) tuples
-        segment_to_pipe : list[tuple[int, int]]
-            Mapping from segment index to (pipe_index, segment_index)
+        element_segments : list[tuple[Point3D, Point3D]]
+            List of element segments as (start_point, end_point) tuples
+        segment_to_element : list[tuple[int, int]]
+            Mapping from segment index to (element_index, segment_index)
 
         Returns
         -------
         tuple[int | None, int | None, float]
-            (pipe_index, segment_index, distance) of closest segment,
+            (element_index, segment_index, distance) of closest segment,
             or (None, None, inf) if no segments exist
         """
-        if not pipe_segments:
+        if not element_segments:
             return None, None, float("inf")
 
         min_distance = float("inf")
-        closest_pipe_idx = None
+        closest_element_idx = None
         closest_segment_idx = None
 
-        for segment_idx, (start_point, end_point) in enumerate(pipe_segments):
+        for segment_idx, (start_point, end_point) in enumerate(element_segments):
             distance = self._point_to_line_distance(text_position, start_point, end_point)
 
             if distance < min_distance:
                 min_distance = distance
-                pipe_idx, seg_idx = segment_to_pipe[segment_idx]
-                closest_pipe_idx = pipe_idx
+                element_idx, seg_idx = segment_to_element[segment_idx]
+                closest_element_idx = element_idx
                 closest_segment_idx = seg_idx
 
-        return closest_pipe_idx, closest_segment_idx, min_distance
+        return closest_element_idx, closest_segment_idx, min_distance
 
-    def _point_to_line_distance(
-        self, point: Point3D, line_start: Point3D, line_end: Point3D
-    ) -> float:
+    def _point_to_line_distance(self, point: Point3D, line_start: Point3D, line_end: Point3D) -> float:
         """Calculate the shortest distance from a point to a line segment.
 
         Parameters
@@ -158,9 +257,9 @@ class SpatialTextAssigner(ITextAssignmentStrategy):
             Shortest distance from point to line segment
         """
         # Convert to numpy arrays for easier calculation (using 2D projection)
-        p = np.array([point.x, point.y])
-        a = np.array([line_start.x, line_start.y])
-        b = np.array([line_end.x, line_end.y])
+        p = np.array([point.east, point.north])
+        a = np.array([line_start.east, line_start.north])
+        b = np.array([line_end.east, line_end.north])
 
         # Vector from line start to end
         ab = b - a
@@ -171,7 +270,7 @@ class SpatialTextAssigner(ITextAssignmentStrategy):
         # If line segment has zero length, return distance to point
         ab_length_squared = np.dot(ab, ab)
         if ab_length_squared == 0:
-            return np.linalg.norm(ap)
+            return float(np.linalg.norm(ap))
 
         # Project point onto line (parametric form)
         t = np.dot(ap, ab) / ab_length_squared
@@ -183,7 +282,7 @@ class SpatialTextAssigner(ITextAssignmentStrategy):
         closest_point = a + t * ab
 
         # Return distance from original point to closest point on segment
-        return np.linalg.norm(p - closest_point)
+        return float(np.linalg.norm(p - closest_point))
 
 
 class ZoneBasedTextAssigner(ITextAssignmentStrategy):
@@ -207,7 +306,52 @@ class ZoneBasedTextAssigner(ITextAssignmentStrategy):
         self.max_distance = max_distance
         self.zone_buffer = zone_buffer
 
-    def assign_texts_to_pipes(self, pipes: list[Pipe], texts: list[DXFText]) -> list[Pipe]:
+    def assign_texts_to_point_based(
+        self, elements: list[ObjectData], texts: list[DxfText]
+    ) -> list[ObjectData]:
+        """Assign texts to point-based elements with zone validation.
+
+        This method uses spatial assignment as base but adds zone-based
+        validation to ensure assignments are valid within defined zones.
+
+        Parameters
+        ----------
+        elements : list[ObjectData]
+            List of point-based elements to assign texts to
+        texts : list[DxfText]
+            List of available texts for assignment
+
+        Returns
+        -------
+        list[ObjectData]
+            List of elements with assigned texts where applicable
+        """
+        if not elements or not texts:
+            return elements
+
+        # First, use spatial assignment as base
+        spatial_assigner = SpatialTextAssigner(self.max_distance)
+        assigned_elements = spatial_assigner.assign_texts_to_point_based(elements, texts)
+
+        # Then validate assignments based on zones
+        for element in assigned_elements:
+            if element.assigned_text is not None and element.positions:
+                text_pos = element.assigned_text.position
+
+                # Check if text is too close to any element position (zone buffer validation)
+                for position in element.positions:
+                    distance = text_pos.distance_2d(position)
+
+                    # If text is too close to element position, remove assignment
+                    if distance < self.zone_buffer:
+                        element.assigned_text = None
+                        break
+
+        return assigned_elements
+
+    def assign_texts_to_line_based(
+        self, elements: list[ObjectData], texts: list[DxfText]
+    ) -> list[ObjectData]:
         """Assign texts to pipes using zone-based validation.
 
         Text assignments are valid only in zones between pipe
@@ -217,7 +361,7 @@ class ZoneBasedTextAssigner(ITextAssignmentStrategy):
         ----------
         pipes : list[Pipe]
             List of pipes to assign texts to
-        texts : list[DXFText]
+        texts : list[DxfText]
             List of available texts for assignment
 
         Returns
@@ -225,48 +369,87 @@ class ZoneBasedTextAssigner(ITextAssignmentStrategy):
         list[Pipe]
             List of pipes with assigned texts where applicable
         """
-        if not pipes or not texts:
-            return pipes
+        if not elements or not texts:
+            return elements
 
         # First, use spatial assignment as base
         spatial_assigner = SpatialTextAssigner(self.max_distance)
-        assigned_pipes = spatial_assigner.assign_texts_to_pipes(pipes, texts)
+        assigned_elements = spatial_assigner.assign_texts_to_line_based(elements, texts)
 
         # Then validate assignments based on zones
         # This is a simplified implementation - in practice, you would
-        # analyze pipe networks to identify junctions and connection points
+        # analyze element networks to identify junctions and connection points
 
-        # For now, we validate that text is not too close to pipe endpoints
-        for pipe in assigned_pipes:
-            if pipe.assigned_text is not None:
-                text_pos = pipe.assigned_text.position
+        # For now, we validate that text is not too close to element endpoints
+        for element in assigned_elements:
+            if element.assigned_text is not None:
+                text_pos = element.assigned_text.position
 
-                # Check if text is too close to pipe start or end
-                if len(pipe.points) >= 2:
-                    start_distance = self._point_distance_2d(text_pos, pipe.points[0])
-                    end_distance = self._point_distance_2d(text_pos, pipe.points[-1])
+                # Check if text is too close to element start or end (for elements with points)
+                if element.points and len(element.points) >= 2:
+                    start_distance = text_pos.distance_2d(element.points[0])
+                    end_distance = text_pos.distance_2d(element.points[-1])
 
                     # If text is too close to endpoints, remove assignment
                     if start_distance < self.zone_buffer or end_distance < self.zone_buffer:
-                        pipe.assigned_text = None
+                        element.assigned_text = None
 
-        return assigned_pipes
+        return assigned_elements
 
-    def _point_distance_2d(self, point1: Point3D, point2: Point3D) -> float:
-        """Calculate 2D distance between two points.
+    def assign_texts_to_objects(self, elements: list[ObjectData], texts: list[DxfText]) -> list[ObjectData]:
+        """Assign texts to objects by combining point-based and line-based assignment with zone validation.
+
+        This method first processes point-based elements, then line-based elements,
+        with additional zone-based validation for all assignments.
 
         Parameters
         ----------
-        point1 : Point3D
-            First point
-        point2 : Point3D
-            Second point
+        elements : list[ObjectData]
+            List of elements to assign texts to
+        texts : list[DxfText]
+            List of available texts for assignment
 
         Returns
         -------
-        float
-            2D Euclidean distance
+        list[ObjectData]
+            List of elements with assigned texts where applicable
         """
-        dx = point1.x - point2.x
-        dy = point1.y - point2.y
-        return np.sqrt(dx**2 + dy**2)
+        if not elements or not texts:
+            return elements
+
+        # Separate elements by type
+        point_based = []
+        line_based = []
+
+        for element in elements:
+            if element.positions:  # Point-based elements have positions
+                point_based.append(element)
+            elif element.points:  # Line-based elements have points
+                line_based.append(element)
+            else:
+                # Neither - keep as is
+                pass
+
+        # Process point-based elements first
+        assigned_elements = []
+        remaining_texts = texts.copy()
+
+        if point_based:
+            point_assigned = self.assign_texts_to_point_based(point_based, remaining_texts)
+            assigned_elements.extend(point_assigned)
+
+            # Remove used texts from remaining texts
+            used_texts = [elem.assigned_text for elem in point_assigned if elem.assigned_text]
+            remaining_texts = [text for text in remaining_texts if text not in used_texts]
+
+        # Then process line-based elements with remaining texts
+        if line_based:
+            line_assigned = self.assign_texts_to_line_based(line_based, remaining_texts)
+            assigned_elements.extend(line_assigned)
+
+        # Add any elements that weren't point or line based
+        for element in elements:
+            if not element.positions and not element.points:
+                assigned_elements.append(element)
+
+        return assigned_elements

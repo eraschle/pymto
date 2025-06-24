@@ -7,8 +7,7 @@ processed from DXF files: shafts (Schächte), pipes (Leitungen), and texts.
 from dataclasses import dataclass, field
 from enum import Enum
 
-from shapely.shape import Point
-from im
+import numpy as np
 
 
 class ShapeType(Enum):
@@ -18,23 +17,65 @@ class ShapeType(Enum):
     ROUND = "round"
 
 
-@dataclass
+@dataclass(frozen=True)
+class DxfColor:
+    """Represents a color in RGB format.
+
+    Parameters
+    ----------
+    r : int
+        Red component (0-255)
+    g : int
+        Green component (0-255)
+    b : int
+        Blue component (0-255)
+    """
+
+    red: int
+    green: int
+    blue: int
+
+    def to_tuple(self) -> tuple[int, int, int]:
+        """Convert color to RGB tuple."""
+        return self.red, self.green, self.blue
+
+
+@dataclass(frozen=True)
 class Point3D:
     """Represents a 3D point with x, y, z coordinates.
 
     Parameters
     ----------
-    x : float
+    east : float
         X coordinate from DXF file
-    y : float
+    north : float
         Y coordinate from DXF file
-    z : float
+    altitude : float
         Z coordinate from LandXML (DGM) file
     """
 
-    x: float
-    y: float
-    z: float
+    east: float
+    north: float
+    altitude: float
+
+    def distance_2d(self, orher: "Point3D") -> float:
+        """Calculate 2D distance between two points.
+
+        Parameters
+        ----------
+        point1 : Point3D
+            First point
+        point2 : Point3D
+            Second point
+
+        Returns
+        -------
+        float
+            2D Euclidean distance
+        """
+        dx = self.east - orher.east
+        dy = self.north - orher.north
+        return np.sqrt(dx**2 + dy**2)
 
 
 @dataclass
@@ -76,7 +117,7 @@ class RoundDimensions:
 
 
 @dataclass
-class ADXFText:
+class DxfText:
     """Represents a text element from DXF file.
 
     Parameters
@@ -98,7 +139,7 @@ class ADXFText:
 
 
 @dataclass
-class AObject:
+class ObjectData:
     """Base class for all DXF objects.
 
     This class serves as a base for other DXF-related data classes.
@@ -106,41 +147,58 @@ class AObject:
     """
 
     # Currently empty, but can be extended later
-    shape: ShapeType | None
     dimensions: RectangularDimensions | RoundDimensions
-    points: list[Point3D] = []
-    positions: list[Point3D] = []
     layer: str
+    points: list[Point3D] = field(default_factory=list)
+    positions: list[Point3D] = field(default_factory=list)
     color: tuple[int, int, int] = field(default_factory=tuple)
-    assigned_text: DXFText | None = None
+    assigned_text: DxfText | None = None
 
 
 @dataclass
-class Pipe(AObject):
-    """Represents a pipe (Leitung) from DXF file.
+class LayerData:
+    name: str = field(repr=True, compare=True)
+    color: str | tuple[int, int, int] | None = field(repr=True, compare=True)
+
+    def __post_init__(self):
+        if self.color is None:
+            self.color = (0, 0, 0)
+
+
+@dataclass(frozen=True)
+class AssignmentConfig:
+    geometry: list[LayerData]
+    text: list[LayerData]
+
+    @property
+    def layers(self) -> list[str]:
+        """Return all layer names from geometry and text configurations."""
+        all_layers = self.geometry + self.text
+        return [layer.name for layer in all_layers]
+
+
+@dataclass(frozen=True)
+class AssingmentData:
+    """Configuration per medium of DXF elements.
 
     Parameters
     ----------
-    shape : ShapeType
-        Shape of the pipe (rectangular or round)
-    points : list[Point3D]
-        All points along the pipe geometry
-    dimensions : RectangularDimensions | RoundDimensions
-        Dimensions based on shape type (width/height for rectangular, diameter for round)
-    layer : str
-        DXF layer name
-    color : tuple[int, int, int]
-        RGB color values
-    assigned_text : DXFText | None
-        Text assigned to this pipe (optional)
+    elements : list[AObject]
+        List of DXF elements (pipes, shafts, etc.) for assignment
+    texts : list[DxfText]
+        List of texts objects to be assigned to elements
     """
 
-    shape: ShapeType
-    points: list[Point3D]
-    dimensions: RectangularDimensions | RoundDimensions
-    layer: str
-    color: tuple[int, int, int]
-    assigned_text: DXFText | None = None
+    elements: list[ObjectData] = field(default_factory=list)
+    texts: list[DxfText] = field(default_factory=list)
+
+    def add_element(self, element: ObjectData) -> None:
+        """Add a DXF element to the assignment data."""
+        self.elements.append(element)
+
+    def add_text(self, text: DxfText) -> None:
+        """Add a text object to the assignment data."""
+        self.texts.append(text)
 
 
 @dataclass
@@ -160,34 +218,7 @@ class Medium:
     """
 
     name: str
-    pipes: list[Pipe]
-    shafts: list[Shaft]
-    texts: list[DXFText]
-
-
-@dataclass
-class GroupingConfig:
-    """Configuration for grouping DXF elements by medium.
-
-    Parameters
-    ----------
-    pipe_layer : str
-        Layer name for pipes
-    shaft_layer : str
-        Layer name for shafts
-    text_layer : str
-        Layer name for texts
-    pipe_color : tuple[int, int, int] | None
-        RGB color for pipes (optional)
-    shaft_color : tuple[int, int, int] | None
-        RGB color for shafts (optional)
-    text_color : tuple[int, int, int] | None
-        RGB color for texts (optional)
-    """
-
-    pipe_layer: str
-    shaft_layer: str
-    text_layer: str
-    pipe_color: tuple[int, int, int] | None = None
-    shaft_color: tuple[int, int, int] | None = None
-    text_color: tuple[int, int, int] | None = None
+    elements: AssignmentConfig
+    lines: AssignmentConfig
+    element_data: AssingmentData = field(default_factory=AssingmentData, init=False)
+    line_data: AssingmentData = field(default_factory=AssingmentData, init=False)
