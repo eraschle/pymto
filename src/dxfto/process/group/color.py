@@ -71,7 +71,8 @@ class ColorBasedGrouper:
                 text
                 for text in texts
                 if any(
-                    self._color_distance(text.color, color) <= self.color_tolerance for color in color_group
+                    self._color_distance(text.color, color) <= self.color_tolerance
+                    for color in color_group
                 )
             ]
 
@@ -81,8 +82,12 @@ class ColorBasedGrouper:
                 dominant_color = self._get_dominant_color(color_group)
                 medium_name = self._color_to_medium_name(dominant_color)
 
-                element_config = MediumConfig(geometry=[], text=[], default_unit="mm")
-                line_config = MediumConfig(geometry=[], text=[], default_unit="mm")
+                element_config = MediumConfig(
+                    medium="test_medium", geometry=[], text=[], default_unit="mm"
+                )
+                line_config = MediumConfig(
+                    medium="test_medium", geometry=[], text=[], default_unit="mm"
+                )
 
                 medium = Medium(
                     name=f"{medium_name}_{i + 1}",
@@ -91,16 +96,18 @@ class ColorBasedGrouper:
                 )
 
                 # Add elements to medium
-                for element in group_elements:
-                    medium.element_data.add_element(element)
-                for text in group_texts:
-                    medium.element_data.add_text(text)
+                # for element in group_elements:
+                #     medium.element_data.add_element(element)
+                # for text in group_texts:
+                #     medium.element_data.add_text(text)
 
                 media.append(medium)
 
         return media
 
-    def _group_similar_colors(self, colors: list[tuple[int, int, int]]) -> list[list[tuple[int, int, int]]]:
+    def _group_similar_colors(
+        self, colors: list[tuple[int, int, int]]
+    ) -> list[list[tuple[int, int, int]]]:
         """Group colors that are similar to each other.
 
         Parameters

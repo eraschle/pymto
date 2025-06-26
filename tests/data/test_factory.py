@@ -48,7 +48,11 @@ def test_factory():
 
         # Create ObjectData
         object_type = ObjectType.SHAFT if is_element else ObjectType.PIPE_WASTEWATER
-        obj_data = factory.create_from_entity(entity, object_type=object_type)
+        obj_data = factory.create_from_entity(
+            medium="test",
+            entity=entity,
+            object_type=object_type,
+        )
         if obj_data is None:
             log.error("  Failed to create ObjectData")
             continue

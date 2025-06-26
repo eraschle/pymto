@@ -95,7 +95,13 @@ class TestDxfText:
     def test_dxf_text_creation(self):
         """Test DxfText creation."""
         position = Point3D(east=10.0, north=20.0, altitude=0.0)
-        text = DxfText(content="Test Text", position=position, layer="TEXT_LAYER", color=(255, 0, 0))
+        text = DxfText(
+            medium="Test Medium",
+            content="Test Text",
+            position=position,
+            layer="TEXT_LAYER",
+            color=(255, 0, 0),
+        )
 
         assert text.content == "Test Text"
         assert text.position == position
@@ -112,6 +118,7 @@ class TestObjectData:
         position = Point3D(east=10.0, north=20.0, altitude=0.0)
 
         obj = ObjectData(
+            medium="Test Medium",
             object_type=ObjectType.UNKNOWN,
             dimensions=dims,
             layer="CIRCLE_LAYER",
@@ -138,6 +145,7 @@ class TestObjectData:
         ]
 
         obj = ObjectData(
+            medium="Test Medium",
             object_type=ObjectType.UNKNOWN,
             dimensions=dims,
             layer="RECT_LAYER",
@@ -155,10 +163,20 @@ class TestObjectData:
         """Test ObjectData with assigned text."""
         dims = RoundDimensions(diameter=3.0)
         text_pos = Point3D(east=5.0, north=10.0, altitude=0.0)
-        assigned_text = DxfText(content="SHAFT_01", position=text_pos, layer="TEXT", color=(0, 0, 0))
+        assigned_text = DxfText(
+            medium="Test Medium",
+            content="SHAFT_01",
+            position=text_pos,
+            layer="TEXT",
+            color=(0, 0, 0),
+        )
 
         obj = ObjectData(
-            object_type=ObjectType.UNKNOWN, dimensions=dims, layer="SHAFT_LAYER", assigned_text=assigned_text
+            medium="Test Medium",
+            object_type=ObjectType.UNKNOWN,
+            dimensions=dims,
+            layer="SHAFT_LAYER",
+            assigned_text=assigned_text,
         )
 
         assert obj.assigned_text == assigned_text
@@ -225,7 +243,12 @@ class TestAssignmentConfig:
             LayerData(name="TEXT", color=(0, 0, 0)),
         ]
 
-        config = MediumConfig(geometry=geometry_layers, text=text_layers, default_unit="mm")
+        config = MediumConfig(
+            medium="Test Medium",
+            geometry=geometry_layers,
+            text=text_layers,
+            default_unit="mm",
+        )
         assert config.geometry == geometry_layers
         assert config.text == text_layers
 
@@ -242,10 +265,15 @@ class TestAssingmentData:
     def test_add_element(self):
         """Test adding element to assignment data."""
         dims = RoundDimensions(diameter=5.0)
-        element = ObjectData(object_type=ObjectType.UNKNOWN, dimensions=dims, layer="TEST")
+        element = ObjectData(
+            medium="Test Medium",
+            object_type=ObjectType.UNKNOWN,
+            dimensions=dims,
+            layer="TEST",
+        )
 
         data = AssingmentData()
-        data.add_element(element)
+        data.set_elements("Test Medium", [element])
 
         assert len(data.elements) == 1
         assert data.elements[0] == element
@@ -253,10 +281,16 @@ class TestAssingmentData:
     def test_add_text(self):
         """Test adding text to assignment data."""
         position = Point3D(east=0.0, north=0.0, altitude=0.0)
-        text = DxfText(content="Test", position=position, layer="TEXT", color=(0, 0, 0))
+        text = DxfText(
+            medium="Test Medium",
+            content="Test",
+            position=position,
+            layer="TEXT",
+            color=(0, 0, 0),
+        )
 
         data = AssingmentData()
-        data.add_text(text)
+        data.set_texts("text", [text])
 
         assert len(data.texts) == 1
         assert data.texts[0] == text
@@ -270,8 +304,18 @@ class TestMedium:
         geometry_layers = [LayerData(name="PIPES", color=(0, 255, 0))]
         text_layers = [LayerData(name="TEXT", color=(0, 0, 0))]
 
-        elements_config = MediumConfig(geometry=geometry_layers, text=text_layers, default_unit="mm")
-        lines_config = MediumConfig(geometry=geometry_layers, text=text_layers, default_unit="mm")
+        elements_config = MediumConfig(
+            medium="Test Medium",
+            geometry=geometry_layers,
+            text=text_layers,
+            default_unit="mm",
+        )
+        lines_config = MediumConfig(
+            medium="Test Medium",
+            geometry=geometry_layers,
+            text=text_layers,
+            default_unit="mm",
+        )
 
         medium = Medium(name="Abwasserleitung", elements=elements_config, lines=lines_config)
 

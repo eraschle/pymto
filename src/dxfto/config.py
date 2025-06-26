@@ -73,13 +73,15 @@ class ConfigurationHandler:
         log.warning(f"Unknown shape type: {shape}, defaulting to UNKNOWN")
         return ObjectType.UNKNOWN
 
-    def _create_config(self, medium_config: dict) -> MediumConfig:
+    def _create_config(self, medium: str, medium_config: dict) -> MediumConfig:
         return MediumConfig(
-            default_shape=self._create_default_shape(medium_config.get("Shape", "NONE")),
+            medium=medium,
+            default_object_type=self._create_default_shape(medium_config.get("Shape", "NONE")),
             default_unit=self._create_default_unit(medium_config.get("Unit", "mm")),
             geometry=self._create_layers(medium_config.get("Geometrie", [])),
             text=self._create_layers(medium_config.get("Text", [])),
         )
+
 
     def load_config(self) -> None:
         """Load grouping configuration from JSON file.
@@ -113,8 +115,8 @@ class ConfigurationHandler:
 
                 self.mediums[medium_name] = Medium(
                     name=medium_name,
-                    elements=self._create_config(object_data),
-                    lines=self._create_config(line_data),
+                    elements=self._create_config(medium_name, object_data),
+                    lines=self._create_config(medium_name, line_data),
                 )
 
         except json.JSONDecodeError as e:

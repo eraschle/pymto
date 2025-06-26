@@ -13,7 +13,7 @@
                 "../dxf-config.json",
                 "-l",
                 "/mnt/c/workspace/sersa/projekte/1000161406_RhB_Ardez/41_Grundlagen/DGM/DGM_Autovermascht_reduziert.xml",
-                "-o", "./revit_data.json",
+                "-o", "../revit_data.json",
                 "-v",
             ],
             "cwd": "${workspaceFolder}/src",

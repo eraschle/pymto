@@ -4,11 +4,14 @@ This module contains the dataclasses that represent the core entities
 processed from DXF files: shafts (Schächte), pipes (Leitungen), and texts.
 """
 
+import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import ClassVar
 
 import numpy as np
+
+log = logging.getLogger(__name__)
 
 
 class ObjectType(Enum):
@@ -137,6 +140,7 @@ class DxfText:
         RGB color values
     """
 
+    medium: str
     content: str
     position: Point3D
     layer: str
@@ -161,13 +165,15 @@ class ObjectData:
         ObjectType.SHAFT,
     }
 
+    medium: str
     object_type: ObjectType
     dimensions: RectangularDimensions | RoundDimensions
     layer: str
-    points: list[Point3D] = field(default_factory=list)
-    positions: list[Point3D] = field(default_factory=list)
-    color: tuple[int, int, int] = field(default_factory=tuple)
+    points: list[Point3D] = field(default_factory=list, repr=False, compare=False)
+    positions: list[Point3D] = field(default_factory=list, repr=False, compare=False)
+    color: tuple[int, int, int] = field(default_factory=tuple, repr=True, compare=True)
     assigned_text: DxfText | None = None
+
     @property
     def is_line_based(self) -> bool:
         """Check if the object is line-based (e.g., pipe, cable duct).
@@ -214,37 +220,70 @@ class LayerData:
 
 @dataclass(frozen=True)
 class MediumConfig:
+    medium: str
     geometry: list[LayerData]
     text: list[LayerData]
     default_unit: str = "mm"
-    default_shape: ObjectType = ObjectType.UNKNOWN
+    default_object_type: ObjectType = ObjectType.UNKNOWN
 
 
-@dataclass(frozen=True)
 class AssingmentData:
     """Configuration per medium of DXF elements.
 
     Parameters
     ----------
-    elements : list[AObject]
-        List of DXF elements (pipes, shafts, etc.) for assignment
+    elements : list[ObjectData]
+        List of elements assigned to this medium
     texts : list[DxfText]
-        List of texts objects to be assigned to elements
+        List of texts assigned to this medium
     """
 
-    elements: list[ObjectData] = field(default_factory=list)
-    texts: list[DxfText] = field(default_factory=list)
+    def __init__(self, elements: list[ObjectData] | None = None, texts: list[DxfText] | None = None) -> None:
+        self._elements = elements if elements is not None else []
+        self._texts = texts if texts is not None else []
 
-    def add_element(self, element: ObjectData) -> None:
-        """Add a DXF element to the assignment data."""
-        self.elements.append(element)
+    @property
+    def elements(self) -> list[ObjectData]:
+        """Get all elements assigned to this medium."""
+        return self.elements
 
-    def add_text(self, text: DxfText) -> None:
-        """Add a text object to the assignment data."""
-        self.texts.append(text)
+    def set_elements(self, medium: str, elements: list[ObjectData]) -> None:
+        """Set elements for this medium."""
+        for elem in elements:
+            if not elem.is_line_based:
+                log.warning(f"Element {elem} is not line-based, skipping assignment")
+                raise ValueError(f"Element {elem} is not line-based")
+            elem.medium = medium
+        self._elements = elements
+
+    @property
+    def texts(self) -> list[DxfText]:
+        """Get all texts assigned to this medium."""
+        return self._texts
+
+    def set_texts(self, medium: str, texts: list[DxfText]) -> None:
+        """Set texts for this medium."""
+        for text in texts:
+            text.medium = medium
+        self._texts = texts
+
+    def update(self, medium: str, data: "AssingmentData") -> None:
+        """Update elements and texts for this medium.
+
+        Parameters
+        ----------
+        medium : str
+            Name of the medium to update
+        elements : list[ObjectData]
+            List of elements to assign to this medium
+        texts : list[DxfText]
+            List of texts to assign to this medium
+        """
+        self.set_elements(medium, data.elements)
+        self.set_texts(medium, data.texts)
 
 
-@dataclass
+@dataclass(frozen=True)
 class Medium:
     """Represents a medium (e.g., Abwasserleitung) with its associated elements.
 
@@ -263,5 +302,6 @@ class Medium:
     name: str
     elements: MediumConfig
     lines: MediumConfig
-    element_data: AssingmentData = field(default_factory=AssingmentData, init=False)
-    line_data: AssingmentData = field(default_factory=AssingmentData, init=False)
+    element_data: AssingmentData = field(default_factory=AssingmentData, repr=False, compare=False)
+    line_data: AssingmentData = field(default_factory=AssingmentData, repr=False, compare=False)
+

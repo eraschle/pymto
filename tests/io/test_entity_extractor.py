@@ -32,7 +32,7 @@ class TestDXFEntityExtractor:
         """Create test assignment configuration."""
         geometry_layers = [LayerData(name="GEOMETRY", color=(255, 0, 0))]
         text_layers = [LayerData(name="TEXT", color=(0, 0, 0))]
-        return MediumConfig(geometry=geometry_layers, text=text_layers)
+        return MediumConfig(medium="test_medium", geometry=geometry_layers, text=text_layers)
 
     def test_extractor_initialization(self, mock_reader):
         """Test extractor initialization."""

@@ -14,14 +14,17 @@ from ezdxf.entities.text import Text
 
 from .config import ConfigurationHandler
 from .io import DXFEntityExtractor, DXFReader
-from .models import AssingmentData, DxfText, Medium, MediumConfig, ObjectData, Point3D
-from .process.objectdata_factory import ObjectDataFactory
-from .protocols import (
-    IAssignmentStrategy,
-    IDimensionUpdater,
-    IElevationUpdater,
-    IExporter,
+from .models import (
+    AssingmentData,
+    DxfText,
+    Medium,
+    MediumConfig,
+    ObjectData,
+    ObjectType,
+    Point3D,
 )
+from .process.objectdata_factory import ObjectDataFactory
+from .protocols import IAssignmentStrategy, IDimensionUpdater, IElevationUpdater, IExporter
 
 log = logging.getLogger(__name__)
 
@@ -111,14 +114,11 @@ class DXFProcessor:
 
         for medium_name, medium in self.config.mediums.items():
             log.debug(f"Processing medium: {medium_name}")
+            data = self._process_assignment(medium.elements)
+            medium.element_data.update(medium_name, data)
 
-            medium.element_data = self._process_assignment(medium.elements)
-            medium.line_data = self._process_assignment(medium.lines)
-
-            log.info(
-                f"Medium '{medium_name}': {len(medium.element_data.elements)} elements, "
-                f"{len(medium.line_data.elements)} lines, "
-            )
+            data = self._process_assignment(medium.lines)
+            medium.line_data.update(medium_name, data)
 
     def _process_assignment(self, config: MediumConfig) -> AssingmentData:
         """Process a single assignment configuration.
@@ -137,12 +137,19 @@ class DXFProcessor:
             raise RuntimeError("Processor components not initialized")
 
         extracted = self.extractor.extract_entities(config)
-        geometries = self._convert_entities_to_objects(extracted["geometries"], config)
-        texts = self._convert_entities_to_texts(extracted["texts"])
+        geometries = self._convert_to_objects(
+            config.medium, extracted["geometries"], config.default_object_type
+        )
+        texts = self._convert_to_texts(config.medium, extracted["texts"])
 
-        return AssingmentData(elements=geometries, texts=texts)
+        return AssingmentData(
+            elements=geometries,
+            texts=texts,
+        )
 
-    def _convert_entities_to_objects(self, entities: list[DXFEntity], config: MediumConfig) -> list[ObjectData]:
+    def _convert_to_objects(
+        self, medium: str, entities: list[DXFEntity], object_type: ObjectType
+    ) -> list[ObjectData]:
         """Convert DXF entities to ObjectData using the factory.
 
         Parameters
@@ -160,7 +167,7 @@ class DXFProcessor:
 
         objects = []
         for entity in entities:
-            obj_data = self.factory.create_from_entity(entity, config.default_shape)
+            obj_data = self.factory.create_from_entity(medium, entity, object_type)
             if obj_data is not None:
                 objects.append(obj_data)
             else:
@@ -169,7 +176,7 @@ class DXFProcessor:
         log.debug(f"Converted {len(objects)}/{len(entities)} entities to ObjectData")
         return objects
 
-    def _convert_entities_to_texts(self, entities: list[DXFEntity]) -> list[DxfText]:
+    def _convert_to_texts(self, medium: str, entities: list[DXFEntity]) -> list[DxfText]:
         """Convert DXF text entities to DxfText objects.
 
         Parameters
@@ -184,7 +191,7 @@ class DXFProcessor:
         """
         texts = []
         for entity in entities:
-            text_obj = self._create_text_from_entity(entity)
+            text_obj = self._create_text_from(medium, entity)
             if text_obj is not None:
                 texts.append(text_obj)
             else:
@@ -193,7 +200,7 @@ class DXFProcessor:
         log.debug(f"Converted {len(texts)}/{len(entities)} entities to DxfText")
         return texts
 
-    def _create_text_from_entity(self, entity: DXFEntity) -> DxfText | None:
+    def _create_text_from(self, medium: str, entity: DXFEntity) -> DxfText | None:
         """Create a DxfText object from a DXF text entity.
 
         Parameters
@@ -229,7 +236,13 @@ class DXFProcessor:
             layer = getattr(entity.dxf, "layer", "0")
             color = self._get_entity_color(entity)
 
-            return DxfText(content=text_content, position=position, layer=layer, color=color)
+            return DxfText(
+                medium=medium,
+                content=text_content,
+                position=position,
+                layer=layer,
+                color=color,
+            )
 
         except Exception as e:
             log.error(f"Failed to create DxfText from entity: {e}")

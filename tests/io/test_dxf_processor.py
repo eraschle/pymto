@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from dxfto.config import ConfigurationHandler
 from dxfto.io import DXFReader
-from dxfto.models import LayerData, Medium, MediumConfig
+from dxfto.models import LayerData, Medium, MediumConfig, ObjectType
 from dxfto.processor import DXFProcessor
 
 
@@ -56,8 +56,12 @@ class TestDXFProcessor:
         geometry_layers = [LayerData(name="0", color=(255, 0, 0))]
         text_layers = [LayerData(name="TEXT", color=(0, 0, 0))]
 
-        elements_config = MediumConfig(geometry=geometry_layers, text=text_layers, default_unit="mm")
-        lines_config = MediumConfig(geometry=geometry_layers, text=text_layers, default_unit="mm")
+        elements_config = MediumConfig(
+            medium="test_medium", geometry=geometry_layers, text=text_layers, default_unit="mm"
+        )
+        lines_config = MediumConfig(
+            medium="test_medium", geometry=geometry_layers, text=text_layers, default_unit="mm"
+        )
 
         test_medium = Medium(name="Test Medium", elements=elements_config, lines=lines_config)
 
@@ -76,12 +80,16 @@ class TestDXFProcessor:
         # Mock the factory
         processor.factory = Mock()
 
-        result = processor._convert_entities_to_objects([])
+        result = processor._convert_to_objects(
+            medium="test_medium",
+            entities=[],
+            object_type=ObjectType.UNKNOWN,
+        )
         assert result == []
 
     def test_convert_entities_to_texts_empty(self, processor: DXFProcessor):
         """Test converting empty text entity list."""
-        result = processor._convert_entities_to_texts([])
+        result = processor._convert_to_texts([])
         assert result == []
 
     def test_create_text_from_entity_invalid(self, processor: DXFProcessor):
@@ -89,7 +97,10 @@ class TestDXFProcessor:
         mock_entity = Mock()
         mock_entity.__class__ = Mock  # Not Text or MText
 
-        result = processor._create_text_from_entity(mock_entity)
+        result = processor._create_text_from(
+            medium="test_medium",
+            entity=mock_entity,
+        )
         assert result is None
 
     def test_get_entity_color_default(self, processor: DXFProcessor):
@@ -144,8 +155,12 @@ class TestDXFProcessorIntegration:
         geometry_layers = [LayerData(name="0", color=(255, 0, 0))]
         text_layers = [LayerData(name="TEXT", color=(0, 0, 0))]
 
-        elements_config = MediumConfig(geometry=geometry_layers, text=text_layers, default_unit="mm")
-        lines_config = MediumConfig(geometry=geometry_layers, text=text_layers, default_unit="mm")
+        elements_config = MediumConfig(
+            medium="test_medium", geometry=geometry_layers, text=text_layers, default_unit="mm"
+        )
+        lines_config = MediumConfig(
+            medium="test_medium", geometry=geometry_layers, text=text_layers, default_unit="mm"
+        )
 
         medium = Medium(name="Integration Test Medium", elements=elements_config, lines=lines_config)
         processor.config.mediums = {"integration_test": medium}
@@ -167,7 +182,9 @@ class TestDXFProcessorIntegration:
         geometry_layers = [LayerData(name="0", color=(255, 0, 0))]
         text_layers = [LayerData(name="TEXT", color=(0, 0, 0))]
 
-        config = MediumConfig(geometry=geometry_layers, text=text_layers, default_unit="mm")
+        config = MediumConfig(
+            medium="test_medium", geometry=geometry_layers, text=text_layers, default_unit="mm"
+        )
         medium = Medium(name="Test", elements=config, lines=config)
 
         processor.extract_mediums(reader)

@@ -151,8 +151,8 @@ class ColorBasedGrouper:
 
                 from ...models import MediumConfig
 
-                element_config = MediumConfig(geometry=[], text=[], default_unit="mm")
-                line_config = MediumConfig(geometry=[], text=[], default_unit="mm")
+                element_config = MediumConfig(medium="test_medium",geometry=[], text=[], default_unit="mm")
+                line_config = MediumConfig(medium="test_medium",geometry=[], text=[], default_unit="mm")
 
                 medium = Medium(
                     name=f"{medium_name}_{i + 1}",
@@ -161,10 +161,10 @@ class ColorBasedGrouper:
                 )
 
                 # Add elements to medium
-                for element in group_elements:
-                    medium.element_data.add_element(element)
-                for text in group_texts:
-                    medium.element_data.add_text(text)
+                # for element in group_elements:
+                #     medium.element_data.add_element(element)
+                # for text in group_texts:
+                #     medium.element_data.add_text(text)
 
                 media.append(medium)
 
