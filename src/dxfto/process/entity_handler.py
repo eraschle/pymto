@@ -112,12 +112,12 @@ def detect_shape_type(points: list[Point3D]) -> str:
         return "linear"
     elif num_points < 4:
         return "linear"
-    elif num_points == 4 and is_rectangular(points):
-        return "rectangular"
-    elif is_closed(points):
-        return "multi_sided"
     elif is_near_circular(points):
         return "round"
+    elif num_points == 4 and is_rectangular(points):
+        return "rectangular"
+    elif num_points >= 4:
+        return "multi_sided"
     raise ValueError(
         f"Cannot determine shape type from points: {num_points} points provided, expected at least 2."
     )

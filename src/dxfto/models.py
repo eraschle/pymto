@@ -245,14 +245,11 @@ class AssingmentData:
     @property
     def elements(self) -> list[ObjectData]:
         """Get all elements assigned to this medium."""
-        return self.elements
+        return self._elements
 
     def set_elements(self, medium: str, elements: list[ObjectData]) -> None:
         """Set elements for this medium."""
         for elem in elements:
-            if not elem.is_line_based:
-                log.warning(f"Element {elem} is not line-based, skipping assignment")
-                raise ValueError(f"Element {elem} is not line-based")
             elem.medium = medium
         self._elements = elements
 

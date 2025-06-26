@@ -249,7 +249,7 @@ class ObjectDataFactory:
         """
         try:
             points = dxf.extract_points_from(entity)
-            return self._create_line_object(medium,entity, points, object_type)
+            return self._create_line_object(medium, entity, points, object_type)
 
         except Exception as e:
             log.error(f"Failed to process LINE entity: {e}")
