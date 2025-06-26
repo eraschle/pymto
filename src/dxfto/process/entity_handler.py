@@ -12,7 +12,7 @@ from ezdxf.entities.line import Line
 from ezdxf.entities.lwpolyline import LWPolyline
 from ezdxf.entities.polyline import Polyline
 
-from ..models import MediumConfig, Point3D, ShapeType
+from ..models import Point3D
 
 log = logging.getLogger(__name__)
 

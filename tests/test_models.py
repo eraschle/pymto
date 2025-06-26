@@ -11,6 +11,7 @@ from dxfto.models import (
     Medium,
     MediumConfig,
     ObjectData,
+    ObjectType,
     Point3D,
     RectangularDimensions,
     RoundDimensions,
@@ -110,7 +111,13 @@ class TestObjectData:
         dims = RoundDimensions(diameter=5.0)
         position = Point3D(east=10.0, north=20.0, altitude=0.0)
 
-        obj = ObjectData(dimensions=dims, layer="CIRCLE_LAYER", positions=[position], color=(0, 255, 0))
+        obj = ObjectData(
+            object_type=ObjectType.UNKNOWN,
+            dimensions=dims,
+            layer="CIRCLE_LAYER",
+            positions=[position],
+            color=(0, 255, 0),
+        )
 
         assert obj.dimensions == dims
         assert obj.layer == "CIRCLE_LAYER"
@@ -130,7 +137,13 @@ class TestObjectData:
             Point3D(east=0.0, north=5.0, altitude=0.0),
         ]
 
-        obj = ObjectData(dimensions=dims, layer="RECT_LAYER", points=points, color=(0, 0, 255))
+        obj = ObjectData(
+            object_type=ObjectType.UNKNOWN,
+            dimensions=dims,
+            layer="RECT_LAYER",
+            points=points,
+            color=(0, 0, 255),
+        )
 
         assert obj.dimensions == dims
         assert obj.layer == "RECT_LAYER"
@@ -144,7 +157,9 @@ class TestObjectData:
         text_pos = Point3D(east=5.0, north=10.0, altitude=0.0)
         assigned_text = DxfText(content="SHAFT_01", position=text_pos, layer="TEXT", color=(0, 0, 0))
 
-        obj = ObjectData(dimensions=dims, layer="SHAFT_LAYER", assigned_text=assigned_text)
+        obj = ObjectData(
+            object_type=ObjectType.UNKNOWN, dimensions=dims, layer="SHAFT_LAYER", assigned_text=assigned_text
+        )
 
         assert obj.assigned_text == assigned_text
         assert obj.assigned_text is not None
@@ -227,7 +242,7 @@ class TestAssingmentData:
     def test_add_element(self):
         """Test adding element to assignment data."""
         dims = RoundDimensions(diameter=5.0)
-        element = ObjectData(dimensions=dims, layer="TEST")
+        element = ObjectData(object_type=ObjectType.UNKNOWN, dimensions=dims, layer="TEST")
 
         data = AssingmentData()
         data.add_element(element)

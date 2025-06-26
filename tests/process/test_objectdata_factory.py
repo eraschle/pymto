@@ -6,6 +6,7 @@ import pytest
 
 from dxfto.models import (
     ObjectData,
+    ObjectType,
     Point3D,
     RectangularDimensions,
     RoundDimensions,
@@ -319,7 +320,7 @@ class TestObjectDataFactoryInsertEntity:
                 return False
 
             mock_isinstance.side_effect = isinstance_side_effect
-            result = factory_with_blocks.create_from_entity(entity)
+            result = factory_with_blocks.create_from_entity(entity, ObjectType.UNKNOWN)
 
         assert result is not None
         assert isinstance(result, ObjectData)

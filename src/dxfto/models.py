@@ -6,17 +6,20 @@ processed from DXF files: shafts (Schächte), pipes (Leitungen), and texts.
 
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import ClassVar
 
 import numpy as np
 
 
-class ShapeType(Enum):
+class ObjectType(Enum):
     """Shape types for pipes and shafts."""
 
     UNKNOWN = "unknown"
     SHAFT = "shaft"
-    PIPE = "pipe"
-    DUCT = "duct"
+    PIPE_WASTEWATER = "wastewater"
+    PIPE_WATER = "water"
+    PIPE_GAS = "gas"
+    CABLE_DUCT = "duct"
 
 
 @dataclass(frozen=True)
@@ -148,12 +151,55 @@ class ObjectData:
     It can be extended with common properties or methods in the future.
     """
 
+    line_based_types: ClassVar[set[ObjectType]] = {
+        ObjectType.PIPE_WASTEWATER,
+        ObjectType.PIPE_WATER,
+        ObjectType.PIPE_GAS,
+        ObjectType.CABLE_DUCT,
+    }
+    point_based_types: ClassVar[set[ObjectType]] = {
+        ObjectType.SHAFT,
+    }
+
+    object_type: ObjectType
     dimensions: RectangularDimensions | RoundDimensions
     layer: str
     points: list[Point3D] = field(default_factory=list)
     positions: list[Point3D] = field(default_factory=list)
     color: tuple[int, int, int] = field(default_factory=tuple)
     assigned_text: DxfText | None = None
+    @property
+    def is_line_based(self) -> bool:
+        """Check if the object is line-based (e.g., pipe, cable duct).
+
+        Returns
+        -------
+        bool
+            True if the object is line-based, False otherwise.
+        """
+        return self.object_type in self.line_based_types
+
+    @property
+    def is_point_based(self) -> bool:
+        """Check if the object is point-based (e.g., shaft).
+
+        Returns
+        -------
+        bool
+            True if the object is point-based, False otherwise.
+        """
+        return self.object_type == ObjectType.SHAFT
+
+    @property
+    def should_be_round(self) -> bool:
+        """Check if the object has round dimensions.
+
+        Returns
+        -------
+        bool
+            True if the object has round dimensions, False otherwise.
+        """
+        return self.object_type.name.startswith("PIPE") or self.object_type == ObjectType.SHAFT
 
 
 @dataclass
@@ -171,7 +217,7 @@ class MediumConfig:
     geometry: list[LayerData]
     text: list[LayerData]
     default_unit: str = "mm"
-    default_shape: ShapeType = ShapeType.UNKNOWN
+    default_shape: ObjectType = ObjectType.UNKNOWN
 
 
 @dataclass(frozen=True)

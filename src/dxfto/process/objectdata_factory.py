@@ -15,11 +15,10 @@ from ezdxf.entities.insert import Insert
 from ..models import (
     MediumConfig,
     ObjectData,
+    ObjectType,
     Point3D,
     RectangularDimensions,
     RoundDimensions,
-    ShapeType,
-)
 from .entity_handler import (
     calculate_bounding_box_dimensions,
     calculate_center_point,
@@ -33,7 +32,8 @@ from .entity_handler import (
 
 log = logging.getLogger(__name__)
 
-def is_pipe_or_duct(object_type: ShapeType) -> bool:
+
+def is_pipe_or_duct(object_type: ObjectType) -> bool:
     """Check if the object type is PIPE or DUCT.
 
     Parameters
@@ -46,7 +46,13 @@ def is_pipe_or_duct(object_type: ShapeType) -> bool:
     bool
         True if the object type is PIPE or DUCT, False otherwise
     """
-    return object_type in (ShapeType.PIPE, ShapeType.DUCT)
+    return object_type in (
+        ObjectType.CABLE_DUCT,
+        ObjectType.PIPE_GAS,
+        ObjectType.PIPE_WASTEWATER,
+        ObjectType.PIPE_WATER,
+    )
+
 
 class ObjectDataFactory:
     """Factory for creating ObjectData from DXF entities."""
@@ -62,7 +68,7 @@ class ObjectDataFactory:
         self.doc = dxf_document
         self._block_cache = {}
 
-    def create_from_entity(self, entity: DXFEntity, object_type: ShapeType) -> ObjectData | None:
+    def create_from_entity(self, entity: DXFEntity, object_type: ObjectType) -> ObjectData | None:
         """Create ObjectData from any DXF entity.
 
         Parameters
@@ -96,7 +102,7 @@ class ObjectDataFactory:
             log.error(f"Failed to create ObjectData from {entity.dxftype()}: {e}")
             return None
 
-    def _create_from_insert(self, entity: DXFEntity, object_type: ShapeType) -> ObjectData | None:
+    def _create_from_insert(self, entity: DXFEntity, object_type: ObjectType) -> ObjectData | None:
         """Create ObjectData from INSERT entity (block reference).
 
         Parameters
@@ -135,6 +141,7 @@ class ObjectDataFactory:
             layer = getattr(entity.dxf, "layer", "0")
 
             return ObjectData(
+                object_type=object_type,
                 dimensions=dimensions,
                 layer=layer,
                 positions=[position],
@@ -146,7 +153,7 @@ class ObjectDataFactory:
             log.error(f"Failed to process INSERT entity: {e}")
             return None
 
-    def _create_from_circle(self, entity: DXFEntity, object_type: ShapeType) -> ObjectData | None:
+    def _create_from_circle(self, entity: DXFEntity, object_type: ObjectType) -> ObjectData | None:
         """Create ObjectData from CIRCLE entity.
 
         Parameters
@@ -175,6 +182,7 @@ class ObjectDataFactory:
             layer = getattr(entity.dxf, "layer", "0")
 
             return ObjectData(
+                object_type=object_type,
                 dimensions=dimensions,
                 layer=layer,
                 positions=[position],
@@ -185,7 +193,7 @@ class ObjectDataFactory:
             log.error(f"Failed to process CIRCLE entity: {e}")
             return None
 
-    def _create_from_polyline(self, entity: DXFEntity, object_type: ShapeType) -> ObjectData | None:
+    def _create_from_polyline(self, entity: DXFEntity, object_type: ObjectType) -> ObjectData | None:
         """Create ObjectData from POLYLINE or LWPOLYLINE entity.
 
         Parameters
@@ -204,26 +212,26 @@ class ObjectDataFactory:
             points = extract_points_from_entity(entity)
             if not points:
                 return None
-            if object_type == ShapeType.PIPE:
+            if object_type.name.lower().startswith("pipe"):
                 return self._create_round_object_from_polygon(entity, points, object_type)
-            elif object_type == ShapeType.DUCT:
-                return self._create_rectangular_object(entity, points , object_type)
-            shape_type = detect_shape_type(points)
+            elif object_type == ObjectType.CABLE_DUCT:
+                return self._create_rectangular_object(entity, points, object_type)
+            shape_type = dxf.detect_shape_type(points)
             if shape_type == "rectangular":
                 return self._create_rectangular_object(entity, points, object_type)
             elif shape_type == "round":
-                return self._create_round_object_from_polygon(entity, points, object_type )
+                return self._create_round_object_from_polygon(entity, points, object_type)
             elif shape_type == "multi_sided":
-                return self._create_multi_sided_object(entity, points)
+                return self._create_multi_sided_object(entity, points, object_type)
             else:
                 # Linear or simple shape - treat as line-based
-                return self._create_line_object(entity, points)
+                return self._create_line_object(entity, points, object_type)
 
         except Exception as e:
             log.error(f"Failed to process polyline entity: {e}")
             return None
 
-    def _create_from_line(self, entity: DXFEntity, object_type: ShapeType) -> ObjectData | None:
+    def _create_from_line(self, entity: DXFEntity, object_type: ObjectType) -> ObjectData | None:
         """Create ObjectData from LINE entity.
 
         Parameters
@@ -239,15 +247,16 @@ class ObjectDataFactory:
             Created ObjectData or None if processing failed
         """
         try:
-            points = extract_points_from_entity(entity)
-            return self._create_line_object(entity, points)
+            points = dxf.extract_points_from(entity)
+            return self._create_line_object(entity, points, object_type)
 
         except Exception as e:
             log.error(f"Failed to process LINE entity: {e}")
             return None
 
     def _create_rectangular_object(
-        self, entity: DXFEntity, points: list[Point3D], object_type: ShapeType) -> ObjectData:
+        self, entity: DXFEntity, points: list[Point3D], object_type: ObjectType
+    ) -> ObjectData:
         """Create rectangular ObjectData from points.
 
         Parameters
@@ -278,6 +287,7 @@ class ObjectDataFactory:
         layer = getattr(entity.dxf, "layer", "0")
 
         return ObjectData(
+            object_type=object_type,
             dimensions=dimensions,
             layer=layer,
             positions=[position],
@@ -286,7 +296,8 @@ class ObjectDataFactory:
         )
 
     def _create_round_object_from_polygon(
-            self, entity: DXFEntity, points: list[Point3D], object_type: ShapeType) -> ObjectData:
+        self, entity: DXFEntity, points: list[Point3D], object_type: ObjectType
+    ) -> ObjectData:
         """Create round ObjectData from polygonal points.
 
         Parameters
@@ -313,6 +324,7 @@ class ObjectDataFactory:
         layer = getattr(entity.dxf, "layer", "0")
 
         return ObjectData(
+            object_type=object_type,
             dimensions=dimensions,
             layer=layer,
             positions=[position],
@@ -320,7 +332,9 @@ class ObjectDataFactory:
             color=color,
         )
 
-    def _create_multi_sided_object(self, entity: DXFEntity, points: list[Point3D]) -> ObjectData:
+    def _create_multi_sided_object(
+        self, entity: DXFEntity, points: list[Point3D], object_type: ObjectType
+    ) -> ObjectData:
         """Create multi-sided ObjectData from points.
 
         For multi-sided shapes, we use bounding box dimensions but keep
@@ -332,6 +346,8 @@ class ObjectDataFactory:
             Source entity
         points : List[Point3D]
             Points defining the multi-sided shape
+        object_type : ObjectType
+            Type of object (PIPE, DUCT, etc.)
 
         Returns
         -------
@@ -346,6 +362,7 @@ class ObjectDataFactory:
         layer = getattr(entity.dxf, "layer", "0")
 
         return ObjectData(
+            object_type=object_type,
             dimensions=dimensions,
             layer=layer,
             positions=[position],
@@ -353,7 +370,9 @@ class ObjectDataFactory:
             color=color,
         )
 
-    def _create_line_object(self, entity: DXFEntity, points: list[Point3D]) -> ObjectData:
+    def _create_line_object(
+        self, entity: DXFEntity, points: list[Point3D], object_type: ObjectType
+    ) -> ObjectData:
         """Create line-based ObjectData from points.
 
         Parameters
@@ -362,6 +381,8 @@ class ObjectDataFactory:
             Source entity
         points : List[Point3D]
             Points defining the line
+        object_type : ObjectType
+            Type of object (PIPE, DUCT, etc.)
 
         Returns
         -------
@@ -375,6 +396,7 @@ class ObjectDataFactory:
         layer = getattr(entity.dxf, "layer", "0")
 
         return ObjectData(
+            object_type=object_type,
             dimensions=dimensions,
             layer=layer,
             points=points,  # Line-based, use points not positions
@@ -507,9 +529,7 @@ class ObjectDataFactory:
 
         return dimensions, []
 
-    def _transform_block_geometry(
-        self, points: list[Point3D], insert_entity: Insert
-    ) -> list[Point3D]:
+    def _transform_block_geometry(self, points: list[Point3D], insert_entity: Insert) -> list[Point3D]:
         """Transform block geometry points to world coordinates.
 
         Parameters

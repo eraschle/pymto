@@ -2,7 +2,7 @@ import json
 import logging
 from pathlib import Path
 
-from .models import LayerData, Medium, MediumConfig, ShapeType
+from .models import LayerData, Medium, MediumConfig, ObjectType
 
 log = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ class ConfigurationHandler:
         log.warning(f"Unknown unit type: {unit}, defaulting to 'mm'")
         return "mm"
 
-    def _create_default_shape(self, shape: str) -> ShapeType:
+    def _create_default_shape(self, shape: str) -> ObjectType:
         """Create default shape based on string representation.
 
         Parameters
@@ -66,12 +66,12 @@ class ConfigurationHandler:
         ShapeType
             Corresponding ShapeType enum value
         """
-        for shape_type in ShapeType:
+        for shape_type in ObjectType:
             if shape_type.name.lower() != shape.lower():
                 continue
             return shape_type
         log.warning(f"Unknown shape type: {shape}, defaulting to UNKNOWN")
-        return ShapeType.UNKNOWN
+        return ObjectType.UNKNOWN
 
     def _create_config(self, medium_config: dict) -> MediumConfig:
         return MediumConfig(

@@ -45,6 +45,7 @@ class SpatialTextAssigner(IAssignmentStrategy):
         for element in elements:
             # Create a new ObjectData with all required fields
             new_element = ObjectData(
+                object_type=element.object_type,
                 dimensions=element.dimensions,
                 layer=element.layer,
                 points=element.points.copy() if element.points else [],

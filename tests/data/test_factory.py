@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 import ezdxf.filemanagement as ezdxf
 
+from dxfto.models import ObjectType
 from dxfto.process.objectdata_factory import ObjectDataFactory
 
 log = logging.getLogger(__name__)
@@ -46,7 +47,8 @@ def test_factory():
         log.info(f"  Classification: {'Element' if is_element else 'Line'}")
 
         # Create ObjectData
-        obj_data = factory.create_from_entity(entity)
+        object_type = ObjectType.SHAFT if is_element else ObjectType.PIPE_WASTEWATER
+        obj_data = factory.create_from_entity(entity, object_type=object_type)
         if obj_data is None:
             log.error("  Failed to create ObjectData")
             continue
