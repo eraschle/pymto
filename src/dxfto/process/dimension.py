@@ -12,13 +12,15 @@ from ..models import (
     RoundDimensions,
 )
 from . import dimension_extractor as dim
+from .dimension_mapper import InfrastructureDimensionMapper
 
 
 class DimensionUpdater:
     """Class to update dimensions in DXF entities."""
 
-    def __init__(self, target_unit: str) -> None:
+    def __init__(self, target_unit: str, dimension_mapper: InfrastructureDimensionMapper) -> None:
         self.target_unit = target_unit
+        self.dimension_mapper = dimension_mapper
         self.do_convert_dimension: bool = True
 
     def update_dimension(self, element: ObjectData, config: MediumConfig) -> None:
@@ -51,7 +53,9 @@ class DimensionUpdater:
                 if unit is None:
                     unit = config.default_unit
                 width = dim.convert_to_unit(width, unit, self.target_unit)
+                width = self.dimension_mapper.snap_dimension(int(width), element.object_type)
                 height = dim.convert_to_unit(height, unit, self.target_unit)
+                self.dimension_mapper.snap_dimension(int(height), element.object_type)
 
             length, width = sorted([width, height])
             element.dimensions.length = length

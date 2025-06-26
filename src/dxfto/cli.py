@@ -14,6 +14,7 @@ from dxfto.config import ConfigurationHandler
 from .assigners import SpatialTextAssigner, ZoneBasedTextAssigner
 from .io import DXFReader, JsonExporter, LandXMLReader
 from .process.dimension import DimensionUpdater
+from .process.dimension_mapper import InfrastructureDimensionMapper
 from .processor import DXFProcessor
 
 
@@ -131,7 +132,8 @@ def process_dxf(
         processor.assign_texts_to_mediums(text_assigner)
 
         click.echo("Updating dimensions based on assigned texts...")
-        dimension_updater = DimensionUpdater(target_unit="m")
+        dim_mapper = InfrastructureDimensionMapper()
+        dimension_updater = DimensionUpdater(target_unit="m", dimension_mapper=dim_mapper)
         processor.update_dimensions(dimension_updater)
 
         # Process LandXML if provided
