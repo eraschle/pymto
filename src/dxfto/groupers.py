@@ -149,10 +149,10 @@ class ColorBasedGrouper:
                 dominant_color = self._get_dominant_color(color_group)
                 medium_name = self._color_to_medium_name(dominant_color)
 
-                from .models import AssignmentConfig
+                from .models import MediumConfig
 
-                element_config = AssignmentConfig(geometry=[], text=[])
-                line_config = AssignmentConfig(geometry=[], text=[])
+                element_config = MediumConfig(geometry=[], text=[], default_unit="mm")
+                line_config = MediumConfig(geometry=[], text=[], default_unit="mm")
 
                 medium = Medium(
                     name=f"{medium_name}_{i + 1}",

@@ -1,7 +1,8 @@
 {
     "Hauptleitung": {
         "Leitung": {
-            "Shape": "Round",
+            "Unit": "mm",
+            "Shape": "Pipe",
             "Geometrie": [
                 {
                     "Name": "Leitung--Hauptleitungen-",
@@ -48,7 +49,8 @@
             ]
         },
         "Element": {
-            "Shape": "Round",
+            "Unit": "cm",
+            "Shape": "Shaft",
             "Geometrie": [
                 {
                     "Name": "Normschacht--T-",
@@ -69,7 +71,8 @@
     },
     "Nebenleitung": {
         "Leitung": {
-            "Shape": "Round",
+            "Unit": "mm",
+            "Shape": "Pipe",
             "Geometrie": [
                 {
                     "Name": "Leitung--Nebenleitungen-",
@@ -100,7 +103,8 @@
             ]
         },
         "Element": {
-            "Shape": "Round",
+            "Unit": "cm",
+            "Shape": "Shaft",
             "Geometrie": [
                 {
                     "Name": "Normschacht--T-",
@@ -121,7 +125,8 @@
     },
     "Abwasser_Orange": {
         "Leitung": {
-            "Shape": "Round",
+            "Unit": "mm",
+            "Shape": "Pipe",
             "Geometrie": [
                 {
                     "Name": "Haltung--T-",
@@ -144,7 +149,8 @@
             ]
         },
         "Element": {
-            "Shape": "Round",
+            "Unit": "cm",
+            "Shape": "Shaft",
             "Geometrie": [
                 {
                     "Name": "Normschacht--T-",
@@ -165,7 +171,8 @@
     },
     "Abwasser_Violett": {
         "Leitung": {
-            "Shape": "Round",
+            "Unit": "mm",
+            "Shape": "Pipe",
             "Geometrie": [
                 {
                     "Name": "Haltung--T-",
@@ -188,7 +195,8 @@
             ]
         },
         "Element": {
-            "Shape": "Round",
+            "Unit": "cm",
+            "Shape": "Shaft",
             "Geometrie": [
                 {
                     "Name": "Normschacht--T-",
@@ -209,7 +217,8 @@
     },
     "Abwasser_Magenta": {
         "Leitung": {
-            "Shape": "Round",
+            "Unit": "mm",
+            "Shape": "Pipe",
             "Geometrie": [
                 {
                     "Name": "Haltung--T-",
@@ -240,7 +249,8 @@
             ]
         },
         "Element": {
-            "Shape": "Round",
+            "Unit": "cm",
+            "Shape": "Shaft",
             "Geometrie": [
                 {
                     "Name": "Normschacht--T-",
@@ -261,7 +271,8 @@
     },
     "Abwasser_Grün": {
         "Leitung": {
-            "Shape": "Round",
+            "Unit": "mm",
+            "Shape": "Pipe",
             "Geometrie": [
                 {
                     "Name": "Haltung--T-",
@@ -284,6 +295,8 @@
             ]
         },
         "Element": {
+            "Unit": "cm",
+            "Shape": "Shaft",
             "Geometrie": [
                 {
                     "Name": "Normschacht--T-",

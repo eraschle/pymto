@@ -1,7 +1,10 @@
 import json
+import logging
 from pathlib import Path
 
-from .models import AssignmentConfig, LayerData, Medium
+from .models import LayerData, Medium, MediumConfig, ShapeType
+
+log = logging.getLogger(__name__)
 
 
 class ConfigurationHandler:
@@ -20,23 +23,7 @@ class ConfigurationHandler:
             Path to JSON configuration file
         """
         self.config_path = config_path
-        self.medium_configs: dict[str, Medium] = {}
-
-    @property
-    def text_count(self) -> int:
-        count = 0
-        for medium in self.medium_configs.values():
-            count += len(medium.element_data.texts)
-            count += len(medium.line_data.texts)
-        return count
-
-    @property
-    def element_count(self) -> int:
-        count = 0
-        for medium in self.medium_configs.values():
-            count += len(medium.element_data.elements)
-            count += len(medium.line_data.elements)
-        return count
+        self.mediums: dict[str, Medium] = {}
 
     def _create_layers(self, layer_data: list[dict]) -> list[LayerData]:
         layers = []
@@ -49,10 +36,49 @@ class ConfigurationHandler:
             )
         return layers
 
-    def _create_assignment(self, assignments: dict) -> AssignmentConfig:
-        return AssignmentConfig(
-            geometry=self._create_layers(assignments.get("Geometrie", [])),
-            text=self._create_layers(assignments.get("Text", [])),
+    def _create_default_unit(self, unit: str) -> str:
+        """Create default unit based on string representation.
+
+        Parameters
+        ----------
+        unit : str
+            Unit type as string (e.g., "mm", "cm", "m")
+        Returns
+        -------
+        str
+            Corresponding unit string
+        """
+        valid_units = {"mm", "cm", "m"}
+        if unit.lower() in valid_units:
+            return unit.lower()
+        log.warning(f"Unknown unit type: {unit}, defaulting to 'mm'")
+        return "mm"
+
+    def _create_default_shape(self, shape: str) -> ShapeType:
+        """Create default shape based on string representation.
+
+        Parameters
+        ----------
+        shape : str
+            Shape type as string (e.g., "RECTANGLE", "CIRCLE")
+        Returns
+        -------
+        ShapeType
+            Corresponding ShapeType enum value
+        """
+        for shape_type in ShapeType:
+            if shape_type.name.lower() != shape.lower():
+                continue
+            return shape_type
+        log.warning(f"Unknown shape type: {shape}, defaulting to UNKNOWN")
+        return ShapeType.UNKNOWN
+
+    def _create_config(self, medium_config: dict) -> MediumConfig:
+        return MediumConfig(
+            default_shape=self._create_default_shape(medium_config.get("Shape", "NONE")),
+            default_unit=self._create_default_unit(medium_config.get("Unit", "mm")),
+            geometry=self._create_layers(medium_config.get("Geometrie", [])),
+            text=self._create_layers(medium_config.get("Text", [])),
         )
 
     def load_config(self) -> None:
@@ -85,10 +111,10 @@ class ConfigurationHandler:
                 line_data = medium_data.get("Leitung", {})
                 object_data = medium_data.get("Element", {})
 
-                self.medium_configs[medium_name] = Medium(
+                self.mediums[medium_name] = Medium(
                     name=medium_name,
-                    elements=self._create_assignment(object_data),
-                    lines=self._create_assignment(line_data),
+                    elements=self._create_config(object_data),
+                    lines=self._create_config(line_data),
                 )
 
         except json.JSONDecodeError as e:

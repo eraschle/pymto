@@ -286,7 +286,7 @@ class TestObjectDataFactoryInsertEntity:
 
             mock_isinstance.side_effect = isinstance_side_effect
 
-            result = factory_with_blocks.create_from_entity(entity)
+            result = factory_with_blocks.create_from_entity(entity, config)
 
         assert result is not None
         assert isinstance(result, ObjectData)

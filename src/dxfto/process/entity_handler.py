@@ -12,7 +12,7 @@ from ezdxf.entities.line import Line
 from ezdxf.entities.lwpolyline import LWPolyline
 from ezdxf.entities.polyline import Polyline
 
-from ..models import Point3D
+from ..models import MediumConfig, Point3D, ShapeType
 
 log = logging.getLogger(__name__)
 
@@ -92,17 +92,16 @@ def detect_shape_type(points: list[Point3D]) -> str:
         return "linear"
     elif num_points < 4:
         return "linear"
-    elif num_points == 4:
-        if is_rectangular_shape(points):
-            return "rectangular"
-        else:
-            return "multi_sided"
-    else:
-        # Check if it's a regular polygon that might be treated as round
-        if is_near_circular_shape(points):
-            return "round"
-        else:
-            return "multi_sided"
+    elif num_points == 4 and is_rectangular_shape(points):
+        return "rectangular"
+    elif is_closed_shape(points):
+        return "multi_sided"
+    elif is_near_circular_shape(points):
+        return "round"
+    raise ValueError(
+        "Cannot determine shape type from points: "
+        f"{num_points} points provided, expected at least 2."
+    )
 
 
 def is_rectangular_shape(points: list[Point3D]) -> bool:
@@ -127,6 +126,24 @@ def is_rectangular_shape(points: list[Point3D]) -> bool:
 
     return abs(diagonal1 - diagonal2) < 1e-6
 
+def is_closed_shape(points: list[Point3D]) -> bool:
+    """Check if a shape defined by points is closed (first point == last point).
+
+    Parameters
+    ----------
+    points : List[Point3D]
+        List of points defining the shape
+
+    Returns
+    -------
+    bool
+        True if shape is closed
+    """
+    if len(points) < 3:
+        return False
+
+    # Check if first and last points are the same
+    return points[0].distance_2d(points[-1]) < 1e-6
 
 def is_near_circular_shape(points: list[Point3D]) -> bool:
     """Check if points form a near-circular shape (regular polygon with many sides).
@@ -377,3 +394,20 @@ def is_element_entity(entity: DXFEntity) -> bool:
 
     # Simple lines and short polylines are typically pipes
     return False
+
+
+def is_text_entity(entity: DXFEntity) -> bool:
+    """Determine if a DXF entity should be processed as text.
+
+    Parameters
+    ----------
+    entity : DXFEntity
+        DXF entity to classify
+
+    Returns
+    -------
+    bool
+        True if entity should be processed as teo
+    """
+    entity_type = entity.dxftype()
+    return entity_type in ("TEXT", "MTEXT", "ATTRIB", "ATTDEF", "DIMENSION")

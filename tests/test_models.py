@@ -4,12 +4,12 @@ import numpy as np
 import pytest
 
 from dxfto.models import (
-    AssignmentConfig,
     AssingmentData,
     DxfColor,
     DxfText,
     LayerData,
     Medium,
+    MediumConfig,
     ObjectData,
     Point3D,
     RectangularDimensions,
@@ -210,29 +210,9 @@ class TestAssignmentConfig:
             LayerData(name="TEXT", color=(0, 0, 0)),
         ]
 
-        config = AssignmentConfig(geometry=geometry_layers, text=text_layers)
+        config = MediumConfig(geometry=geometry_layers, text=text_layers, default_unit="mm")
         assert config.geometry == geometry_layers
         assert config.text == text_layers
-
-    def test_layers_property(self):
-        """Test layers property."""
-        geometry_layers = [
-            LayerData(name="PIPES", color=(0, 255, 0)),
-            LayerData(name="SHAFTS", color=(255, 0, 0)),
-        ]
-        text_layers = [
-            LayerData(name="TEXT", color=(0, 0, 0)),
-            LayerData(name="LABELS", color=(128, 128, 128)),
-        ]
-
-        config = AssignmentConfig(geometry=geometry_layers, text=text_layers)
-        layers = config.layers
-
-        assert len(layers) == 4
-        assert "PIPES" in layers
-        assert "SHAFTS" in layers
-        assert "TEXT" in layers
-        assert "LABELS" in layers
 
 
 class TestAssingmentData:
@@ -275,8 +255,8 @@ class TestMedium:
         geometry_layers = [LayerData(name="PIPES", color=(0, 255, 0))]
         text_layers = [LayerData(name="TEXT", color=(0, 0, 0))]
 
-        elements_config = AssignmentConfig(geometry=geometry_layers, text=text_layers)
-        lines_config = AssignmentConfig(geometry=geometry_layers, text=text_layers)
+        elements_config = MediumConfig(geometry=geometry_layers, text=text_layers, default_unit="mm")
+        lines_config = MediumConfig(geometry=geometry_layers, text=text_layers, default_unit="mm")
 
         medium = Medium(name="Abwasserleitung", elements=elements_config, lines=lines_config)
 

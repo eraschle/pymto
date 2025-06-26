@@ -13,10 +13,12 @@ from ezdxf.entities.dxfentity import DXFEntity
 from ezdxf.entities.insert import Insert
 
 from ..models import (
+    MediumConfig,
     ObjectData,
     Point3D,
     RectangularDimensions,
     RoundDimensions,
+    ShapeType,
 )
 from .entity_handler import (
     calculate_bounding_box_dimensions,
@@ -31,6 +33,20 @@ from .entity_handler import (
 
 log = logging.getLogger(__name__)
 
+def is_pipe_or_duct(object_type: ShapeType) -> bool:
+    """Check if the object type is PIPE or DUCT.
+
+    Parameters
+    ----------
+    object_type : ShapeType
+        The type of the object to check
+
+    Returns
+    -------
+    bool
+        True if the object type is PIPE or DUCT, False otherwise
+    """
+    return object_type in (ShapeType.PIPE, ShapeType.DUCT)
 
 class ObjectDataFactory:
     """Factory for creating ObjectData from DXF entities."""
@@ -46,13 +62,15 @@ class ObjectDataFactory:
         self.doc = dxf_document
         self._block_cache = {}
 
-    def create_from_entity(self, entity: DXFEntity) -> ObjectData | None:
+    def create_from_entity(self, entity: DXFEntity, object_type: ShapeType) -> ObjectData | None:
         """Create ObjectData from any DXF entity.
 
         Parameters
         ----------
         entity : DXFEntity
             DXF entity to process
+        config : MediumConfig
+            Configuration for medium processing
 
         Returns
         -------
@@ -63,13 +81,13 @@ class ObjectDataFactory:
             entity_type = entity.dxftype()
 
             if entity_type == "INSERT":
-                return self._create_from_insert(entity)
+                return self._create_from_insert(entity, object_type)
             elif entity_type == "CIRCLE":
-                return self._create_from_circle(entity)
+                return self._create_from_circle(entity, object_type)
             elif entity_type in ("POLYLINE", "LWPOLYLINE"):
-                return self._create_from_polyline(entity)
+                return self._create_from_polyline(entity, object_type)
             elif entity_type == "LINE":
-                return self._create_from_line(entity)
+                return self._create_from_line(entity, object_type)
             else:
                 log.warning(f"Unsupported entity type: {entity_type}")
                 return None
@@ -78,13 +96,15 @@ class ObjectDataFactory:
             log.error(f"Failed to create ObjectData from {entity.dxftype()}: {e}")
             return None
 
-    def _create_from_insert(self, entity: DXFEntity) -> ObjectData | None:
+    def _create_from_insert(self, entity: DXFEntity, object_type: ShapeType) -> ObjectData | None:
         """Create ObjectData from INSERT entity (block reference).
 
         Parameters
         ----------
         entity : Insert
             INSERT entity to process
+        config : MediumConfig
+            Configuration for medium processing
 
         Returns
         -------
@@ -126,13 +146,15 @@ class ObjectDataFactory:
             log.error(f"Failed to process INSERT entity: {e}")
             return None
 
-    def _create_from_circle(self, entity: DXFEntity) -> ObjectData | None:
+    def _create_from_circle(self, entity: DXFEntity, object_type: ShapeType) -> ObjectData | None:
         """Create ObjectData from CIRCLE entity.
 
         Parameters
         ----------
         entity : Circle
             CIRCLE entity to process
+        config : MediumConfig
+            Configuration for medium processing
 
         Returns
         -------
@@ -163,13 +185,15 @@ class ObjectDataFactory:
             log.error(f"Failed to process CIRCLE entity: {e}")
             return None
 
-    def _create_from_polyline(self, entity: DXFEntity) -> ObjectData | None:
+    def _create_from_polyline(self, entity: DXFEntity, object_type: ShapeType) -> ObjectData | None:
         """Create ObjectData from POLYLINE or LWPOLYLINE entity.
 
         Parameters
         ----------
         entity : DXFEntity
             POLYLINE or LWPOLYLINE entity to process
+        config : MediumConfig
+            Configuration for medium processing
 
         Returns
         -------
@@ -180,13 +204,15 @@ class ObjectDataFactory:
             points = extract_points_from_entity(entity)
             if not points:
                 return None
-
+            if object_type == ShapeType.PIPE:
+                return self._create_round_object_from_polygon(entity, points, object_type)
+            elif object_type == ShapeType.DUCT:
+                return self._create_rectangular_object(entity, points , object_type)
             shape_type = detect_shape_type(points)
-
             if shape_type == "rectangular":
-                return self._create_rectangular_object(entity, points)
+                return self._create_rectangular_object(entity, points, object_type)
             elif shape_type == "round":
-                return self._create_round_object_from_polygon(entity, points)
+                return self._create_round_object_from_polygon(entity, points, object_type )
             elif shape_type == "multi_sided":
                 return self._create_multi_sided_object(entity, points)
             else:
@@ -197,13 +223,15 @@ class ObjectDataFactory:
             log.error(f"Failed to process polyline entity: {e}")
             return None
 
-    def _create_from_line(self, entity: DXFEntity) -> ObjectData | None:
+    def _create_from_line(self, entity: DXFEntity, object_type: ShapeType) -> ObjectData | None:
         """Create ObjectData from LINE entity.
 
         Parameters
         ----------
         entity : DXFEntity
             LINE entity to process
+        config : MediumConfig
+            Configuration for medium processing
 
         Returns
         -------
@@ -218,7 +246,8 @@ class ObjectDataFactory:
             log.error(f"Failed to process LINE entity: {e}")
             return None
 
-    def _create_rectangular_object(self, entity: DXFEntity, points: list[Point3D]) -> ObjectData:
+    def _create_rectangular_object(
+        self, entity: DXFEntity, points: list[Point3D], object_type: ShapeType) -> ObjectData:
         """Create rectangular ObjectData from points.
 
         Parameters
@@ -227,16 +256,20 @@ class ObjectDataFactory:
             Source entity
         points : List[Point3D]
             Points defining the rectangle
+        object_type : ShapeType
+            Type of object (PIPE, DUCT, etc.)
 
         Returns
         -------
         ObjectData
             Created ObjectData with rectangular dimensions
         """
-        if is_rectangular_shape(points):
-            length, width = calculate_precise_rectangular_dimensions(points)
-        else:
-            length, width = calculate_bounding_box_dimensions(points)
+        length, width = 0.0, 0.0
+        if not is_pipe_or_duct(object_type):
+            if is_rectangular_shape(points):
+                length, width = calculate_precise_rectangular_dimensions(points)
+            else:
+                length, width = calculate_bounding_box_dimensions(points)
 
         position = calculate_center_point(points)
         dimensions = RectangularDimensions(length=length, width=width, angle=0.0)
@@ -252,7 +285,8 @@ class ObjectDataFactory:
             color=color,
         )
 
-    def _create_round_object_from_polygon(self, entity: DXFEntity, points: list[Point3D]) -> ObjectData:
+    def _create_round_object_from_polygon(
+            self, entity: DXFEntity, points: list[Point3D], object_type: ShapeType) -> ObjectData:
         """Create round ObjectData from polygonal points.
 
         Parameters
@@ -261,6 +295,8 @@ class ObjectDataFactory:
             Source entity
         points : List[Point3D]
             Points defining the near-circular shape
+        object_type : ShapeType
+            Type of object (PIPE, DUCT, etc.)
 
         Returns
         -------
@@ -268,7 +304,9 @@ class ObjectDataFactory:
             Created ObjectData with round dimensions
         """
         position = calculate_center_point(points)
-        diameter = estimate_diameter_from_polygon(points)
+        diameter = 0.0
+        if not is_pipe_or_duct(object_type):
+            diameter = estimate_diameter_from_polygon(points)
         dimensions = RoundDimensions(diameter=diameter)
 
         color = self._get_entity_color(entity)
@@ -363,7 +401,9 @@ class ObjectDataFactory:
             self._block_cache[block_name] = entities
         return self._block_cache[block_name]
 
-    def _analyze_block_shape(self, insert_entity: Insert, block_entities: list[DXFEntity]) -> tuple | None:
+    def _analyze_block_shape(
+        self, insert_entity: Insert, block_entities: list[DXFEntity]
+    ) -> tuple | None:
         """Analyze block geometry to determine shape and dimensions.
 
         Parameters
@@ -467,7 +507,9 @@ class ObjectDataFactory:
 
         return dimensions, []
 
-    def _transform_block_geometry(self, points: list[Point3D], insert_entity: Insert) -> list[Point3D]:
+    def _transform_block_geometry(
+        self, points: list[Point3D], insert_entity: Insert
+    ) -> list[Point3D]:
         """Transform block geometry points to world coordinates.
 
         Parameters

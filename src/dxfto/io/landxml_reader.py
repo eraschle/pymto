@@ -104,7 +104,7 @@ class LandXMLReader:
 
         return float(interpolated_z)
 
-    def update_points_elevation(self, points: list[Point3D]) -> list[Point3D]:
+    def update_elevation(self, points: list[Point3D]) -> list[Point3D]:
         """Update Z coordinates for a list of points using elevation data.
 
         Parameters

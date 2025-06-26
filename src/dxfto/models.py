@@ -13,8 +13,10 @@ import numpy as np
 class ShapeType(Enum):
     """Shape types for pipes and shafts."""
 
-    RECTANGULAR = "rectangular"
-    ROUND = "round"
+    UNKNOWN = "unknown"
+    SHAFT = "shaft"
+    PIPE = "pipe"
+    DUCT = "duct"
 
 
 @dataclass(frozen=True)
@@ -146,7 +148,6 @@ class ObjectData:
     It can be extended with common properties or methods in the future.
     """
 
-    # Currently empty, but can be extended later
     dimensions: RectangularDimensions | RoundDimensions
     layer: str
     points: list[Point3D] = field(default_factory=list)
@@ -166,15 +167,11 @@ class LayerData:
 
 
 @dataclass(frozen=True)
-class AssignmentConfig:
+class MediumConfig:
     geometry: list[LayerData]
     text: list[LayerData]
-
-    @property
-    def layers(self) -> list[str]:
-        """Return all layer names from geometry and text configurations."""
-        all_layers = self.geometry + self.text
-        return [layer.name for layer in all_layers]
+    default_unit: str = "mm"
+    default_shape: ShapeType = ShapeType.UNKNOWN
 
 
 @dataclass(frozen=True)
@@ -218,7 +215,7 @@ class Medium:
     """
 
     name: str
-    elements: AssignmentConfig
-    lines: AssignmentConfig
+    elements: MediumConfig
+    lines: MediumConfig
     element_data: AssingmentData = field(default_factory=AssingmentData, init=False)
     line_data: AssingmentData = field(default_factory=AssingmentData, init=False)

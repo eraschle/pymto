@@ -5,12 +5,11 @@ for grouping DXF elements and assigning texts to pipes to be
 easily interchangeable following SOLID principles.
 """
 
-from typing import Protocol, runtime_checkable
+from typing import Protocol
 
-from .models import DxfText, Medium, ObjectData
+from .models import DxfText, Medium, MediumConfig, ObjectData, Point3D
 
 
-@runtime_checkable
 class IGroupingStrategy(Protocol):
     """Protocol for grouping DXF elements into media.
 
@@ -36,17 +35,14 @@ class IGroupingStrategy(Protocol):
         ...
 
 
-@runtime_checkable
-class ITextAssignmentStrategy(Protocol):
+class IAssignmentStrategy(Protocol):
     """Protocol for assigning texts to pipes.
 
     Implementations should assign text elements to pipes based on
     spatial proximity and validity rules.
     """
 
-    def assign_texts_to_line_based(
-        self, elements: list[ObjectData], texts: list[DxfText]
-    ) -> list[ObjectData]:
+    def texts_to_line_based(self, elements: list[ObjectData], texts: list[DxfText]) -> list[ObjectData]:
         """Assign texts to elements based on spatial proximity.
 
         Parameters
@@ -63,9 +59,7 @@ class ITextAssignmentStrategy(Protocol):
         """
         ...
 
-    def assign_texts_to_point_based(
-        self, elements: list[ObjectData], texts: list[DxfText]
-    ) -> list[ObjectData]:
+    def texts_to_point_based(self, elements: list[ObjectData], texts: list[DxfText]) -> list[ObjectData]:
         """Assign texts to elements based on spatial proximity.
 
         Parameters
@@ -81,4 +75,61 @@ class ITextAssignmentStrategy(Protocol):
             List of elements with assigned texts where applicable
         """
 
+        ...
+
+
+class IElevationUpdater(Protocol):
+    def update_elevation(self, points: list[Point3D]) -> list[Point3D]:
+        """Update Z coordinates for a list of points using elevation data.
+
+        Parameters
+        ----------
+        points : list[Point3D]
+            List of points to update with elevation data
+
+        Returns
+        -------
+        list[Point3D]
+            List of points with updated Z coordinates
+        """
+        ...
+
+
+class IDimensionUpdater(Protocol):
+    """Protocol for updating dimensions of media based on their elements."""
+
+    def update_dimension(self, element: ObjectData, config: MediumConfig) -> None:
+        """Update dimensions of a single element based on other information.
+
+        Default unit is used to determine how to interpret dimensions
+        when no unit is specified or could be extracted from the element.
+
+        Parameters
+        ----------
+        medium : Medium
+            Medium containing the element to update
+        element : ObjectData
+            Element for which to update dimensions
+        Returns
+        -------
+        None
+        """
+        ...
+
+
+class IExporter(Protocol):
+    """Protocol for exporting media data to a specified format."""
+
+    def export_data(self, mediums: list[Medium]) -> None:
+        """Export media data to a specified format (e.g., JSON).
+
+        Parameters
+        ----------
+        mediums : list[Medium]
+            List of media to export
+
+        Returns
+        -------
+        None
+        """
         ...

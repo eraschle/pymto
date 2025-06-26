@@ -9,8 +9,8 @@ import logging
 
 from ezdxf.entities.dxfentity import DXFEntity
 
-from ..models import AssignmentConfig
-from ..process.entity_handler import is_element_entity
+from ..models import MediumConfig
+from ..process import entity_handler
 
 log = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ class DXFEntityExtractor:
         """
         self.reader = dxf_reader
 
-    def extract_entities(self, config: AssignmentConfig) -> dict[str, list[DXFEntity]]:
+    def extract_entities(self, config: MediumConfig) -> dict[str, list[DXFEntity]]:
         """Extract entities categorized by type.
 
         Parameters
@@ -46,35 +46,12 @@ class DXFEntityExtractor:
             Dictionary with 'elements', 'lines', and 'texts' keys
         """
         return {
-            "elements": self._extract_element_entities(config),
-            "lines": self._extract_line_entities(config),
+            "geometries": self._extract_geometry_entities(config),
             "texts": self._extract_text_entities(config),
         }
 
-    def _extract_element_entities(self, config: AssignmentConfig) -> list[DXFEntity]:
-        """Extract entities that should be processed as elements (shafts, etc.).
-
-        Parameters
-        ----------
-        config : AssignmentConfig
-            Configuration for geometry layers
-
-        Returns
-        -------
-        list[DXFEntity]
-            List of entities to be processed as elements
-        """
-        entities = []
-
-        for entity in self.reader.query_entities(config.geometry):
-            if is_element_entity(entity):
-                entities.append(entity)
-
-        log.debug(f"Extracted {len(entities)} element entities")
-        return entities
-
-    def _extract_line_entities(self, config: AssignmentConfig) -> list[DXFEntity]:
-        """Extract entities that should be processed as lines (pipes, etc.).
+    def _extract_geometry_entities(self, config: MediumConfig) -> list[DXFEntity]:
+        """Extract geometry entities from specified layers.
 
         Parameters
         ----------
@@ -88,14 +65,17 @@ class DXFEntityExtractor:
         """
         entities = []
 
-        for entity in self.reader.query_entities(config.geometry):
-            if not is_element_entity(entity):
+        for layer_data in config.geometry:
+            for entity in self.reader.query_layer(layer_data):
+                if entity_handler.is_text_entity(entity):
+                    continue
+
                 entities.append(entity)
 
-        log.debug(f"Extracted {len(entities)} line entities")
+        log.debug(f"Extracted {len(entities)} geometry entities")
         return entities
 
-    def _extract_text_entities(self, config: AssignmentConfig) -> list[DXFEntity]:
+    def _extract_text_entities(self, config: MediumConfig) -> list[DXFEntity]:
         """Extract text entities from specified layers.
 
         Parameters
@@ -110,8 +90,10 @@ class DXFEntityExtractor:
         """
         entities = []
 
-        for entity in self.reader.query_entities(config.text):
-            if entity.dxftype() in ("TEXT", "MTEXT"):
+        for layer_data in config.text:
+            for entity in self.reader.query_layer(layer_data):
+                if not entity_handler.is_text_entity(entity):
+                    continue
                 entities.append(entity)
 
         log.debug(f"Extracted {len(entities)} text entities")

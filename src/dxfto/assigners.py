@@ -7,12 +7,12 @@ or pipe junctions.
 
 import numpy as np
 
-from dxfto.protocols import ITextAssignmentStrategy
+from dxfto.protocols import IAssignmentStrategy
 
 from .models import DxfText, ObjectData, Point3D
 
 
-class SpatialTextAssigner(ITextAssignmentStrategy):
+class SpatialTextAssigner(IAssignmentStrategy):
     """Assigns texts to pipes based on spatial proximity.
 
     This assigner uses spatial analysis to find the closest pipe
@@ -20,7 +20,7 @@ class SpatialTextAssigner(ITextAssignmentStrategy):
     and validity between shafts/junctions.
     """
 
-    def __init__(self, max_distance: float = 50.0) -> None:
+    def __init__(self, max_distance: float) -> None:
         """Initialize spatial text assigner.
 
         Parameters
@@ -55,9 +55,7 @@ class SpatialTextAssigner(ITextAssignmentStrategy):
             copied_elements.append(new_element)
         return copied_elements
 
-    def assign_texts_to_point_based(
-        self, elements: list[ObjectData], texts: list[DxfText]
-    ) -> list[ObjectData]:
+    def texts_to_point_based(self, elements: list[ObjectData], texts: list[DxfText]) -> list[ObjectData]:
         """Assign texts to point-based elements based on spatial proximity.
 
         For point-based elements, texts are assigned to the closest element
@@ -138,9 +136,7 @@ class SpatialTextAssigner(ITextAssignmentStrategy):
 
         return closest_element_idx, min_distance
 
-    def assign_texts_to_line_based(
-        self, elements: list[ObjectData], texts: list[DxfText]
-    ) -> list[ObjectData]:
+    def texts_to_line_based(self, elements: list[ObjectData], texts: list[DxfText]) -> list[ObjectData]:
         """Assign texts to pipes based on spatial proximity.
 
         Each text can be assigned to at most one pipe segment.
@@ -184,7 +180,7 @@ class SpatialTextAssigner(ITextAssignmentStrategy):
 
         # For each text, find the closest element segment
         for text in texts:
-            closest_element_idx, closest_segment_idx, distance = self._find_closest_element_segment(
+            closest_element_idx, _, distance = self._find_closest_element_segment(
                 text.position, element_segments, segment_to_element
             )
 
@@ -285,7 +281,7 @@ class SpatialTextAssigner(ITextAssignmentStrategy):
         return float(np.linalg.norm(p - closest_point))
 
 
-class ZoneBasedTextAssigner(ITextAssignmentStrategy):
+class ZoneBasedTextAssigner(IAssignmentStrategy):
     """Assigns texts to pipes using zone-based validation.
 
     This assigner ensures that text assignments are valid only
@@ -306,9 +302,7 @@ class ZoneBasedTextAssigner(ITextAssignmentStrategy):
         self.max_distance = max_distance
         self.zone_buffer = zone_buffer
 
-    def assign_texts_to_point_based(
-        self, elements: list[ObjectData], texts: list[DxfText]
-    ) -> list[ObjectData]:
+    def texts_to_point_based(self, elements: list[ObjectData], texts: list[DxfText]) -> list[ObjectData]:
         """Assign texts to point-based elements with zone validation.
 
         This method uses spatial assignment as base but adds zone-based
@@ -331,7 +325,7 @@ class ZoneBasedTextAssigner(ITextAssignmentStrategy):
 
         # First, use spatial assignment as base
         spatial_assigner = SpatialTextAssigner(self.max_distance)
-        assigned_elements = spatial_assigner.assign_texts_to_point_based(elements, texts)
+        assigned_elements = spatial_assigner.texts_to_point_based(elements, texts)
 
         # Then validate assignments based on zones
         for element in assigned_elements:
@@ -349,9 +343,7 @@ class ZoneBasedTextAssigner(ITextAssignmentStrategy):
 
         return assigned_elements
 
-    def assign_texts_to_line_based(
-        self, elements: list[ObjectData], texts: list[DxfText]
-    ) -> list[ObjectData]:
+    def texts_to_line_based(self, elements: list[ObjectData], texts: list[DxfText]) -> list[ObjectData]:
         """Assign texts to pipes using zone-based validation.
 
         Text assignments are valid only in zones between pipe
@@ -374,7 +366,7 @@ class ZoneBasedTextAssigner(ITextAssignmentStrategy):
 
         # First, use spatial assignment as base
         spatial_assigner = SpatialTextAssigner(self.max_distance)
-        assigned_elements = spatial_assigner.assign_texts_to_line_based(elements, texts)
+        assigned_elements = spatial_assigner.texts_to_line_based(elements, texts)
 
         # Then validate assignments based on zones
         # This is a simplified implementation - in practice, you would
@@ -382,17 +374,18 @@ class ZoneBasedTextAssigner(ITextAssignmentStrategy):
 
         # For now, we validate that text is not too close to element endpoints
         for element in assigned_elements:
-            if element.assigned_text is not None:
-                text_pos = element.assigned_text.position
+            if element.assigned_text is None:
+                continue
+            text_pos = element.assigned_text.position
 
-                # Check if text is too close to element start or end (for elements with points)
-                if element.points and len(element.points) >= 2:
-                    start_distance = text_pos.distance_2d(element.points[0])
-                    end_distance = text_pos.distance_2d(element.points[-1])
+            # Check if text is too close to element start or end (for elements with points)
+            if element.points and len(element.points) >= 2:
+                start_distance = text_pos.distance_2d(element.points[0])
+                end_distance = text_pos.distance_2d(element.points[-1])
 
-                    # If text is too close to endpoints, remove assignment
-                    if start_distance < self.zone_buffer or end_distance < self.zone_buffer:
-                        element.assigned_text = None
+                # If text is too close to endpoints, remove assignment
+                if start_distance < self.zone_buffer or end_distance < self.zone_buffer:
+                    element.assigned_text = None
 
         return assigned_elements
 
@@ -435,7 +428,7 @@ class ZoneBasedTextAssigner(ITextAssignmentStrategy):
         remaining_texts = texts.copy()
 
         if point_based:
-            point_assigned = self.assign_texts_to_point_based(point_based, remaining_texts)
+            point_assigned = self.texts_to_point_based(point_based, remaining_texts)
             assigned_elements.extend(point_assigned)
 
             # Remove used texts from remaining texts
@@ -444,7 +437,7 @@ class ZoneBasedTextAssigner(ITextAssignmentStrategy):
 
         # Then process line-based elements with remaining texts
         if line_based:
-            line_assigned = self.assign_texts_to_line_based(line_based, remaining_texts)
+            line_assigned = self.texts_to_line_based(line_based, remaining_texts)
             assigned_elements.extend(line_assigned)
 
         # Add any elements that weren't point or line based

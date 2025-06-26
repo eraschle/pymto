@@ -7,14 +7,15 @@ This package provides:
 - DXFProcessor: Orchestrator for the complete pipeline
 """
 
-from .dxf_processor import DXFProcessor
-from .dxf_reader import DXFReader as LegacyDXFReader
-from .dxf_reader_clean import DXFReader
+from .dxf_reader import DXFReader
 from .entity_extractor import DXFEntityExtractor
+from .json_exporter import AsIsDataJsonExporter, JsonExporter
+from .landxml_reader import LandXMLReader
 
 __all__ = [
-    "DXFProcessor",
     "DXFReader",
     "DXFEntityExtractor",
-    "LegacyDXFReader",
+    "LandXMLReader",
+    "JsonExporter",
+    "AsIsDataJsonExporter",
 ]

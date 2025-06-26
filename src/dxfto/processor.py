@@ -6,24 +6,22 @@ orchestrator pattern.
 """
 
 import logging
-from pathlib import Path
-from typing import Any
+from collections.abc import Iterable
 
 from ezdxf.entities.dxfentity import DXFEntity
 from ezdxf.entities.mtext import MText
 from ezdxf.entities.text import Text
 
-from ..models import (
-    AssignmentConfig,
-    AssingmentData,
-    DxfText,
-    Medium,
-    ObjectData,
-    Point3D,
+from .config import ConfigurationHandler
+from .io import DXFEntityExtractor, DXFReader
+from .models import AssingmentData, DxfText, Medium, MediumConfig, ObjectData, Point3D
+from .process.objectdata_factory import ObjectDataFactory
+from .protocols import (
+    IAssignmentStrategy,
+    IDimensionUpdater,
+    IElevationUpdater,
+    IExporter,
 )
-from ..process.objectdata_factory import ObjectDataFactory
-from .dxf_reader_clean import DXFReader
-from .entity_extractor import DXFEntityExtractor
 
 log = logging.getLogger(__name__)
 
@@ -37,7 +35,7 @@ class DXFProcessor:
     3. Object creation (ObjectDataFactory)
     """
 
-    def __init__(self, dxf_path: Path) -> None:
+    def __init__(self, config: ConfigurationHandler) -> None:
         """Initialize DXF processor with file path.
 
         Parameters
@@ -45,32 +43,52 @@ class DXFProcessor:
         dxf_path : Path
             Path to the DXF file to process
         """
-        self.dxf_path = dxf_path
-        self.reader = DXFReader(dxf_path)
+        self.config = config
         self.extractor: DXFEntityExtractor | None = None
         self.factory: ObjectDataFactory | None = None
 
-    def load_file(self) -> None:
-        """Load DXF file and initialize processing components.
+    @property
+    def mediums(self) -> Iterable[Medium]:
+        """Get list of mediums from the configuration.
 
-        Raises
-        ------
-        FileNotFoundError
-            If DXF file does not exist
-        DXFError
-            If DXF file cannot be parsed
+        Returns
+        -------
+        list[Medium]
+            List of Medium objects defined in the configuration
         """
-        self.reader.load_file()
-        self.extractor = DXFEntityExtractor(self.reader)
+        return self.config.mediums.values()
 
-        # Initialize factory with loaded document
-        if self.reader.document is not None:
-            self.factory = ObjectDataFactory(self.reader.document)
-            log.info("DXF processor initialized successfully")
-        else:
-            raise RuntimeError("Failed to load DXF document")
+    def element_count(self) -> tuple[int, int]:
+        """Get total number of elements and texts of point based mediums.
 
-    def process_mediums(self, mediums: dict[str, Medium]) -> None:
+        Returns
+        -------
+        tuple[int, int]
+            Total number of elements and texts in the DXF file
+        """
+        element_count = 0
+        text_count = 0
+        for medium in self.mediums:
+            element_count += len(medium.element_data.elements)
+            text_count += len(medium.element_data.texts)
+        return element_count, text_count
+
+    def line_count(self) -> tuple[int, int]:
+        """Get total number of elements and texts of line based mediums.
+
+        Returns
+        -------
+        tuple[int, int]
+            Total number of elements and texts in the DXF file
+        """
+        element_count = 0
+        text_count = 0
+        for medium in self.mediums:
+            element_count += len(medium.line_data.elements)
+            text_count += len(medium.line_data.texts)
+        return element_count, text_count
+
+    def extract_mediums(self, reader: DXFReader) -> None:
         """Process all mediums by extracting and creating objects.
 
         Parameters
@@ -83,27 +101,26 @@ class DXFProcessor:
         RuntimeError
             If processor is not initialized
         """
-        if not self.is_initialized():
-            raise RuntimeError("DXF processor not initialized. Call load_file() first.")
+        if reader.document is None:
+            raise RuntimeError("DXF document not loaded. Call load_file() first.")
+        self.extractor = DXFEntityExtractor(reader)
+        self.factory = ObjectDataFactory(reader.document)
+        log.info("DXF processor initialized successfully")
 
-        log.info(f"Processing {len(mediums)} mediums")
+        log.info(f"Processing {len(self.config.mediums)} mediums")
 
-        for medium_name, medium in mediums.items():
+        for medium_name, medium in self.config.mediums.items():
             log.debug(f"Processing medium: {medium_name}")
 
-            # Process elements
             medium.element_data = self._process_assignment(medium.elements)
-
-            # Process lines
             medium.line_data = self._process_assignment(medium.lines)
 
             log.info(
                 f"Medium '{medium_name}': {len(medium.element_data.elements)} elements, "
                 f"{len(medium.line_data.elements)} lines, "
-                f"{len(medium.element_data.texts)} texts"
             )
 
-    def _process_assignment(self, config: AssignmentConfig) -> AssingmentData:
+    def _process_assignment(self, config: MediumConfig) -> AssingmentData:
         """Process a single assignment configuration.
 
         Parameters
@@ -119,20 +136,13 @@ class DXFProcessor:
         if self.extractor is None or self.factory is None:
             raise RuntimeError("Processor components not initialized")
 
-        # Extract raw entities
         extracted = self.extractor.extract_entities(config)
-
-        # Convert entities to objects
-        elements = self._convert_entities_to_objects(
-            extracted["elements"] + extracted["lines"]  # Combine both types
-        )
-
-        # Convert text entities to DxfText objects
+        geometries = self._convert_entities_to_objects(extracted["geometries"], config)
         texts = self._convert_entities_to_texts(extracted["texts"])
 
-        return AssingmentData(elements=elements, texts=texts)
+        return AssingmentData(elements=geometries, texts=texts)
 
-    def _convert_entities_to_objects(self, entities: list[DXFEntity]) -> list[ObjectData]:
+    def _convert_entities_to_objects(self, entities: list[DXFEntity], config: MediumConfig) -> list[ObjectData]:
         """Convert DXF entities to ObjectData using the factory.
 
         Parameters
@@ -150,7 +160,7 @@ class DXFProcessor:
 
         objects = []
         for entity in entities:
-            obj_data = self.factory.create_from_entity(entity)
+            obj_data = self.factory.create_from_entity(entity, config.default_shape)
             if obj_data is not None:
                 objects.append(obj_data)
             else:
@@ -257,34 +267,80 @@ class DXFProcessor:
         except Exception:
             return (0, 0, 0)
 
-    def is_initialized(self) -> bool:
-        """Check if processor is fully initialized.
+    def assign_texts_to_mediums(self, assigner: IAssignmentStrategy) -> None:
+        """Assign extracted texts to mediums.
 
-        Returns
-        -------
-        bool
-            True if all components are initialized
+        Parameters
+        ----------
+        mediums : dict[str, Medium]
+            Dictionary of mediums to assign texts to
         """
-        return self.reader.is_loaded() and self.extractor is not None and self.factory is not None
+        for medium, medium_data in self.config.mediums.items():
+            # Assign texts to elements
+            log.info(f"Assigning texts to elements of medium: {medium}")
+            element_data = medium_data.element_data
+            assigned_elements = assigner.texts_to_point_based(
+                element_data.elements,
+                element_data.texts,
+            )
+            element_data.elements.clear()
+            element_data.elements.extend(assigned_elements)
 
-    def get_statistics(self) -> dict[str, Any]:
-        """Get processing statistics.
+            # Assign texts to lines (pipes)
+            line_data = medium_data.element_data
+            assigned_lines = assigner.texts_to_line_based(line_data.elements, line_data.texts)
+            line_data.elements.clear()
+            line_data.elements.extend(assigned_lines)
 
-        Returns
-        -------
-        dict[str, int]
-            Dictionary with processing statistics
+    def update_dimensions(self, updater: IDimensionUpdater) -> None:
+        """Update dimensions of elements and lines in mediums.
 
-        Raises
-        ------
-        RuntimeError
-            If processor is not initialized
+        Parameters
+        ----------
+        updater : IDimensionUpdater
+            Dimension updater to apply to elements and lines
         """
-        if not self.reader.is_loaded():
-            raise RuntimeError("DXF file not loaded")
+        for medium in self.config.mediums.values():
+            for element in medium.element_data.elements:
+                updater.update_dimension(element, config=medium.elements)
+            for line in medium.line_data.elements:
+                updater.update_dimension(line, config=medium.lines)
 
-        return {
-            "total_entities": self.reader.get_entity_count(),
-            "available_layers": len(self.reader.get_layer_names()),
-            "layer_names": self.reader.get_layer_names(),
-        }
+    def update_points_elevation(self, updater: IElevationUpdater) -> None:
+        """Assign extracted texts to mediums.
+
+        Parameters
+        ----------
+        mediums : dict[str, Medium]
+            Dictionary of mediums to assign texts to
+        """
+        for medium in self.config.mediums.values():
+            # Update elements points/positions
+            for element in medium.element_data.elements:
+                if element.points:
+                    element.points = updater.update_elevation(element.points)
+                if element.positions:
+                    element.positions = updater.update_elevation(element.positions)
+
+            for element in medium.line_data.elements:
+                if element.points:
+                    element.points = updater.update_elevation(element.points)
+                if element.positions:
+                    element.positions = updater.update_elevation(element.positions)
+
+            # Update text positions
+            for text in medium.element_data.texts:
+                text.position = updater.update_elevation([text.position])[0]
+
+            for text in medium.line_data.texts:
+                text.position = updater.update_elevation([text.position])[0]
+
+    def export_data(self, exporter: IExporter) -> None:
+        """Export processed data using the provided exporter.
+
+        Parameters
+        ----------
+        exporter : IExporter
+            Exporter instance to use for exporting data
+        """
+        exporter.export_data(list(self.mediums))

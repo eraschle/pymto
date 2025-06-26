@@ -28,22 +28,10 @@ class JsonExporter:
         """
         self.output_path = output_path
 
-    def export_media(self, media: list[Medium]) -> None:
-        """Export list of media to JSON file.
-
-        Parameters
-        ----------
-        media : list[Medium]
-            List of media containing pipes, shafts, and texts
-
-        Raises
-        ------
-        IOError
-            If the output, ObjectData file cannot be written
-        """
+    def export_data(self, mediums: list[Medium]) -> None:
         export_data = {}
 
-        for medium in media:
+        for medium in mediums:
             export_data[medium.name] = self._export_medium(medium)
 
         try:
@@ -70,23 +58,23 @@ class JsonExporter:
         # Export elements (shafts)
         for element in medium.element_data.elements:
             if element.positions:
-                elements.append(self._export_shaft(element))
+                elements.append(self._export_point_element(element))
             else:
-                elements.append(self._export_pipe(element))
+                elements.append(self._export_line_element(element))
 
         # Export lines (pipes)
         for line in medium.line_data.elements:
-            elements.append(self._export_pipe(line))
+            elements.append(self._export_line_element(line))
 
         return elements
 
-    def _export_pipe(self, pipe: ObjectData) -> dict[str, Any]:
+    def _export_line_element(self, element: ObjectData) -> dict[str, Any]:
         """Export a pipe to dictionary format.
 
         Parameters
         ----------
-        pipe : Pipe
-            Pipe to export
+        element : ObjectData
+            Element to export
 
         Returns
         -------
@@ -95,38 +83,45 @@ class JsonExporter:
         """
         pipe_data = {
             "type": "pipe",
-            "layer": pipe.layer,
-            "color": {"r": pipe.color[0], "g": pipe.color[1], "b": pipe.color[2]},
-            "points": [self._export_point(point) for point in pipe.points],
-            "dimensions": self._export_dimensions(pipe.dimensions),
+            "layer": element.layer,
+            # "color": self._export_color(element.color),
+            "points": [self._export_point(point) for point in element.points],
+            "dimensions": self._export_dimensions(element.dimensions),
         }
 
         # Add assigned text if available
-        if pipe.assigned_text is not None:
-            pipe_data["assigned_text"] = self._export_text(pipe.assigned_text)
+        if element.assigned_text is not None:
+            pipe_data["assigned_text"] = self._export_text(element.assigned_text)
 
         return pipe_data
 
-    def _export_shaft(self, shaft: ObjectData) -> dict[str, Any]:
+    def _export_point_element(self, element: ObjectData) -> dict[str, Any]:
         """Export a shaft to dictionary format.
 
         Parameters
         ----------
-        shaft : Shaft
-            Shaft to export
+        element : ObjectData
+            Element to export
 
         Returns
         -------
         dict[str, Any]
             Dictionary containing shaft information
         """
-        return {
+
+        element_data = {
             "type": "shaft",
-            "layer": shaft.layer,
-            "color": {"r": shaft.color[0], "g": shaft.color[1], "b": shaft.color[2]},
-            "position": self._export_point(shaft.positions[0]),
-            "dimensions": self._export_dimensions(shaft.dimensions),
+            "layer": element.layer,
+            # "color": self._export_color(element.color),
+            "position": self._export_point(element.positions[0]),
+            "dimensions": self._export_dimensions(element.dimensions),
         }
+
+        # Add assigned text if available
+        if element.assigned_text is not None:
+            element_data["assigned_text"] = self._export_text(element.assigned_text)
+
+        return element_data
 
     def _export_point(self, point: Point3D) -> dict[str, float]:
         """Export a 3D point to dictionary format.
@@ -170,12 +165,30 @@ class JsonExporter:
             return dim_data
 
         elif isinstance(dimensions, RoundDimensions):
-            dim_data = {"type": "round", "diameter": dimensions.diameter}
+            dim_data = {
+                "type": "round",
+                "diameter": dimensions.diameter,
+            }
 
             if dimensions.height is not None:
                 dim_data["height"] = dimensions.height
 
             return dim_data
+
+    def _export_color(self, color: tuple[int, int, int]) -> dict[str, int]:
+        """Export color to dictionary format.
+
+        Parameters
+        ----------
+        color : tuple[int, int, int]
+            RGB color tuple
+
+        Returns
+        -------
+        dict[str, int]
+            Dictionary with r, g, b values
+        """
+        return {"r": color[0], "g": color[1], "b": color[2]}
 
     def _export_text(self, text: DxfText) -> dict[str, Any]:
         """Export a text element to dictionary format.
@@ -192,9 +205,8 @@ class JsonExporter:
         """
         return {
             "content": text.content,
-            "layer": text.layer,
-            "color": {"r": text.color[0], "g": text.color[1], "b": text.color[2]},
-            "position": self._export_point(text.position),
+            # "layer": text.layer,
+            # "position": self._export_point(text.position),
         }
 
 
@@ -278,7 +290,7 @@ class AsIsDataJsonExporter(JsonExporter):
         dict[str, Any]
             Dictionary with Revit-compatible pipe data
         """
-        pipe_data = self._export_pipe(pipe)
+        pipe_data = self._export_line_element(pipe)
 
         # Add Revit-specific metadata
         pipe_data["revit_metadata"] = {
@@ -309,7 +321,7 @@ class AsIsDataJsonExporter(JsonExporter):
         dict[str, Any]
             Dictionary with Revit-compatible shaft data
         """
-        shaft_data = self._export_shaft(shaft)
+        shaft_data = self._export_point_element(shaft)
 
         # Add Revit-specific metadata
         shaft_data["revit_metadata"] = {}

@@ -10,7 +10,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from dxfto.io.entity_extractor import DXFEntityExtractor
-from dxfto.models import AssignmentConfig, LayerData
+from dxfto.models import LayerData, MediumConfig
 
 
 class TestDXFEntityExtractor:
@@ -32,7 +32,7 @@ class TestDXFEntityExtractor:
         """Create test assignment configuration."""
         geometry_layers = [LayerData(name="GEOMETRY", color=(255, 0, 0))]
         text_layers = [LayerData(name="TEXT", color=(0, 0, 0))]
-        return AssignmentConfig(geometry=geometry_layers, text=text_layers)
+        return MediumConfig(geometry=geometry_layers, text=text_layers)
 
     def test_extractor_initialization(self, mock_reader):
         """Test extractor initialization."""
@@ -150,8 +150,6 @@ class TestDXFEntityExtractor:
 
         insert = Mock()
         insert.dxftype.return_value = "INSERT"
-
-        mock_entities = [circle, line, text, insert]
 
         # Configure mock to return different entities for different layer types
         def query_side_effect(layers):

@@ -8,7 +8,7 @@ import pytest
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from dxfto.io.dxf_reader_clean import DXFReader
+from dxfto.io.dxf_reader import DXFReader
 from dxfto.models import LayerData
 
 
@@ -99,11 +99,6 @@ class TestDXFReader:
         assert isinstance(layer_names, list)
         assert len(layer_names) >= 1  # Should have at least default layer "0"
         assert "0" in layer_names  # Default layer should exist
-
-    def test_get_entity_count_not_loaded(self, reader):
-        """Test getting entity count without loading file."""
-        with pytest.raises(RuntimeError, match="not loaded"):
-            reader.get_entity_count()
 
     def test_get_entity_count_all_entities(self, reader, test_dxf_path):
         """Test getting total entity count."""

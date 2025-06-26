@@ -22,6 +22,7 @@ dev = [
 
 [tool.pyright]
 stubsPath = "~/workspace/_data_/python/_stubs_"
+exclude = ["docs", ".venv"]
 
 [tool.ruff]
 line-length = 110

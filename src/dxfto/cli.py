@@ -12,9 +12,9 @@ import click
 from dxfto.config import ConfigurationHandler
 
 from .assigners import SpatialTextAssigner, ZoneBasedTextAssigner
-from .io.dxf_reader import DXFReader
-from .io.json_exporter import AsIsDataJsonExporter, JsonExporter
-from .io.landxml_reader import LandXMLReader
+from .io import DXFReader, JsonExporter, LandXMLReader
+from .process.dimension import DimensionUpdater
+from .processor import DXFProcessor
 
 
 @click.command()
@@ -63,11 +63,6 @@ from .io.landxml_reader import LandXMLReader
     help="Color tolerance for color-based grouping",
 )
 @click.option(
-    "--revit-format",
-    is_flag=True,
-    help="Export in Revit-specific JSON format",
-)
-@click.option(
     "--verbose",
     "-v",
     is_flag=True,
@@ -82,7 +77,6 @@ def process_dxf(
     text_assignment: str,
     max_text_distance: float,
     color_tolerance: float,
-    revit_format: bool,
     verbose: bool,
 ) -> None:
     """Process DXF file and export pipe/shaft data for Revit modeling.
@@ -111,86 +105,53 @@ def process_dxf(
         if verbose:
             click.echo("Loading DXF file...")
 
-        dxf_reader = DXFReader(dxf_file)
-        dxf_reader.load_file()
+        reader = DXFReader(dxf_file)
+        reader.load_file()
 
-        dxf_reader.extract_data(handler.medium_configs)
+        processor = DXFProcessor(handler)
+        processor.extract_mediums(reader)
 
         if verbose:
-            click.echo(f"{len(handler.medium_configs)}: Verschiedene Mediums gefunden")
-            click.echo(f"Extracted {handler.element_count} Elements, {handler.text_count} Text")
-
-        # Process LandXML if provided
-        if landxml:
-            if verbose:
-                click.echo(f"Loading LandXML file: {landxml}")
-
-            landxml_reader = LandXMLReader(landxml)
-            landxml_reader.load_file()
-
-            # Update Z coordinates for all elements
-            for medium in handler.medium_configs.values():
-                # Update elements points/positions
-                for element in medium.element_data.elements:
-                    if element.points:
-                        element.points = landxml_reader.update_points_elevation(element.points)
-                    if element.positions:
-                        element.positions = landxml_reader.update_points_elevation(element.positions)
-
-                for element in medium.line_data.elements:
-                    if element.points:
-                        element.points = landxml_reader.update_points_elevation(element.points)
-                    if element.positions:
-                        element.positions = landxml_reader.update_points_elevation(element.positions)
-
-                # Update text positions
-                for text in medium.element_data.texts:
-                    text.position = landxml_reader.update_points_elevation([text.position])[0]
-
-                for text in medium.line_data.texts:
-                    text.position = landxml_reader.update_points_elevation([text.position])[0]
-
-            if verbose:
-                click.echo("Updated Z coordinates from LandXML")
+            e_count, t_count = processor.element_count()
+            click.echo(f"{len(handler.mediums)}: Verschiedene Mediums gefunden")
+            click.echo(f"Extracted {e_count}/{t_count} point based elements")
+            e_count, t_count = processor.line_count()
+            click.echo(f"Extracted {e_count}/{t_count} line based elements")
 
         # Group elements by medium (already handled by config loading)
         if verbose:
             click.echo("Using configuration-based grouping...")
-
-        media = list(handler.medium_configs.values())
-
-        if verbose:
-            click.echo(f"Found {len(media)} configured media groups")
-
-        # Assign texts to elements
-        if verbose:
-            click.echo(f"Assigning texts using {text_assignment} strategy...")
 
         if text_assignment.lower() == "zone":
             text_assigner = ZoneBasedTextAssigner(max_distance=max_text_distance)
         else:
             text_assigner = SpatialTextAssigner(max_distance=max_text_distance)
 
-        for medium in media:
-            # Assign texts to elements
-            assigned_elements = text_assigner.assign_texts_to_point_based(
-                medium.element_data.elements,
-                medium.element_data.texts,
-            )
-            medium.element_data.elements.clear()
-            medium.element_data.elements.extend(assigned_elements)
+        click.echo("Assigning texts to elements...")
+        processor.assign_texts_to_mediums(text_assigner)
 
-            # Assign texts to lines (pipes)
-            assigned_lines = text_assigner.assign_texts_to_line_based(
-                medium.line_data.elements,
-                medium.line_data.texts,
-            )
-            medium.line_data.elements.clear()
-            medium.line_data.elements.extend(assigned_lines)
+        click.echo("Updating dimensions based on assigned texts...")
+        dimension_updater = DimensionUpdater(target_unit="m")
+        processor.update_dimensions(dimension_updater)
+
+        # Process LandXML if provided
+        if landxml:
+            landxml_reader = LandXMLReader(landxml)
+
+            if verbose:
+                click.echo(f"Loading LandXML file: {landxml}")
+            landxml_reader.load_file()
+
+            click.echo("Updating points elevation from LandXML...")
+            processor.update_points_elevation(landxml_reader)
+
+        # Assign texts to elements
+        if verbose:
+            click.echo(f"Assigning texts using {text_assignment} strategy...")
 
         # Count successful text assignments
         total_assigned = 0
-        for medium in media:
+        for medium in processor.mediums:
             total_assigned += sum(
                 1 for element in medium.element_data.elements if element.assigned_text is not None
             )
@@ -201,16 +162,9 @@ def process_dxf(
         if verbose:
             click.echo(f"Assigned {total_assigned} texts to pipes")
 
-        # Export to JSON
-        if verbose:
-            click.echo(f"Exporting to JSON: {output}")
-
-        if revit_format:
-            exporter = AsIsDataJsonExporter(output)
-        else:
-            exporter = JsonExporter(output)
-
-        exporter.export_media(media)
+        click.echo(f"Exporting to JSON: {output}")
+        exporter = JsonExporter(output)
+        processor.export_data(exporter)
 
         if verbose:
             click.echo("Processing completed successfully!")
@@ -218,9 +172,8 @@ def process_dxf(
         # Summary output
         click.echo(f"Processed {dxf_file}")
         click.echo(f"Output: {output}")
-        click.echo(f"Media: {len(media)}")
-        click.echo(f"Lines: {sum(len(m.line_data.elements) for m in media)}")
-        click.echo(f"Elements: {sum(len(m.element_data.elements) for m in media)}")
+        click.echo(f"Lines: {sum(len(m.line_data.elements) for m in processor.mediums)}")
+        click.echo(f"Elements: {sum(len(m.element_data.elements) for m in processor.mediums)}")
         click.echo(f"Text assignments: {total_assigned}")
 
     except Exception as e:
@@ -230,7 +183,7 @@ def process_dxf(
 @click.group()
 @click.version_option()
 def main() -> None:
-    """DXF processor for pipes and shafts with Revit export.
+    """DXF processor for Revit modeling.
 
     This tool processes DXF files containing infrastructure elements
     (pipes and shafts) and exports them in JSON format suitable for
