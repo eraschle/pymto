@@ -6,18 +6,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from dxfto.models import Point3D
-from dxfto.process.entity_handler import (
-    are_crossing_diagonals,
-    calculate_bounding_box_dimensions,
-    calculate_center_point,
-    calculate_precise_rectangular_dimensions,
-    detect_shape_type,
-    estimate_diameter_from_polygon,
-    extract_points_from_entity,
-    is_element_entity,
-    is_near_circular_shape,
-    is_rectangular_shape,
-)
+from dxfto.process import entity_handler as dxf
 
 
 class TestExtractPointsFromEntity:
@@ -40,7 +29,7 @@ class TestExtractPointsFromEntity:
 
             mock_isinstance.side_effect = isinstance_side_effect
 
-            points = extract_points_from_entity(line_entity)
+            points = dxf.extract_points_from(line_entity)
 
         assert len(points) == 2
         assert points[0] == Point3D(east=0.0, north=0.0, altitude=0.0)
@@ -62,7 +51,7 @@ class TestExtractPointsFromEntity:
 
             mock_isinstance.side_effect = isinstance_side_effect
 
-            points = extract_points_from_entity(circle_entity)
+            points = dxf.extract_points_from(circle_entity)
 
         assert len(points) == 1
         assert points[0] == Point3D(east=5.0, north=5.0, altitude=0.0)
@@ -77,7 +66,7 @@ class TestDetectShapeType:
             Point3D(east=0.0, north=0.0, altitude=0.0),
             Point3D(east=10.0, north=0.0, altitude=0.0),
         ]
-        assert detect_shape_type(points) == "linear"
+        assert dxf.detect_shape_type(points) == "linear"
 
     def test_detect_rectangular_shape(self):
         """Test detection of rectangular shape."""
@@ -88,7 +77,7 @@ class TestDetectShapeType:
             Point3D(east=10.0, north=5.0, altitude=0.0),
             Point3D(east=0.0, north=5.0, altitude=0.0),
         ]
-        assert detect_shape_type(points) == "rectangular"
+        assert dxf.detect_shape_type(points) == "rectangular"
 
     def test_detect_multi_sided_shape(self):
         """Test detection of multi-sided shape."""
@@ -99,7 +88,7 @@ class TestDetectShapeType:
             Point3D(east=8.0, north=8.0, altitude=0.0),
             Point3D(east=2.0, north=6.0, altitude=0.0),
         ]
-        assert detect_shape_type(points) == "multi_sided"
+        assert dxf.detect_shape_type(points) == "multi_sided"
 
     def test_detect_circular_shape(self):
         """Test detection of near-circular shape (regular polygon)."""
@@ -113,7 +102,7 @@ class TestDetectShapeType:
             y = center.north + radius * math.sin(angle)
             points.append(Point3D(east=x, north=y, altitude=0.0))
 
-        assert detect_shape_type(points) == "round"
+        assert dxf.detect_shape_type(points) == "round"
 
 
 class TestIsRectangularShape:
@@ -127,7 +116,7 @@ class TestIsRectangularShape:
             Point3D(east=10.0, north=5.0, altitude=0.0),
             Point3D(east=0.0, north=5.0, altitude=0.0),
         ]
-        assert is_rectangular_shape(points)
+        assert dxf.is_rectangular(points)
 
     def test_non_rectangle(self):
         """Test non-rectangular shape."""
@@ -137,7 +126,7 @@ class TestIsRectangularShape:
             Point3D(east=8.0, north=8.0, altitude=0.0),
             Point3D(east=2.0, north=6.0, altitude=0.0),
         ]
-        assert not is_rectangular_shape(points)
+        assert not dxf.is_rectangular(points)
 
     def test_wrong_number_of_points(self):
         """Test with wrong number of points."""
@@ -146,7 +135,7 @@ class TestIsRectangularShape:
             Point3D(east=10.0, north=0.0, altitude=0.0),
             Point3D(east=10.0, north=5.0, altitude=0.0),
         ]
-        assert not is_rectangular_shape(points)
+        assert not dxf.is_rectangular(points)
 
 
 class TestIsNearCircularShape:
@@ -163,7 +152,7 @@ class TestIsNearCircularShape:
             y = center.north + radius * math.sin(angle)
             points.append(Point3D(east=x, north=y, altitude=0.0))
 
-        assert is_near_circular_shape(points)
+        assert dxf.is_near_circular(points)
 
     def test_irregular_polygon(self):
         """Test irregular polygon (should not be circular)."""
@@ -175,7 +164,7 @@ class TestIsNearCircularShape:
             Point3D(east=-2.0, north=4.0, altitude=0.0),
             Point3D(east=-5.0, north=1.0, altitude=0.0),
         ]
-        assert not is_near_circular_shape(points)
+        assert not dxf.is_near_circular(points)
 
     def test_too_few_points(self):
         """Test with too few points."""
@@ -184,7 +173,7 @@ class TestIsNearCircularShape:
             Point3D(east=10.0, north=0.0, altitude=0.0),
             Point3D(east=10.0, north=5.0, altitude=0.0),
         ]
-        assert not is_near_circular_shape(points)
+        assert not dxf.is_near_circular(points)
 
 
 class TestAreCrossingDiagonals:
@@ -195,21 +184,21 @@ class TestAreCrossingDiagonals:
         line1 = ((0.0, 0.0), (10.0, 10.0))  # Diagonal from bottom-left to top-right
         line2 = ((0.0, 10.0), (10.0, 0.0))  # Diagonal from top-left to bottom-right
 
-        assert are_crossing_diagonals(line1, line2) is True
+        assert dxf.are_crossing_diagonals(line1, line2) is True
 
     def test_parallel_lines(self):
         """Test parallel lines (should not be crossing)."""
         line1 = ((0.0, 0.0), (10.0, 0.0))  # Horizontal line
         line2 = ((0.0, 5.0), (10.0, 5.0))  # Parallel horizontal line
 
-        assert are_crossing_diagonals(line1, line2) is False
+        assert dxf.are_crossing_diagonals(line1, line2) is False
 
     def test_vertical_lines(self):
         """Test vertical lines."""
         line1 = ((0.0, 0.0), (0.0, 10.0))  # Vertical line
         line2 = ((5.0, 0.0), (5.0, 10.0))  # Parallel vertical line
 
-        assert are_crossing_diagonals(line1, line2) is False
+        assert dxf.are_crossing_diagonals(line1, line2) is False
 
 
 class TestCalculateBoundingBoxDimensions:
@@ -223,14 +212,14 @@ class TestCalculateBoundingBoxDimensions:
             Point3D(east=10.0, north=5.0, altitude=0.0),
             Point3D(east=0.0, north=5.0, altitude=0.0),
         ]
-        length, width = calculate_bounding_box_dimensions(points)
+        length, width = dxf.calculate_bbox_dimensions(points)
         assert length == 10.0
         assert width == 5.0
 
     def test_empty_points(self):
         """Test with empty points list."""
         points = []
-        length, width = calculate_bounding_box_dimensions(points)
+        length, width = dxf.calculate_bbox_dimensions(points)
         assert length == 0.0
         assert width == 0.0
 
@@ -246,7 +235,7 @@ class TestCalculatePreciseRectangularDimensions:
             Point3D(east=10.0, north=5.0, altitude=0.0),
             Point3D(east=0.0, north=5.0, altitude=0.0),
         ]
-        length, width = calculate_precise_rectangular_dimensions(points)
+        length, width = dxf.calculate_rect_dimensions(points)
         assert length == 10.0
         assert width == 5.0
 
@@ -257,7 +246,7 @@ class TestCalculatePreciseRectangularDimensions:
             Point3D(east=10.0, north=0.0, altitude=0.0),
             Point3D(east=10.0, north=5.0, altitude=0.0),
         ]
-        length, width = calculate_precise_rectangular_dimensions(points)
+        length, width = dxf.calculate_rect_dimensions(points)
         assert length == 10.0
         assert width == 5.0
 
@@ -273,7 +262,7 @@ class TestCalculateCenterPoint:
             Point3D(east=10.0, north=10.0, altitude=0.0),
             Point3D(east=0.0, north=10.0, altitude=0.0),
         ]
-        center = calculate_center_point(points)
+        center = dxf.calculate_center_point(points)
         assert center.east == 5.0
         assert center.north == 5.0
         assert center.altitude == 0.0
@@ -281,7 +270,7 @@ class TestCalculateCenterPoint:
     def test_empty_points(self):
         """Test with empty points list."""
         points = []
-        center = calculate_center_point(points)
+        center = dxf.calculate_center_point(points)
         assert center.east == 0.0
         assert center.north == 0.0
         assert center.altitude == 0.0
@@ -301,13 +290,13 @@ class TestEstimateDiameterFromPolygon:
             y = center.north + radius * math.sin(angle)
             points.append(Point3D(east=x, north=y, altitude=0.0))
 
-        diameter = estimate_diameter_from_polygon(points)
+        diameter = dxf.estimate_diameter_from(points)
         assert abs(diameter - 10.0) < 0.01  # Should be close to 2 * radius
 
     def test_empty_points(self):
         """Test with empty points list."""
         points = []
-        diameter = estimate_diameter_from_polygon(points)
+        diameter = dxf.estimate_diameter_from(points)
         assert diameter == 0.0
 
 
@@ -319,21 +308,21 @@ class TestIsElementEntity:
         entity = Mock()
         entity.dxftype.return_value = "INSERT"
 
-        assert is_element_entity(entity) is True
+        assert dxf.is_element_entity(entity) is True
 
     def test_circle_entity_is_element(self):
         """Test that CIRCLE entities are always elements."""
         entity = Mock()
         entity.dxftype.return_value = "CIRCLE"
 
-        assert is_element_entity(entity) is True
+        assert dxf.is_element_entity(entity) is True
 
     def test_line_entity_is_not_element(self):
         """Test that LINE entities are not elements."""
         entity = Mock()
         entity.dxftype.return_value = "LINE"
 
-        assert is_element_entity(entity) is False
+        assert dxf.is_element_entity(entity) is False
 
     def test_complex_polyline_is_element(self):
         """Test that complex polylines are elements."""
@@ -347,7 +336,7 @@ class TestIsElementEntity:
                 "dxfto.process.entity_handler.extract_points_from_entity", lambda _: [Point3D(0, 0, 0)] * 5
             )
 
-            assert is_element_entity(entity) is True
+            assert dxf.is_element_entity(entity) is True
 
     def test_simple_polyline_is_not_element(self):
         """Test that simple polylines are not elements."""
@@ -361,4 +350,4 @@ class TestIsElementEntity:
                 "dxfto.process.entity_handler.extract_points_from_entity", lambda _: [Point3D(0, 0, 0)] * 2
             )
 
-            assert is_element_entity(entity) is False
+            assert dxf.is_element_entity(entity) is False

@@ -13,22 +13,13 @@ from ezdxf.entities.dxfentity import DXFEntity
 from ezdxf.entities.insert import Insert
 
 from ..models import (
-    MediumConfig,
     ObjectData,
     ObjectType,
     Point3D,
     RectangularDimensions,
     RoundDimensions,
-from .entity_handler import (
-    calculate_bounding_box_dimensions,
-    calculate_center_point,
-    calculate_precise_rectangular_dimensions,
-    detect_shape_type,
-    estimate_diameter_from_polygon,
-    extract_points_from_entity,
-    is_element_entity,
-    is_rectangular_shape,
 )
+from . import entity_handler as dxf
 
 log = logging.getLogger(__name__)
 
@@ -209,7 +200,7 @@ class ObjectDataFactory:
             Created ObjectData or None if processing failed
         """
         try:
-            points = extract_points_from_entity(entity)
+            points = dxf.extract_points_from(entity)
             if not points:
                 return None
             if object_type.name.lower().startswith("pipe"):
@@ -275,10 +266,10 @@ class ObjectDataFactory:
         """
         length, width = 0.0, 0.0
         if not is_pipe_or_duct(object_type):
-            if is_rectangular_shape(points):
-                length, width = calculate_precise_rectangular_dimensions(points)
+            if dxf.is_rectangular(points):
+                length, width = dxf.calculate_rect_dimensions(points)
             else:
-                length, width = calculate_bounding_box_dimensions(points)
+                length, width = dxf.calculate_bbox_dimensions(points)
 
         position = calculate_center_point(points)
         dimensions = RectangularDimensions(length=length, width=width, angle=0.0)
@@ -314,10 +305,10 @@ class ObjectDataFactory:
         ObjectData
             Created ObjectData with round dimensions
         """
-        position = calculate_center_point(points)
+        position = dxf.calculate_center_point(points)
         diameter = 0.0
         if not is_pipe_or_duct(object_type):
-            diameter = estimate_diameter_from_polygon(points)
+            diameter = dxf.estimate_diameter_from(points)
         dimensions = RoundDimensions(diameter=diameter)
 
         color = self._get_entity_color(entity)
@@ -354,8 +345,8 @@ class ObjectDataFactory:
         ObjectData
             Created ObjectData with rectangular dimensions (bounding box)
         """
-        position = calculate_center_point(points)
-        length, width = calculate_bounding_box_dimensions(points)
+        position = dxf.calculate_center_point(points)
+        length, width = dxf.calculate_bbox_dimensions(points)
         dimensions = RectangularDimensions(length=length, width=width, angle=0.0)
 
         color = self._get_entity_color(entity)
@@ -423,9 +414,7 @@ class ObjectDataFactory:
             self._block_cache[block_name] = entities
         return self._block_cache[block_name]
 
-    def _analyze_block_shape(
-        self, insert_entity: Insert, block_entities: list[DXFEntity]
-    ) -> tuple | None:
+    def _analyze_block_shape(self, insert_entity: Insert, block_entities: list[DXFEntity]) -> tuple | None:
         """Analyze block geometry to determine shape and dimensions.
 
         Parameters
@@ -451,27 +440,27 @@ class ObjectDataFactory:
         # Extract all geometry points from block entities
         all_points = []
         for entity in block_entities:
-            entity_points = extract_points_from_entity(entity)
+            entity_points = dxf.extract_points_from(entity)
             all_points.extend(entity_points)
 
         if not all_points:
             return self._default_block_dimensions(insert_entity)
 
         # Detect shape type
-        shape_type = detect_shape_type(all_points)
+        shape_type = dxf.detect_shape_type(all_points)
 
         if shape_type == "rectangular":
-            if is_rectangular_shape(all_points):
-                length, width = calculate_precise_rectangular_dimensions(all_points)
+            if dxf.is_rectangular(all_points):
+                length, width = dxf.calculate_rect_dimensions(all_points)
             else:
-                length, width = calculate_bounding_box_dimensions(all_points)
+                length, width = dxf.calculate_bbox_dimensions(all_points)
             dimensions = RectangularDimensions(length=length, width=width, angle=0.0)
         elif shape_type == "round":
-            diameter = estimate_diameter_from_polygon(all_points)
+            diameter = dxf.estimate_diameter_from(all_points)
             dimensions = RoundDimensions(diameter=diameter)
         else:
             # Multi-sided or complex - use bounding box
-            length, width = calculate_bounding_box_dimensions(all_points)
+            length, width = dxf.calculate_bbox_dimensions(all_points)
             dimensions = RectangularDimensions(length=length, width=width, angle=0.0)
 
         return dimensions, all_points
@@ -612,4 +601,4 @@ class ObjectDataFactory:
         bool
             True if should be processed as element
         """
-        return is_element_entity(entity)
+        return dxf.is_element_entity(entity)

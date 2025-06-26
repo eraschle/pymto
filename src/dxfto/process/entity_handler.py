@@ -17,7 +17,7 @@ from ..models import Point3D
 log = logging.getLogger(__name__)
 
 
-def extract_points_from_entity(entity: DXFEntity) -> list[Point3D]:
+def extract_points_from(entity: DXFEntity) -> list[Point3D]:
     """Extract coordinate points from any DXF entity.
 
     Parameters
@@ -51,6 +51,26 @@ def extract_points_from_entity(entity: DXFEntity) -> list[Point3D]:
         points = [Point3D(east=center.x, north=center.y, altitude=0.0)]
 
     return points
+
+
+def is_closed(points: list[Point3D]) -> bool:
+    """Check if a shape defined by points is closed (first point == last point).
+
+    Parameters
+    ----------
+    points : List[Point3D]
+        List of points defining the shape
+
+    Returns
+    -------
+    bool
+        True if shape is closed
+    """
+    if len(points) < 3:
+        return False
+
+    # Check if first and last points are the same
+    return points[0].distance_2d(points[-1]) < 1e-6
 
 
 def is_closed_polyline(entity: DXFEntity) -> bool:
@@ -92,19 +112,18 @@ def detect_shape_type(points: list[Point3D]) -> str:
         return "linear"
     elif num_points < 4:
         return "linear"
-    elif num_points == 4 and is_rectangular_shape(points):
+    elif num_points == 4 and is_rectangular(points):
         return "rectangular"
-    elif is_closed_shape(points):
+    elif is_closed(points):
         return "multi_sided"
-    elif is_near_circular_shape(points):
+    elif is_near_circular(points):
         return "round"
     raise ValueError(
-        "Cannot determine shape type from points: "
-        f"{num_points} points provided, expected at least 2."
+        f"Cannot determine shape type from points: {num_points} points provided, expected at least 2."
     )
 
 
-def is_rectangular_shape(points: list[Point3D]) -> bool:
+def is_rectangular(points: list[Point3D]) -> bool:
     """Check if 4 points form a rectangular shape.
 
     Parameters
@@ -126,26 +145,8 @@ def is_rectangular_shape(points: list[Point3D]) -> bool:
 
     return abs(diagonal1 - diagonal2) < 1e-6
 
-def is_closed_shape(points: list[Point3D]) -> bool:
-    """Check if a shape defined by points is closed (first point == last point).
 
-    Parameters
-    ----------
-    points : List[Point3D]
-        List of points defining the shape
-
-    Returns
-    -------
-    bool
-        True if shape is closed
-    """
-    if len(points) < 3:
-        return False
-
-    # Check if first and last points are the same
-    return points[0].distance_2d(points[-1]) < 1e-6
-
-def is_near_circular_shape(points: list[Point3D]) -> bool:
+def is_near_circular(points: list[Point3D]) -> bool:
     """Check if points form a near-circular shape (regular polygon with many sides).
 
     Parameters
@@ -253,7 +254,7 @@ def are_crossing_diagonals(
     return False
 
 
-def calculate_bounding_box_dimensions(points: list[Point3D]) -> tuple[float, float]:
+def calculate_bbox_dimensions(points: list[Point3D]) -> tuple[float, float]:
     """Calculate length and width from bounding box of points.
 
     Parameters
@@ -280,7 +281,7 @@ def calculate_bounding_box_dimensions(points: list[Point3D]) -> tuple[float, flo
     return length, width
 
 
-def calculate_precise_rectangular_dimensions(points: list[Point3D]) -> tuple[float, float]:
+def calculate_rect_dimensions(points: list[Point3D]) -> tuple[float, float]:
     """Calculate precise rectangular dimensions from 4 corner points.
 
     Parameters
@@ -294,7 +295,7 @@ def calculate_precise_rectangular_dimensions(points: list[Point3D]) -> tuple[flo
         Length and width of rectangle
     """
     if len(points) != 4:
-        return calculate_bounding_box_dimensions(points)
+        return calculate_bbox_dimensions(points)
 
     # Calculate side lengths
     side1 = points[0].distance_2d(points[1])
@@ -330,7 +331,7 @@ def calculate_center_point(points: list[Point3D]) -> Point3D:
     return Point3D(east=center_x, north=center_y, altitude=center_z)
 
 
-def estimate_diameter_from_polygon(points: list[Point3D]) -> float:
+def estimate_diameter_from(points: list[Point3D]) -> float:
     """Estimate diameter of a polygonal shape (for near-circular shapes).
 
     Parameters
@@ -388,7 +389,7 @@ def is_element_entity(entity: DXFEntity) -> bool:
             return True
 
         # Complex polylines (4+ points) are likely elements
-        points = extract_points_from_entity(entity)
+        points = extract_points_from(entity)
         if len(points) >= 4:
             return True
 
