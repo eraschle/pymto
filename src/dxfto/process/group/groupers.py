@@ -8,7 +8,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .models import DxfText, LayerData, Medium, ObjectData
+from ...models import DxfText, LayerData, Medium, ObjectData
 
 
 class LayerBasedGrouper:
@@ -149,7 +149,7 @@ class ColorBasedGrouper:
                 dominant_color = self._get_dominant_color(color_group)
                 medium_name = self._color_to_medium_name(dominant_color)
 
-                from .models import MediumConfig
+                from ...models import MediumConfig
 
                 element_config = MediumConfig(geometry=[], text=[], default_unit="mm")
                 line_config = MediumConfig(geometry=[], text=[], default_unit="mm")
