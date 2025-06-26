@@ -159,7 +159,7 @@ class ObjectData:
 @dataclass
 class LayerData:
     name: str = field(repr=True, compare=True)
-    color: str | tuple[int, int, int] | None = field(repr=True, compare=True)
+    color: str | int | tuple[int, int, int] | None = field(repr=True, compare=True)
 
     def __post_init__(self):
         if self.color is None:

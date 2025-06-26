@@ -129,9 +129,8 @@ class DXFReader:
                 entity_color = getattr(entity, "rgb", RGB(0, 0, 0))
                 layer_color = RGB(*layer.color)
                 return entity_color == layer_color
-            elif isinstance(layer.color, str) and layer.color.startswith("Farbe"):
-                aci_color = layer.color.split(" ")[-1]
-                return entity.dxf.color == int(aci_color)
+            elif isinstance(layer.color, int) :
+                return entity.dxf.color == layer.color
             elif isinstance(layer.color, str):
                 layer_color = layer.color.upper()
                 layer_color = LAYER_TRANSLATION.get(layer_color, layer_color)
@@ -140,7 +139,7 @@ class DXFReader:
                         continue
                     return True
             log.warning(
-                f"No able to find color for {vars(entity)} in layer {layer.name} with color {layer.color}"
+                f"No able to find color for {entity} in layer {layer.name} with color {layer.color}"
             )
             return False
 

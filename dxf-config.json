@@ -15,14 +15,6 @@
                 {
                     "Name": "Haltung--T-",
                     "Farbe": [
-                        169,
-                        0,
-                        230
-                    ]
-                },
-                {
-                    "Name": "Haltung--T-",
-                    "Farbe": [
                         0,
                         0,
                         255
@@ -54,7 +46,7 @@
             "Geometrie": [
                 {
                     "Name": "Normschacht--T-",
-                    "Farbe": "Farbe 13"
+                    "Farbe": 13
                 }
             ],
             "Text": [
@@ -200,7 +192,7 @@
             "Geometrie": [
                 {
                     "Name": "Normschacht--T-",
-                    "Farbe": "Farbe 173"
+                    "Farbe": 173
                 }
             ],
             "Text": [
@@ -254,7 +246,7 @@
             "Geometrie": [
                 {
                     "Name": "Normschacht--T-",
-                    "Farbe": "Farbe 203"
+                    "Farbe": 203
                 }
             ],
             "Text": [
@@ -300,7 +292,7 @@
             "Geometrie": [
                 {
                     "Name": "Normschacht--T-",
-                    "Farbe": "Farbe 80"
+                    "Farbe": 80
                 }
             ],
             "Text": [
