@@ -78,8 +78,7 @@ class ColorBasedGrouper:
                 text
                 for text in texts
                 if any(
-                    self._color_distance(text.color, color) <= self.color_tolerance
-                    for color in color_group
+                    self._color_distance(text.color, color) <= self.color_tolerance for color in color_group
                 )
             ]
 
@@ -121,9 +120,7 @@ class ColorBasedGrouper:
 
         return media
 
-    def _group_similar_colors(
-        self, colors: list[tuple[int, int, int]]
-    ) -> list[list[tuple[int, int, int]]]:
+    def _group_similar_colors(self, colors: list[tuple[int, int, int]]) -> list[list[tuple[int, int, int]]]:
         """Group colors that are similar to each other.
 
         Parameters

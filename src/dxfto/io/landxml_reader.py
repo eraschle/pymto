@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 from scipy.spatial import KDTree
 
-from ..models import AssingmentData, Point3D
+from ..models import Point3D
 
 
 class LandXMLReader:

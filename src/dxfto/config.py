@@ -134,6 +134,4 @@ class ConfigurationHandler:
                 )
 
         except json.JSONDecodeError as e:
-            raise json.JSONDecodeError(
-                f"Invalid JSON in configuration file: {e}", e.doc, e.pos
-            ) from e
+            raise json.JSONDecodeError(f"Invalid JSON in configuration file: {e}", e.doc, e.pos) from e

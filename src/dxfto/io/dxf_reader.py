@@ -35,6 +35,7 @@ LAYER_TRANSLATION = {
     "HELLGRAU": "LIGHTGRAY",
 }
 
+
 class DXFReader:
     """Clean DXF file reader focused on file I/O and entity querying.
 
@@ -131,7 +132,7 @@ class DXFReader:
                 entity_color = getattr(entity, "rgb", RGB(0, 0, 0))
                 layer_color = RGB(*layer.color)
                 return entity_color == layer_color
-            elif isinstance(layer.color, int) :
+            elif isinstance(layer.color, int):
                 return entity.dxf.color == layer.color
             elif isinstance(layer.color, str):
                 layer_color = layer.color.upper()
@@ -140,9 +141,7 @@ class DXFReader:
                     if aci_color.name != layer_color:
                         continue
                     return True
-            log.warning(
-                f"No able to find color for {entity} in layer {layer.name} with color {layer.color}"
-            )
+            log.warning(f"No able to find color for {entity} in layer {layer.name} with color {layer.color}")
             return False
 
         query = f'*[layer=="{layer.name}"]'

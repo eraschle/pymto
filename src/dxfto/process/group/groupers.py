@@ -146,8 +146,7 @@ class ColorBasedGrouper:
                 text
                 for text in texts
                 if any(
-                    self._color_distance(text.color, color) <= self.color_tolerance
-                    for color in color_group
+                    self._color_distance(text.color, color) <= self.color_tolerance for color in color_group
                 )
             ]
 

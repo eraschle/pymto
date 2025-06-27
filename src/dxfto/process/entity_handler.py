@@ -7,16 +7,15 @@ shape characteristics (round, rectangular, multi-sided) and processing type.
 import logging
 import math
 
+from ezdxf import math as ezmath
 from ezdxf.entities.circle import Circle
 from ezdxf.entities.dxfentity import DXFEntity
 from ezdxf.entities.line import Line
 from ezdxf.entities.lwpolyline import LWPolyline
 from ezdxf.entities.polyline import Polyline
-from ezdxf import math as ezmath
 from ezdxf.math import Vec2
 
 from ..models import Point3D
-
 
 log = logging.getLogger(__name__)
 
@@ -122,7 +121,9 @@ def detect_shape_type(points: list[Point3D]) -> str:
         return "rectangular"
     elif num_points >= 4:
         return "multi_sided"
-    raise ValueError(f"Cannot determine shape type from points: {num_points} points provided, expected at least 2.")
+    raise ValueError(
+        f"Cannot determine shape type from points: {num_points} points provided, expected at least 2."
+    )
 
 
 def get_angle_from_entity(entity: DXFEntity) -> float:
@@ -183,7 +184,9 @@ def get_angle_point_on_line(
         except IndexError:
             continue
 
-        if ezmath.is_point_on_line_2d(Vec2(point), Vec2(start_point), Vec2(end_point), ray=False, abs_tol=threshold):
+        if ezmath.is_point_on_line_2d(
+            Vec2(point), Vec2(start_point), Vec2(end_point), ray=False, abs_tol=threshold
+        ):
             angle = get_points_angle(start_point, end_point)
             return angle
 

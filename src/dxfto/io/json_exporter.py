@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import Any
 
 from ..models import (
-    DxfText,
     Medium,
     MediumConfig,
     ObjectData,
@@ -144,9 +143,7 @@ class JsonExporter:
 
         return element_data
 
-    def _export_dimensions(
-        self, dimensions: RectangularDimensions | RoundDimensions
-    ) -> dict[str, Any]:
+    def _export_dimensions(self, dimensions: RectangularDimensions | RoundDimensions) -> dict[str, Any]:
         """Export dimensions to dictionary format.
 
         Parameters
