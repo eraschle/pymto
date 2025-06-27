@@ -11,6 +11,25 @@ from typing import Any
 from ..models import DxfText, Medium, ObjectData, Point3D, RectangularDimensions, RoundDimensions
 
 
+def _export_point(point: Point3D) -> dict[str, float]:
+    return {"x": point.east, "y": point.north, "z": point.altitude}
+
+
+def _export_points(points: list[Point3D]) -> dict | list[dict] | None:
+    """Export a list of Point3D to a list of dictionaries."""
+    points = [point for point in points if point is not None]
+    point_data = [_export_point(point) for point in points]
+    if len(point_data) == 0:
+        return None
+    if len(point_data) == 1:
+        return point_data[0]
+    return point_data
+
+
+def _export_color(color: tuple[int, int, int]) -> dict[str, int]:
+    return {"r": color[0], "g": color[1], "b": color[2]}
+
+
 class JsonExporter:
     """Exports processed DXF data to JSON format for Revit compatibility.
 
@@ -40,104 +59,6 @@ class JsonExporter:
         except OSError as e:
             raise OSError(f"Cannot write JSON file {self.output_path}: {e}") from e
 
-    def _export_medium(self, medium: Medium) -> list[dict[str, Any]]:
-        """Export a single medium to dictionary format.
-
-        Parameters
-        ----------
-        medium : Medium
-            Medium containing elements and lines
-
-        Returns
-        -------
-        list[dict[str, Any]]
-            List of elements (pipes and shafts) in the medium
-        """
-        elements = []
-
-        # Export elements (shafts)
-        for element in medium.element_data.elements:
-            if element.positions:
-                elements.append(self._export_point_element(element))
-            else:
-                elements.append(self._export_line_element(element))
-
-        # Export lines (pipes)
-        for line in medium.line_data.elements:
-            elements.append(self._export_line_element(line))
-
-        return elements
-
-    def _export_line_element(self, element: ObjectData) -> dict[str, Any]:
-        """Export a pipe to dictionary format.
-
-        Parameters
-        ----------
-        element : ObjectData
-            Element to export
-
-        Returns
-        -------
-        dict[str, Any]
-            Dictionary containing pipe information
-        """
-        pipe_data = {
-            "type": "pipe",
-            "layer": element.layer,
-            # "color": self._export_color(element.color),
-            "points": [self._export_point(point) for point in element.points],
-            "dimensions": self._export_dimensions(element.dimensions),
-        }
-
-        # Add assigned text if available
-        if element.assigned_text is not None:
-            pipe_data["assigned_text"] = self._export_text(element.assigned_text)
-
-        return pipe_data
-
-    def _export_point_element(self, element: ObjectData) -> dict[str, Any]:
-        """Export a shaft to dictionary format.
-
-        Parameters
-        ----------
-        element : ObjectData
-            Element to export
-
-        Returns
-        -------
-        dict[str, Any]
-            Dictionary containing shaft information
-        """
-
-        element_data = {
-            "type": "shaft",
-            "layer": element.layer,
-            # "color": self._export_color(element.color),
-            "position": self._export_point(element.positions[0]),
-            "dimensions": self._export_dimensions(element.dimensions),
-        }
-
-        # Add assigned text if available
-        if element.assigned_text is not None:
-            element_data["assigned_text"] = self._export_text(element.assigned_text)
-
-        return element_data
-
-    def _export_point(self, point: Point3D) -> dict[str, float]:
-        """Export a 3D point to dictionary format.
-
-        Parameters
-        ----------
-        point : Point3D
-            Point to export
-
-        Returns
-        -------
-        dict[str, float]
-            Dictionary with x, y, z coordinates
-        """
-        return {"x": point.east, "y": point.north, "z": point.altitude}
-
     def _export_dimensions(self, dimensions: RectangularDimensions | RoundDimensions) -> dict[str, Any]:
         """Export dimensions to dictionary format.
 
@@ -151,211 +72,110 @@ class JsonExporter:
         dict[str, Any]
             Dictionary containing dimension information
         """
+        dimension_data = {}
         if isinstance(dimensions, RectangularDimensions):
-            dim_data = {
-                "type": "rectangular",
+            dimension_data = {
                 "length": dimensions.length,
                 "width": dimensions.width,
                 "angle": dimensions.angle,
             }
-
-            if dimensions.height is not None:
-                dim_data["height"] = dimensions.height
-
-            return dim_data
-
         elif isinstance(dimensions, RoundDimensions):
-            dim_data = {
-                "type": "round",
+            dimension_data = {
+                "radius": dimensions.diameter / 2,
                 "diameter": dimensions.diameter,
             }
 
-            if dimensions.height is not None:
-                dim_data["height"] = dimensions.height
+        if dimensions.height is not None:
+            dimension_data["height"] = dimensions.height
+        return dimension_data
 
-            return dim_data
-
-    def _export_color(self, color: tuple[int, int, int]) -> dict[str, int]:
-        """Export color to dictionary format.
-
-        Parameters
-        ----------
-        color : tuple[int, int, int]
-            RGB color tuple
-
-        Returns
-        -------
-        dict[str, int]
-            Dictionary with r, g, b values
-        """
-        return {"r": color[0], "g": color[1], "b": color[2]}
-
-    def _export_text(self, text: DxfText) -> dict[str, Any]:
-        """Export a text element to dictionary format.
+    def _export_element(self, element: ObjectData) -> dict[str, Any]:
+        """Export a pipe to dictionary format.
 
         Parameters
         ----------
-        text : DxfText
-            Text to export
+        element : ObjectData
+            Element to export
 
         Returns
         -------
         dict[str, Any]
-            Dictionary containing text information
+            Dictionary containing pipe information
         """
-        return {
-            "content": text.content,
-            # "layer": text.layer,
-            # "position": self._export_point(text.position),
+        element_data = {
+            "type": element.object_type.name.lower(),
+            "layer": element.layer,
+            "dimensions": self._export_dimensions(element.dimensions),
         }
 
+        if element.positions:
+            element_points = _export_points(element.positions)
+        else:
+            element_points = _export_points(element.points)
 
-class AsIsDataJsonExporter(JsonExporter):
-    """Specialized JSON exporter with Revit-specific formatting.
+        if element_points is not None:
+            element_data["points"] = element_points
 
-    This exporter formats the JSON output specifically for Revit
-    modeling requirements, with additional metadata and formatting.
-    """
+        if element.assigned_text is not None:
+            element_data["assigned_text"] = element.assigned_text.content
 
-    def export_media(self, media: list[Medium]) -> None:
-        """Export media with Revit-specific formatting.
+        return element_data
+
+    def _export_text(self, text: DxfText) -> dict[str, Any]:
+        text_data: dict[str, Any] = {
+            "text": text.content,
+            "layer": text.layer,
+        }
+        if text.color is not None:
+            text_data["color"] = _export_color(text.color)
+
+        if text.position is not None:
+            text_data["point"] = _export_point(text.position)
+
+        return text_data
+
+    def _get_element_and_text_data(
+        self, element_data: list[tuple[list[ObjectData], list[DxfText]]]
+    ) -> list[dict[str, Any]]:
+        """Export elements and texts to dictionary format.
 
         Parameters
         ----------
-        media : list[Medium]
-            List of media containing pipes, shafts, and texts
+        element_data : list[tuple[list[ObjectData], list[DxfText]]]
+            List of tuples containing elements and their associated texts
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            List of dictionaries containing element and text information
         """
-        export_data = {
-            "version": "1.0",
-            "format": "revit_compatible",
-            "units": "mm",  # Assuming millimeters as default unit
-            "media": {},
-        }
+        export_data = []
 
-        for medium in media:
-            export_data["media"][medium.name] = self._export_medium_revit(medium)
+        for elems_data, text_data in element_data:
+            for elem in elems_data:
+                export_data.append(self._export_element(elem))
+            for text in text_data:
+                export_data.append(self._export_text(text))
 
-        try:
-            with open(self.output_path, "w", encoding="utf-8") as f:
-                json.dump(export_data, f, indent=2, ensure_ascii=False)
-        except OSError as e:
-            raise OSError(f"Cannot write JSON file {self.output_path}: {e}") from e
+        return export_data
 
-    def _export_medium_revit(self, medium: Medium) -> dict[str, Any]:
-        """Export medium with Revit-specific structure.
+    def _export_medium(self, medium: Medium) -> list[dict[str, Any]]:
+        """Export a single medium to dictionary format.
 
         Parameters
         ----------
         medium : Medium
-            Medium to export
+            Medium containing elements and lines
 
         Returns
         -------
-        dict[str, Any]
-            Dictionary with pipes and shafts separated
+        list[dict[str, Any]]
+            List of elements (pipes and shafts) in the medium
         """
-        pipes = []
-        shafts = []
+        elem_export = []
+        point_based_data = self._get_element_and_text_data(medium.element_data.data)
+        elem_export.extend(point_based_data)
 
-        # Separate elements and lines for Revit export
-        for element in medium.element_data.elements:
-            if element.positions:
-                shafts.append(self._export_shaft_revit(element))
-            else:
-                pipes.append(self._export_pipe_revit(element))
-
-        for line in medium.line_data.elements:
-            pipes.append(self._export_pipe_revit(line))
-
-        return {
-            "pipes": pipes,
-            "shafts": shafts,
-            "metadata": {
-                "pipe_count": len(medium.line_data.elements),
-                "shaft_count": len([e for e in medium.element_data.elements if e.positions]),
-                "text_count": len(medium.element_data.texts) + len(medium.line_data.texts),
-            },
-        }
-
-    def _export_pipe_revit(self, pipe: ObjectData) -> dict[str, Any]:
-        """Export pipe with Revit-specific formatting.
-
-        Parameters
-        ----------
-        pipe : Pipe
-            Pipe to export
-
-        Returns
-        -------
-        dict[str, Any]
-            Dictionary with Revit-compatible pipe data
-        """
-        pipe_data = self._export_line_element(pipe)
-
-        # Add Revit-specific metadata
-        pipe_data["revit_metadata"] = {
-            "family": "Pipe",
-            "system_type": "Sanitary",  # Default system type
-            "level": "Level 1",  # Default level
-            "routing_preferences": "Standard",
-        }
-
-        # Add path information for Revit routing
-        if len(pipe.points) >= 2:
-            pipe_data["path_length"] = self._calculate_path_length(pipe.points)
-            pipe_data["start_point"] = self._export_point(pipe.points[0])
-            pipe_data["end_point"] = self._export_point(pipe.points[-1])
-
-        return pipe_data
-
-    def _export_shaft_revit(self, shaft: ObjectData) -> dict[str, Any]:
-        """Export shaft with Revit-specific formatting.
-
-        Parameters
-        ----------
-        shaft : Shaft
-            Shaft to export
-
-        Returns
-        -------
-        dict[str, Any]
-            Dictionary with Revit-compatible shaft data
-        """
-        shaft_data = self._export_point_element(shaft)
-
-        # Add Revit-specific metadata
-        shaft_data["revit_metadata"] = {}
-
-        return shaft_data
-
-    def _calculate_path_length(self, points: list[Point3D]) -> float:
-        """Calculate total length of a path defined by points.
-
-        Parameters
-        ----------
-        points : list[Point3D]
-            List of points defining the path
-
-        Returns
-        -------
-        float
-            Total path length
-        """
-        if len(points) < 2:
-            return 0.0
-
-        total_length = 0.0
-
-        for i in range(len(points) - 1):
-            p1 = points[i]
-            p2 = points[i + 1]
-
-            # Calculate 3D distance between consecutive points
-            dx = p2.east - p1.east
-            dy = p2.north - p1.north
-            dz = p2.altitude - p1.altitude
-
-            segment_length = (dx**2 + dy**2 + dz**2) ** 0.5
-            total_length += segment_length
-
-        return total_length
+        line_based_data = self._get_element_and_text_data(medium.line_data.data)
+        elem_export.extend(line_based_data)
+        return elem_export

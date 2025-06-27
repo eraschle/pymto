@@ -10,6 +10,7 @@ from dxfto.models import (
     LayerData,
     Medium,
     MediumConfig,
+    MediumMasterConfig,
     ObjectData,
     ObjectType,
     Point3D,
@@ -248,6 +249,7 @@ class TestAssignmentConfig:
             geometry=geometry_layers,
             text=text_layers,
             default_unit="mm",
+            object_type=ObjectType.UNKNOWN,
         )
         assert config.geometry == geometry_layers
         assert config.text == text_layers
@@ -258,25 +260,29 @@ class TestAssingmentData:
 
     def test_assignment_data_creation(self):
         """Test AssingmentData creation."""
-        data = AssingmentData()
-        assert data.elements == []
-        assert data.texts == []
+        assignment = AssingmentData()
+        assert assignment.data == []
 
     def test_add_element(self):
         """Test adding element to assignment data."""
         dims = RoundDimensions(diameter=5.0)
+        position = Point3D(east=0.0, north=0.0, altitude=0.0)
         element = ObjectData(
             medium="Test Medium",
             object_type=ObjectType.UNKNOWN,
             dimensions=dims,
             layer="TEST",
+            positions=[position],
         )
+        assignment = AssingmentData()
+        assignment.setup(medium="Test Medium", elements=[[element]], texts=[[]])
 
-        data = AssingmentData()
-        data.set_elements("Test Medium", [element])
-
-        assert len(data.elements) == 1
-        assert data.elements[0] == element
+        assert len(assignment.data) == 1
+        assert len(assignment.data[0]) == 2
+        elem_data, text_data = assignment.data[0]
+        assert len(elem_data) == 1
+        assert len(text_data) == 0
+        assert elem_data[0] == element
 
     def test_add_text(self):
         """Test adding text to assignment data."""
@@ -289,11 +295,15 @@ class TestAssingmentData:
             color=(0, 0, 0),
         )
 
-        data = AssingmentData()
-        data.set_texts("text", [text])
+        assignment = AssingmentData()
+        assignment.setup(medium="Test Medium", elements=[[]], texts=[[text]])
 
-        assert len(data.texts) == 1
-        assert data.texts[0] == text
+        assert len(assignment.data) == 1
+        assert len(assignment.data[0]) == 2
+        elem_data, text_data = assignment.data[0]
+        assert len(elem_data) == 0
+        assert len(text_data) == 1
+        assert text_data[0] == text
 
 
 class TestMedium:
@@ -309,18 +319,27 @@ class TestMedium:
             geometry=geometry_layers,
             text=text_layers,
             default_unit="mm",
+            object_type=ObjectType.UNKNOWN,
         )
         lines_config = MediumConfig(
             medium="Test Medium",
             geometry=geometry_layers,
             text=text_layers,
             default_unit="mm",
+            object_type=ObjectType.UNKNOWN,
+        )
+        master = MediumMasterConfig(
+            medium="Abwasserleitung",
+            point_based=[elements_config],
+            line_based=[lines_config],
         )
 
-        medium = Medium(name="Abwasserleitung", elements=elements_config, lines=lines_config)
+        medium = Medium(name="Abwasserleitung", config=master)
 
         assert medium.name == "Abwasserleitung"
-        assert medium.elements == elements_config
-        assert medium.lines == lines_config
+        assert len(medium.config.point_based) == 1
+        assert medium.config.point_based[0] == elements_config
+        assert len(medium.config.line_based) == 1
+        assert medium.config.line_based[0] == lines_config
         assert isinstance(medium.element_data, AssingmentData)
         assert isinstance(medium.line_data, AssingmentData)

@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from dxfto.config import ConfigurationHandler
 from dxfto.io import DXFReader
-from dxfto.models import LayerData, Medium, MediumConfig, ObjectType
+from dxfto.models import LayerData, Medium, MediumConfig, ObjectType, MediumMasterConfig
 from dxfto.processor import DXFProcessor
 
 
@@ -57,13 +57,25 @@ class TestDXFProcessor:
         text_layers = [LayerData(name="TEXT", color=(0, 0, 0))]
 
         elements_config = MediumConfig(
-            medium="test_medium", geometry=geometry_layers, text=text_layers, default_unit="mm"
+            medium="test_medium",
+            geometry=geometry_layers,
+            text=text_layers,
+            default_unit="mm",
+            object_type=ObjectType.UNKNOWN,
         )
         lines_config = MediumConfig(
-            medium="test_medium", geometry=geometry_layers, text=text_layers, default_unit="mm"
+            medium="test_medium",
+            geometry=geometry_layers,
+            text=text_layers,
+            default_unit="mm",
+            object_type=ObjectType.UNKNOWN,
         )
-
-        test_medium = Medium(name="Test Medium", elements=elements_config, lines=lines_config)
+        master = MediumMasterConfig(
+            medium="test_medium",
+            point_based=[elements_config],
+            line_based=[lines_config],
+        )
+        test_medium = Medium(name="Test Medium", config=master)
 
         # Process mediums
         reader.load_file()  # Ensure reader is loaded
@@ -72,8 +84,18 @@ class TestDXFProcessor:
         # Verify results
         assert test_medium.element_data is not None
         assert test_medium.line_data is not None
-        assert isinstance(test_medium.element_data.elements, list)
-        assert isinstance(test_medium.element_data.texts, list)
+        assert isinstance(test_medium.config, MediumMasterConfig)
+        point_based_config = test_medium.config.point_based
+        assert isinstance(point_based_config, list)
+        assert len(point_based_config) == 1
+        point_config = test_medium.config.point_based[0]
+        assert point_config == elements_config
+
+        line_based_config = test_medium.config.line_based
+        assert isinstance(line_based_config, list)
+        assert len(line_based_config) == 1
+        line_config = test_medium.config.line_based[0]
+        assert line_config == lines_config
 
     def test_convert_entities_to_objects_empty(self, processor: DXFProcessor):
         """Test converting empty entity list."""
@@ -129,5 +151,3 @@ class TestDXFProcessor:
             mock_entity.dxf.color = color_index
             color = processor._get_entity_color(mock_entity)
             assert color == expected_rgb
-
-

@@ -125,6 +125,8 @@ class DXFReader:
 
         def color_filter(entity: DXFEntity) -> bool:
             """Check if entity color matches the layer color."""
+            if layer.color is None:
+                return True
             if isinstance(layer.color, (tuple | list)):
                 entity_color = getattr(entity, "rgb", RGB(0, 0, 0))
                 layer_color = RGB(*layer.color)

@@ -111,14 +111,6 @@ def process_dxf(
 
         processor = DXFProcessor(handler)
         processor.extract_mediums(reader)
-
-        if verbose:
-            e_count, t_count = processor.element_count()
-            click.echo(f"{len(handler.mediums)}: Verschiedene Mediums gefunden")
-            click.echo(f"Extracted {e_count}/{t_count} point based elements")
-            e_count, t_count = processor.line_count()
-            click.echo(f"Extracted {e_count}/{t_count} line based elements")
-
         # Group elements by medium (already handled by config loading)
         if verbose:
             click.echo("Using configuration-based grouping...")
@@ -151,18 +143,36 @@ def process_dxf(
         if verbose:
             click.echo(f"Assigning texts using {text_assignment} strategy...")
 
-        # Count successful text assignments
-        total_assigned = 0
-        for medium in processor.mediums:
-            total_assigned += sum(
-                1 for element in medium.element_data.elements if element.assigned_text is not None
-            )
-            total_assigned += sum(
-                1 for element in medium.line_data.elements if element.assigned_text is not None
-            )
-
+        # Statistik-Tabelle für Text-Zuweisungen
         if verbose:
-            click.echo(f"Assigned {total_assigned} texts to pipes")
+            click.echo("\n" + "=" * 85)
+            click.echo("TEXT ASSIGNMENT STATISTICS")
+            click.echo("=" * 85)
+            click.echo(
+                f"{'Medium':<25} {'Total Elem.':>12} {'Total Text':>12} {'Elem. w/ Text':>15} {'% Assigned':>12}"
+            )
+            click.echo("-" * 85)
+
+            # Statistiken für jedes Medium ausgeben
+            for medium in processor.mediums:
+                # Kombiniere Statistiken von element_data und line_data
+                elem_stats = medium.element_data.get_statistics()
+                line_stats = medium.line_data.get_statistics()
+
+                total_elems = elem_stats["elements"] + line_stats["elements"]
+                total_texts = elem_stats["texts"] + line_stats["texts"]
+                assigned_elems = elem_stats["assigned"] + line_stats["assigned"]
+                assigned_perc = (assigned_elems / total_texts * 100) if total_elems > 0 else 0
+
+                click.echo(
+                    f"{medium.name:<25} "
+                    f"{total_elems:>12} "
+                    f"{total_texts:>12} "
+                    f"{assigned_elems:>15} "
+                    f"{assigned_perc:>11.1f}%"
+                )
+
+            click.echo("-" * 85)
 
         click.echo(f"Exporting to JSON: {output}")
         exporter = JsonExporter(output)
@@ -174,9 +184,8 @@ def process_dxf(
         # Summary output
         click.echo(f"Processed {dxf_file}")
         click.echo(f"Output: {output}")
-        click.echo(f"Lines: {sum(len(m.line_data.elements) for m in processor.mediums)}")
-        click.echo(f"Elements: {sum(len(m.element_data.elements) for m in processor.mediums)}")
-        click.echo(f"Text assignments: {total_assigned}")
+        click.echo(f"Lines: {sum(len(m.line_data.assigned) for m in processor.mediums)}")
+        click.echo(f"Elements: {sum(len(m.element_data.assigned) for m in processor.mediums)}")
 
     except Exception as e:
         raise click.ClickException(f"Processing failed: {e}") from e

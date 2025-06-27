@@ -9,7 +9,7 @@ This package provides:
 
 from .dxf_reader import DXFReader
 from .entity_extractor import DXFEntityExtractor
-from .json_exporter import AsIsDataJsonExporter, JsonExporter
+from .json_exporter import JsonExporter
 from .landxml_reader import LandXMLReader
 
 __all__ = [
@@ -17,5 +17,4 @@ __all__ = [
     "DXFEntityExtractor",
     "LandXMLReader",
     "JsonExporter",
-    "AsIsDataJsonExporter",
 ]

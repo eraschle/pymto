@@ -32,15 +32,18 @@ class SpatialTextAssigner(IAssignmentStrategy):
 
     def _create_copy_of(self, elements: list[ObjectData]) -> list[ObjectData]:
         """Create a copy of ObjectData elements with reset assignments.
+
         Parameters
         ----------
         elements : list[ObjectData]
             List of ObjectData elements to copy
+
         Returns
         -------
         list[ObjectData]
             List of copied ObjectData elements with reset assignments
         """
+        return elements.copy() if elements else []
         copied_elements = []
         for element in elements:
             # Create a new ObjectData with all required fields
@@ -79,7 +82,6 @@ class SpatialTextAssigner(IAssignmentStrategy):
             return elements
 
         assigned_elements = self._create_copy_of(elements)
-
         # For each text, find the closest element position
         for text in texts:
             closest_element_idx, distance = self._find_closest_element_position(
@@ -173,14 +175,12 @@ class SpatialTextAssigner(IAssignmentStrategy):
                     start_point = element.points[idx]
                     end_point = element.points[idx + 1]
 
-                    # Store segment as (start_point, end_point, element_index, segment_index)
                     element_segments.append((start_point, end_point))
                     segment_to_element.append((element_idx, idx))
 
         if not element_segments:
             return assigned_elements
 
-        # For each text, find the closest element segment
         for text in texts:
             closest_element_idx, _, distance = self._find_closest_element_segment(
                 text.position, element_segments, segment_to_element

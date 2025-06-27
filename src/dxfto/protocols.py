@@ -7,7 +7,14 @@ easily interchangeable following SOLID principles.
 
 from typing import Protocol
 
-from .models import DxfText, Medium, MediumConfig, ObjectData, Point3D
+from .models import (
+    AssingmentData,
+    DxfText,
+    Medium,
+    MediumConfig,
+    ObjectData,
+    Point3D,
+)
 
 
 class IGroupingStrategy(Protocol):
@@ -98,6 +105,19 @@ class IElevationUpdater(Protocol):
 class IDimensionUpdater(Protocol):
     """Protocol for updating dimensions of media based on their elements."""
 
+    def update_elements(self, assignment: AssingmentData) -> None:
+        """Update dimensions of all elements in the assignment data container.
+
+        This method should iterate through all elements in the assignment
+        and use the `update_dimension` method to update each element's
+
+        Parameters
+        ----------
+        assignment : AssingmentData
+            Assignment data containing elements and their assigned texts
+        """
+        ...
+
     def update_dimension(self, element: ObjectData, config: MediumConfig) -> None:
         """Update dimensions of a single element based on other information.
 
@@ -106,13 +126,10 @@ class IDimensionUpdater(Protocol):
 
         Parameters
         ----------
-        medium : Medium
-            Medium containing the element to update
         element : ObjectData
-            Element for which to update dimensions
-        Returns
-        -------
-        None
+            Element to update dimensions for
+        config : MediumConfig
+            Configuration for the medium containing the default unit
         """
         ...
 

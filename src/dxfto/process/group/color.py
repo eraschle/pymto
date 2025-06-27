@@ -2,7 +2,14 @@
 
 import numpy as np
 
-from ...models import DxfText, Medium, MediumConfig, ObjectData
+from ...models import (
+    DxfText,
+    Medium,
+    MediumConfig,
+    MediumMasterConfig,
+    ObjectData,
+    ObjectType,
+)
 
 
 class ColorBasedGrouper:
@@ -56,7 +63,7 @@ class ColorBasedGrouper:
 
         media = []
 
-        for i, color_group in enumerate(color_groups):
+        for idx, color_group in enumerate(color_groups):
             # Find elements with colors in this group
             group_elements = [
                 element
@@ -83,17 +90,26 @@ class ColorBasedGrouper:
                 medium_name = self._color_to_medium_name(dominant_color)
 
                 element_config = MediumConfig(
-                    medium="test_medium", geometry=[], text=[], default_unit="mm"
+                    medium=medium_name,
+                    geometry=[],
+                    text=[],
+                    default_unit="mm",
+                    object_type=ObjectType.UNKNOWN,
                 )
                 line_config = MediumConfig(
-                    medium="test_medium", geometry=[], text=[], default_unit="mm"
+                    medium=medium_name,
+                    geometry=[],
+                    text=[],
+                    default_unit="mm",
+                    object_type=ObjectType.UNKNOWN,
+                )
+                master = MediumMasterConfig(
+                    medium=medium_name,
+                    point_based=[element_config],
+                    line_based=[line_config],
                 )
 
-                medium = Medium(
-                    name=f"{medium_name}_{i + 1}",
-                    elements=element_config,
-                    lines=line_config,
-                )
+                medium = Medium(name=medium_name, config=master)
 
                 # Add elements to medium
                 # for element in group_elements:

@@ -19,6 +19,7 @@ from .models import (
     DxfText,
     Medium,
     MediumConfig,
+    MediumMasterConfig,
     ObjectData,
     ObjectType,
     Point3D,
@@ -61,36 +62,6 @@ class DXFProcessor:
         """
         return self.config.mediums.values()
 
-    def element_count(self) -> tuple[int, int]:
-        """Get total number of elements and texts of point based mediums.
-
-        Returns
-        -------
-        tuple[int, int]
-            Total number of elements and texts in the DXF file
-        """
-        element_count = 0
-        text_count = 0
-        for medium in self.mediums:
-            element_count += len(medium.element_data.elements)
-            text_count += len(medium.element_data.texts)
-        return element_count, text_count
-
-    def line_count(self) -> tuple[int, int]:
-        """Get total number of elements and texts of line based mediums.
-
-        Returns
-        -------
-        tuple[int, int]
-            Total number of elements and texts in the DXF file
-        """
-        element_count = 0
-        text_count = 0
-        for medium in self.mediums:
-            element_count += len(medium.line_data.elements)
-            text_count += len(medium.line_data.texts)
-        return element_count, text_count
-
     def extract_mediums(self, reader: DXFReader) -> None:
         """Process all mediums by extracting and creating objects.
 
@@ -111,16 +82,43 @@ class DXFProcessor:
         log.info("DXF processor initialized successfully")
 
         log.info(f"Processing {len(self.config.mediums)} mediums")
-
         for medium_name, medium in self.config.mediums.items():
             log.debug(f"Processing medium: {medium_name}")
-            data = self._process_assignment(medium.elements)
-            medium.element_data.update(medium_name, data)
+            geom_elems, text_elems = self._get_assignment_data(
+                medium_name, medium.config.point_based
+            )
+            medium.element_data.setup(medium_name, geom_elems, text_elems)
+            geom_elems, text_elems = self._get_assignment_data(
+                medium_name, medium.config.line_based
+            )
+            medium.line_data.setup(medium_name, geom_elems, text_elems)
 
-            data = self._process_assignment(medium.lines)
-            medium.line_data.update(medium_name, data)
+    def _get_assignment_data(
+        self, medium: str, configs: list[MediumConfig]
+    ) -> tuple[list[list[ObjectData]], list[list[DxfText]]]:
+        """Process a single assignment configuration.
 
-    def _process_assignment(self, config: MediumConfig) -> AssingmentData:
+        Parameters
+        ----------
+        config : AssignmentConfig
+            Configuration for elements or lines
+
+        Returns
+        -------
+        AssingmentData
+            Processed assignment data with objects and texts
+        """
+        geometries: list[list[ObjectData]] = []
+        texts: list[list[DxfText]] = []
+        for config in configs:
+            geom_elems, text_elems = self._process_assignment(medium, config)
+            geometries.append(geom_elems)
+            texts.append(text_elems)
+        return geometries, texts
+
+    def _process_assignment(
+        self, medium: str, config: MediumConfig
+    ) -> tuple[list[ObjectData], list[DxfText]]:
         """Process a single assignment configuration.
 
         Parameters
@@ -137,15 +135,9 @@ class DXFProcessor:
             raise RuntimeError("Processor components not initialized")
 
         extracted = self.extractor.extract_entities(config)
-        geometries = self._convert_to_objects(
-            config.medium, extracted["geometries"], config.default_object_type
-        )
-        texts = self._convert_to_texts(config.medium, extracted["texts"])
-
-        return AssingmentData(
-            elements=geometries,
-            texts=texts,
-        )
+        geometries = self._convert_to_objects(medium, extracted["geometries"], config.object_type)
+        texts = self._convert_to_texts(medium, extracted["texts"])
+        return geometries, texts
 
     def _convert_to_objects(
         self, medium: str, entities: list[DXFEntity], object_type: ObjectType
@@ -280,6 +272,13 @@ class DXFProcessor:
         except Exception:
             return (0, 0, 0)
 
+    def assign_texts_to(
+        self, assigner: IAssignmentStrategy, handler: AssingmentData, configs: list[MediumConfig]
+    ) -> None:
+        for (elems, texts), config in zip(handler.data, configs, strict=True):
+            assigned = assigner.texts_to_point_based(elems, texts)
+            handler.add_assignment(config, assigned)
+
     def assign_texts_to_mediums(self, assigner: IAssignmentStrategy) -> None:
         """Assign extracted texts to mediums.
 
@@ -288,22 +287,14 @@ class DXFProcessor:
         mediums : dict[str, Medium]
             Dictionary of mediums to assign texts to
         """
-        for medium, medium_data in self.config.mediums.items():
+        for medium in self.mediums:
             # Assign texts to elements
-            log.info(f"Assigning texts to elements of medium: {medium}")
-            element_data = medium_data.element_data
-            assigned_elements = assigner.texts_to_point_based(
-                element_data.elements,
-                element_data.texts,
-            )
-            element_data.elements.clear()
-            element_data.elements.extend(assigned_elements)
+            log.info(f"Assigning elements of {medium.name}")
+            log.info("- Assigning texts to POINT BASED elements")
+            self.assign_texts_to(assigner, medium.element_data, medium.config.point_based)
 
-            # Assign texts to lines (pipes)
-            line_data = medium_data.element_data
-            assigned_lines = assigner.texts_to_line_based(line_data.elements, line_data.texts)
-            line_data.elements.clear()
-            line_data.elements.extend(assigned_lines)
+            log.info("- Assigning texts to LINE BASED elements")
+            self.assign_texts_to(assigner, medium.line_data, medium.config.line_based)
 
     def update_dimensions(self, updater: IDimensionUpdater) -> None:
         """Update dimensions of elements and lines in mediums.
@@ -314,10 +305,18 @@ class DXFProcessor:
             Dimension updater to apply to elements and lines
         """
         for medium in self.config.mediums.values():
-            for element in medium.element_data.elements:
-                updater.update_dimension(element, config=medium.elements)
-            for line in medium.line_data.elements:
-                updater.update_dimension(line, config=medium.lines)
+            updater.update_elements(medium.element_data)
+            updater.update_elements(medium.line_data)
+
+    def _update_elevation(self, updater: IElevationUpdater, assigment: AssingmentData) -> None:
+        # Texts are assigned to elemtents and onbly the elements data are exported, which
+        # means that texts are not updated here.
+        for elements, _ in assigment.data:
+            for element in elements:
+                if element.points:
+                    element.points = updater.update_elevation(element.points)
+                if element.positions:
+                    element.positions = updater.update_elevation(element.positions)
 
     def update_points_elevation(self, updater: IElevationUpdater) -> None:
         """Assign extracted texts to mediums.
@@ -327,26 +326,9 @@ class DXFProcessor:
         mediums : dict[str, Medium]
             Dictionary of mediums to assign texts to
         """
-        for medium in self.config.mediums.values():
-            # Update elements points/positions
-            for element in medium.element_data.elements:
-                if element.points:
-                    element.points = updater.update_elevation(element.points)
-                if element.positions:
-                    element.positions = updater.update_elevation(element.positions)
-
-            for element in medium.line_data.elements:
-                if element.points:
-                    element.points = updater.update_elevation(element.points)
-                if element.positions:
-                    element.positions = updater.update_elevation(element.positions)
-
-            # Update text positions
-            for text in medium.element_data.texts:
-                text.position = updater.update_elevation([text.position])[0]
-
-            for text in medium.line_data.texts:
-                text.position = updater.update_elevation([text.position])[0]
+        for medium in self.mediums:
+            self._update_elevation(updater, medium.element_data)
+            self._update_elevation(updater, medium.line_data)
 
     def export_data(self, exporter: IExporter) -> None:
         """Export processed data using the provided exporter.

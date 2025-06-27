@@ -3,8 +3,6 @@
 import math
 from unittest.mock import Mock, patch
 
-import pytest
-
 from dxfto.models import Point3D
 from dxfto.process import entity_handler as dxf
 

@@ -18,11 +18,14 @@ class ObjectType(Enum):
     """Shape types for pipes and shafts."""
 
     UNKNOWN = "unknown"
-    SHAFT = "shaft"
-    PIPE_WASTEWATER = "wastewater"
-    PIPE_WATER = "water"
+    SHAFT = "shaft"  # Schacht (Abwasser)
+    PIPE_WATER = "water"  # Wasser Leitung
+    PIPE_WASTEWATER = "waste_water"  # Abwasser Leitung
+    WATER_SPECIAL = "water_special"  # Wasser Spezialbauwerk
+    WASTE_WATER_SPECIAL = "waser_water_special"  # Abwasser Spezialbauwerk
     PIPE_GAS = "gas"
-    CABLE_DUCT = "duct"
+    CABLE_DUCT = "duct"  # Kabekanal
+    CATE_VALUE = "gate_value"  # Schieber
 
 
 @dataclass(frozen=True)
@@ -212,10 +215,7 @@ class ObjectData:
 class LayerData:
     name: str = field(repr=True, compare=True)
     color: str | int | tuple[int, int, int] | None = field(repr=True, compare=True)
-
-    def __post_init__(self):
-        if self.color is None:
-            self.color = (0, 0, 0)
+    block: str | None = field(default=None, repr=True, compare=True)
 
 
 @dataclass(frozen=True)
@@ -223,8 +223,29 @@ class MediumConfig:
     medium: str
     geometry: list[LayerData]
     text: list[LayerData]
-    default_unit: str = "mm"
-    default_object_type: ObjectType = ObjectType.UNKNOWN
+    default_unit: str
+    object_type: ObjectType
+
+
+@dataclass(frozen=True)
+class MediumMasterConfig:
+    """Master configuration for medium layers.
+
+    Contains separate configurations for point-based and line-based elements.
+    Each configuration includes a list of geometry and text layers to assign,
+    inluding default values for unit and object type.
+
+    Parameters
+    ----------
+    point_based : list[MediumConfig]
+        List of configurations for point-based elements (e.g., shafts)
+    line_based : list[MediumConfig]
+        List of configurations for line-based elements (e.g., pipes, ducts)
+    """
+
+    medium: str
+    point_based: list[MediumConfig] = field(default_factory=list, repr=True, compare=True)
+    line_based: list[MediumConfig] = field(default_factory=list, repr=True, compare=True)
 
 
 class AssingmentData:
@@ -238,46 +259,67 @@ class AssingmentData:
         List of texts assigned to this medium
     """
 
-    def __init__(self, elements: list[ObjectData] | None = None, texts: list[DxfText] | None = None) -> None:
-        self._elements = elements if elements is not None else []
-        self._texts = texts if texts is not None else []
+    def __init__(self) -> None:
+        self._data: list[tuple[list[ObjectData], list[DxfText]]] = []
+        self._assigned: list[tuple[list[ObjectData], MediumConfig]] = []
 
     @property
-    def elements(self) -> list[ObjectData]:
+    def data(self) -> list[tuple[list[ObjectData], list[DxfText]]]:
         """Get all elements assigned to this medium."""
-        return self._elements
-
-    def set_elements(self, medium: str, elements: list[ObjectData]) -> None:
-        """Set elements for this medium."""
-        for elem in elements:
-            elem.medium = medium
-        self._elements = elements
+        return self._data
 
     @property
-    def texts(self) -> list[DxfText]:
-        """Get all texts assigned to this medium."""
-        return self._texts
+    def assigned(self) -> list[tuple[list[ObjectData], MediumConfig]]:
+        """Get all elements that have been assigned texts."""
+        return self._assigned
 
-    def set_texts(self, medium: str, texts: list[DxfText]) -> None:
-        """Set texts for this medium."""
-        for text in texts:
-            text.medium = medium
-        self._texts = texts
+    def get_statistics(self) -> dict[str, int | float]:
+        """Berechnet Statistiken für die Zuweisungen."""
+        assigned = sum(
+            len([elem for elem in elements if elem.assigned_text is not None])
+            for elements, _ in self.data
+        )
+        return {
+            "elements": sum(len(elements) for elements, _ in self.data),
+            "texts": sum(len(texts) for _, texts in self.data),
+            "assigned": assigned,
+        }
 
-    def update(self, medium: str, data: "AssingmentData") -> None:
-        """Update elements and texts for this medium.
+    def add_assignment(self, config: MediumConfig, assigned_elements: list[ObjectData]) -> None:
+        """Add an assignment of elements to a medium configuration.
+
+        Parameters
+        ----------
+        config : MediumConfig
+            Configuration for the medium
+        assigned_elements : list[ObjectData]
+            List of elements assigned to this medium
+        """
+        self._assigned.append((assigned_elements, config))
+
+    def setup(
+        self, medium: str, elements: list[list[ObjectData]], texts: list[list[DxfText]]
+    ) -> None:
+        """Setup assignment data for a medium.
 
         Parameters
         ----------
         medium : str
-            Name of the medium to update
-        elements : list[ObjectData]
-            List of elements to assign to this medium
-        texts : list[DxfText]
-            List of texts to assign to this medium
+            Name of the medium
+        elements : list[list[ObjectData]]
+            List of elements assigned to this medium
+        texts : list[list[DxfText]]
+            List of texts assigned to this medium
         """
-        self.set_elements(medium, data.elements)
-        self.set_texts(medium, data.texts)
+        for elem_group, text_group in zip(elements, texts, strict=True):
+            if not isinstance(elem_group, list) or not isinstance(text_group, list):
+                log.error(f"Invalid data format for medium '{medium}': {elem_group}, {text_group}")
+                continue
+            for elem_data in elem_group:
+                elem_data.medium = medium
+            for text_data in text_group:
+                text_data.medium = medium
+            self._data.append((elem_group, text_group))
 
 
 @dataclass(frozen=True)
@@ -297,8 +339,6 @@ class Medium:
     """
 
     name: str
-    elements: MediumConfig
-    lines: MediumConfig
+    config: MediumMasterConfig
     element_data: AssingmentData = field(default_factory=AssingmentData, repr=False, compare=False)
     line_data: AssingmentData = field(default_factory=AssingmentData, repr=False, compare=False)
-

@@ -8,7 +8,14 @@ from pathlib import Path
 
 import numpy as np
 
-from ...models import DxfText, LayerData, Medium, ObjectData
+from ...models import (
+    DxfText,
+    LayerData,
+    Medium,
+    MediumMasterConfig,
+    ObjectData,
+    ObjectType,
+)
 
 
 class LayerBasedGrouper:
@@ -139,7 +146,8 @@ class ColorBasedGrouper:
                 text
                 for text in texts
                 if any(
-                    self._color_distance(text.color, color) <= self.color_tolerance for color in color_group
+                    self._color_distance(text.color, color) <= self.color_tolerance
+                    for color in color_group
                 )
             ]
 
@@ -151,15 +159,27 @@ class ColorBasedGrouper:
 
                 from ...models import MediumConfig
 
-                element_config = MediumConfig(medium="test_medium",geometry=[], text=[], default_unit="mm")
-                line_config = MediumConfig(medium="test_medium",geometry=[], text=[], default_unit="mm")
-
-                medium = Medium(
-                    name=f"{medium_name}_{i + 1}",
-                    elements=element_config,
-                    lines=line_config,
+                element_config = MediumConfig(
+                    medium=medium_name,
+                    geometry=[],
+                    text=[],
+                    default_unit="mm",
+                    object_type=ObjectType.UNKNOWN,
+                )
+                line_config = MediumConfig(
+                    medium=medium_name,
+                    geometry=[],
+                    text=[],
+                    default_unit="mm",
+                    object_type=ObjectType.UNKNOWN,
+                )
+                master = MediumMasterConfig(
+                    medium=medium_name,
+                    point_based=[element_config],
+                    line_based=[line_config],
                 )
 
+                medium = Medium(name=f"{medium_name}_{i + 1}", config=master)
                 # Add elements to medium
                 # for element in group_elements:
                 #     medium.element_data.add_element(element)

@@ -1,310 +1,362 @@
 {
-    "Hauptleitung": {
-        "Leitung": {
-            "Unit": "mm",
-            "Shape": "Pipe",
-            "Geometrie": [
-                {
-                    "Name": "Leitung--Hauptleitungen-",
-                    "Farbe": [
-                        255,
-                        0,
-                        0
-                    ]
-                },
-                {
-                    "Name": "Haltung--T-",
-                    "Farbe": [
-                        0,
-                        0,
-                        255
-                    ]
-                }
-            ],
-            "Text": [
-                {
-                    "Name": "Material-Durchmesser-Hauptleitu",
-                    "Farbe": [
-                        255,
-                        0,
-                        0
-                    ]
-                },
-                {
-                    "Name": "Haltung--L-",
-                    "Farbe": [
-                        255,
-                        0,
-                        0
-                    ]
-                }
-            ]
-        },
-        "Element": {
-            "Unit": "cm",
-            "Shape": "Shaft",
-            "Geometrie": [
-                {
-                    "Name": "Normschacht--T-",
-                    "Farbe": 13
-                }
-            ],
-            "Text": [
-                {
-                    "Name": "Normschacht-Nummer--L-",
-                    "Farbe": [
-                        255,
-                        0,
-                        0
-                    ]
-                }
-            ]
-        }
+    "Wasser Gemeinde": {
+        "Leitung": [
+            {
+                "Unit": "mm",
+                "Shape": "water",
+                "Geometrie": [
+                    {
+                        "Name": "Leitung--Hauptleitungen-"
+                    }
+                ],
+                "Text": [
+                    {
+                        "Name": "Material-Durchmesser-Hauptleitu"
+                    }
+                ]
+            }
+        ],
+        "Element": [
+            {
+                "Unit": "cm",
+                "Shape": "water_special",
+                "Geometrie": [
+                    {
+                        "Name": "Sonderbauwerk--Fl-che-",
+                        "Farbe": [
+                            110,
+                            110,
+                            110
+                        ]
+                    },
+                    {
+                        "Name": "Spezialbauwerk",
+                        "Farbe": 250,
+                        "Block": "Spezialbauwerk"
+                    }
+                ],
+                "Text": []
+            },
+            {
+                "Unit": "cm",
+                "Shape": "gate_value",
+                "Geometrie": [
+                    {
+                        "Name": "Armatur",
+                        "Farbe": 160,
+                        "Block": "Armatur_2"
+                    }
+                ],
+                "Text": []
+            }
+        ]
     },
-    "Nebenleitung": {
-        "Leitung": {
-            "Unit": "mm",
-            "Shape": "Pipe",
-            "Geometrie": [
-                {
-                    "Name": "Leitung--Nebenleitungen-",
-                    "Farbe": [
-                        0,
-                        72,
-                        255
-                    ]
-                }
-            ],
-            "Text": [
-                {
-                    "Name": "Material-Durchmesser-Nebenleitu",
-                    "Farbe": [
-                        0,
-                        72,
-                        255
-                    ]
-                },
-                {
-                    "Name": "Haltung--L-",
-                    "Farbe": [
-                        0,
-                        0,
-                        255
-                    ]
-                }
-            ]
-        },
-        "Element": {
-            "Unit": "cm",
-            "Shape": "Shaft",
-            "Geometrie": [
-                {
-                    "Name": "Normschacht--T-",
-                    "Farbe": "blau"
-                }
-            ],
-            "Text": [
-                {
-                    "Name": "Normschacht-Nummer--L-",
-                    "Farbe": [
-                        0,
-                        0,
-                        255
-                    ]
-                }
-            ]
-        }
+    "Wassert Privat": {
+        "Leitung": [
+            {
+                "Unit": "mm",
+                "Shape": "water",
+                "Geometrie": [
+                    {
+                        "Name": "Leitung--Nebenleitungen-",
+                        "Farbe": [
+                            0,
+                            72,
+                            255
+                        ]
+                    }
+                ],
+                "Text": [
+                    {
+                        "Name": "Material-Durchmesser-Nebenleitu",
+                        "Farbe": [
+                            0,
+                            72,
+                            255
+                        ]
+                    }
+                ]
+            }
+        ],
+        "Element": [
+            {
+                "Unit": "cm",
+                "Shape": "water_special",
+                "Geometrie": [
+                    {
+                        "Name": "Sonderbauwerk--Fl-che-",
+                        "Farbe": [
+                            110,
+                            110,
+                            110
+                        ]
+                    },
+                    {
+                        "Name": "Spezialbauwerk",
+                        "Farbe": 250,
+                        "Block": "Spezialbauwerk"
+                    }
+                ],
+                "Text": [
+                    {
+                        "Name": "Name-Spezialbauwerk--L-",
+                        "Farbe": [
+                            0,
+                            72,
+                            255
+                        ]
+                    }
+                ]
+            },
+            {
+                "Unit": "cm",
+                "Shape": "gate_value",
+                "Geometrie": [
+                    {
+                        "Name": "Armatur",
+                        "Farbe": 160,
+                        "Block": "Armatur_2"
+                    }
+                ],
+                "Text": []
+            }
+        ]
     },
     "Abwasser_Orange": {
-        "Leitung": {
-            "Unit": "mm",
-            "Shape": "Pipe",
-            "Geometrie": [
-                {
-                    "Name": "Haltung--T-",
-                    "Farbe": [
-                        255,
-                        130,
-                        130
-                    ]
-                }
-            ],
-            "Text": [
-                {
-                    "Name": "Haltung--L-",
-                    "Farbe": [
-                        255,
-                        0,
-                        0
-                    ]
-                }
-            ]
-        },
-        "Element": {
-            "Unit": "cm",
-            "Shape": "Shaft",
-            "Geometrie": [
-                {
-                    "Name": "Normschacht--T-",
-                    "Farbe": "blau"
-                }
-            ],
-            "Text": [
-                {
-                    "Name": "Normschacht-Nummer--L-",
-                    "Farbe": [
-                        0,
-                        0,
-                        255
-                    ]
-                }
-            ]
-        }
+        "Leitung": [
+            {
+                "Unit": "mm",
+                "Shape": "waste_water",
+                "Geometrie": [
+                    {
+                        "Name": "Leitung--Nebenleitungen-",
+                        "Farbe": [
+                            0,
+                            72,
+                            255
+                        ]
+                    }
+                ],
+                "Text": [
+                    {
+                        "Name": "Haltung--L-",
+                        "Farbe": [
+                            0,
+                            0,
+                            255
+                        ]
+                    }
+                ]
+            }
+        ],
+        "Element": [
+            {
+                "Unit": "cm",
+                "Shape": "Shaft",
+                "Geometrie": [
+                    {}
+                ],
+                "Text": [
+                    {}
+                ]
+            }
+        ]
+    },
+    "Abwasser_Orange": {
+        "Leitung": [
+            {
+                "Unit": "mm",
+                "Shape": "waste_water",
+                "Geometrie": [
+                    {
+                        "Name": "Haltung--T-",
+                        "Farbe": [
+                            255,
+                            130,
+                            130
+                        ]
+                    }
+                ],
+                "Text": [
+                    {
+                        "Name": "Haltung--L-",
+                        "Farbe": [
+                            255,
+                            0,
+                            0
+                        ]
+                    }
+                ]
+            }
+        ],
+        "Element": [
+            {
+                "Unit": "cm",
+                "Shape": "Shaft",
+                "Geometrie": [
+                    {
+                        "Name": "Normschacht--T-",
+                        "Farbe": 13,
+                        "Block": "Normschacht--T-125_7_0"
+                    }
+                ],
+                "Text": [
+                    {
+                        "Name": "Normschacht-Nummer--L-",
+                        "Farbe": [
+                            0,
+                            0,
+                            255
+                        ]
+                    }
+                ]
+            }
+        ]
     },
     "Abwasser_Violett": {
-        "Leitung": {
-            "Unit": "mm",
-            "Shape": "Pipe",
-            "Geometrie": [
-                {
-                    "Name": "Haltung--T-",
-                    "Farbe": [
-                        130,
-                        130,
-                        255
-                    ]
-                }
-            ],
-            "Text": [
-                {
-                    "Name": "Haltung--L-",
-                    "Farbe": [
-                        0,
-                        0,
-                        230
-                    ]
-                }
-            ]
-        },
-        "Element": {
-            "Unit": "cm",
-            "Shape": "Shaft",
-            "Geometrie": [
-                {
-                    "Name": "Normschacht--T-",
-                    "Farbe": 173
-                }
-            ],
-            "Text": [
-                {
-                    "Name": "Normschacht-Nummer--L-",
-                    "Farbe": [
-                        0,
-                        0,
-                        255
-                    ]
-                }
-            ]
-        }
+        "Leitung": [
+            {
+                "Unit": "mm",
+                "Shape": "waste_water",
+                "Geometrie": [
+                    {
+                        "Name": "Haltung--T-",
+                        "Farbe": [
+                            130,
+                            130,
+                            255
+                        ]
+                    }
+                ],
+                "Text": [
+                    {
+                        "Name": "Haltung--L-",
+                        "Farbe": [
+                            0,
+                            0,
+                            230
+                        ]
+                    }
+                ]
+            }
+        ],
+        "Element": [
+            {
+                "Unit": "cm",
+                "Shape": "Shaft",
+                "Geometrie": [
+                    {
+                        "Name": "Normschacht--T-",
+                        "Farbe": 173,
+                        "Block": "Normschacht--T-142_5_0"
+                    }
+                ],
+                "Text": [
+                    {
+                        "Name": "Normschacht-Nummer--L-",
+                        "Farbe": [
+                            0,
+                            0,
+                            255
+                        ]
+                    }
+                ]
+            }
+        ]
     },
     "Abwasser_Magenta": {
-        "Leitung": {
-            "Unit": "mm",
-            "Shape": "Pipe",
-            "Geometrie": [
-                {
-                    "Name": "Haltung--T-",
-                    "Farbe": [
-                        169,
-                        0,
-                        230
-                    ]
-                },
-                {
-                    "Name": "Haltung--T-",
-                    "Farbe": [
-                        169,
-                        130,
-                        230
-                    ]
-                }
-            ],
-            "Text": [
-                {
-                    "Name": "Haltung--L-",
-                    "Farbe": [
-                        169,
-                        0,
-                        230
-                    ]
-                }
-            ]
-        },
-        "Element": {
-            "Unit": "cm",
-            "Shape": "Shaft",
-            "Geometrie": [
-                {
-                    "Name": "Normschacht--T-",
-                    "Farbe": 203
-                }
-            ],
-            "Text": [
-                {
-                    "Name": "Normschacht-Nummer--L-",
-                    "Farbe": [
-                        169,
-                        0,
-                        230
-                    ]
-                }
-            ]
-        }
+        "Leitung": [
+            {
+                "Unit": "mm",
+                "Shape": "waste_water",
+                "Geometrie": [
+                    {
+                        "Name": "Haltung--T-",
+                        "Farbe": [
+                            169,
+                            0,
+                            230
+                        ]
+                    },
+                    {
+                        "Name": "Haltung--T-",
+                        "Farbe": [
+                            169,
+                            130,
+                            230
+                        ]
+                    }
+                ],
+                "Text": [
+                    {
+                        "Name": "Haltung--L-",
+                        "Farbe": [
+                            169,
+                            0,
+                            230
+                        ]
+                    }
+                ]
+            }
+        ],
+        "Element": [
+            {
+                "Unit": "cm",
+                "Shape": "Shaft",
+                "Geometrie": [
+                    {
+                        "Name": "Normschacht--T-",
+                        "Farbe": 203,
+                        "Block": "Normschacht--T-125_4_0"
+                    }
+                ],
+                "Text": [
+                    {
+                        "Name": "Normschacht-Nummer--L-",
+                        "Farbe": [
+                            169,
+                            0,
+                            230
+                        ]
+                    }
+                ]
+            }
+        ]
     },
-    "Abwasser_Grün": {
-        "Leitung": {
-            "Unit": "mm",
-            "Shape": "Pipe",
-            "Geometrie": [
-                {
-                    "Name": "Haltung--T-",
-                    "Farbe": [
-                        85,
-                        255,
-                        0
-                    ]
-                }
-            ],
-            "Text": [
-                {
-                    "Name": "Haltung--L-",
-                    "Farbe": [
-                        0,
-                        0,
-                        255
-                    ]
-                }
-            ]
-        },
-        "Element": {
-            "Unit": "cm",
-            "Shape": "Shaft",
-            "Geometrie": [
-                {
-                    "Name": "Normschacht--T-",
-                    "Farbe": 80
-                }
-            ],
-            "Text": [
-                {
-                    "Name": "Normschacht-Nummer--L-",
-                    "Farbe": [
-                        0,
-                        0,
-                        255
-                    ]
-                }
-            ]
-        }
+    "Bewässerung": {
+        "Leitung": [
+            {
+                "Unit": "mm",
+                "Shape": "water",
+                "Geometrie": [
+                    {
+                        "Name": "bew_leitung"
+                    }
+                ],
+                "Text": [
+                    {
+                        "Name": "bew_leitung_text"
+                    }
+                ]
+            }
+        ],
+        "Element": [
+            {
+                "Unit": "cm",
+                "Shape": "Shaft",
+                "Geometrie": [
+                    {
+                        "Name": "bew_bauwerk",
+                        "Farbe": 80,
+                        "Block": "Normschacht--T-_STD"
+                    }
+                ],
+                "Text": [
+                    {
+                        "Name": "bew_bauwerk_text"
+                    }
+                ]
+            }
+        ]
     }
 }

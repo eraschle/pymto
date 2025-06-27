@@ -6,6 +6,7 @@ and unit specifications.
 """
 
 from ..models import (
+    AssingmentData,
     MediumConfig,
     ObjectData,
     RectangularDimensions,
@@ -22,6 +23,21 @@ class DimensionUpdater:
         self.target_unit = target_unit
         self.dimension_mapper = dimension_mapper
         self.do_convert_dimension: bool = True
+
+    def update_elements(self, assignment: AssingmentData) -> None:
+        """Update dimensions of all elements in the assignment data container.
+
+        This method should iterate through all elements in the assignment
+        and use the `update_dimension` method to update each element's
+
+        Parameters
+        ----------
+        assignment : AssingmentData
+            Assignment data containing elements and their assigned texts
+        """
+        for elements, config in assignment.assigned:
+            for element in elements:
+                self.update_dimension(element, config=config)
 
     def update_dimension(self, element: ObjectData, config: MediumConfig) -> None:
         """Update dimensions in elements based on assigned text with unit conversion.
