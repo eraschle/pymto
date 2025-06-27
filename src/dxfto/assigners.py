@@ -44,21 +44,6 @@ class SpatialTextAssigner(IAssignmentStrategy):
             List of copied ObjectData elements with reset assignments
         """
         return elements.copy() if elements else []
-        copied_elements = []
-        for element in elements:
-            # Create a new ObjectData with all required fields
-            new_element = ObjectData(
-                medium=element.medium,
-                object_type=element.object_type,
-                dimensions=element.dimensions,
-                layer=element.layer,
-                points=element.points.copy() if element.points else [],
-                positions=element.positions.copy() if element.positions else [],
-                color=element.color,
-                assigned_text=None,  # Reset any existing assignments
-            )
-            copied_elements.append(new_element)
-        return copied_elements
 
     def texts_to_point_based(self, elements: list[ObjectData], texts: list[DxfText]) -> list[ObjectData]:
         """Assign texts to point-based elements based on spatial proximity.

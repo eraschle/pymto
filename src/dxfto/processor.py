@@ -311,7 +311,8 @@ class DXFProcessor:
                 if element.points:
                     element.points = updater.update_elevation(element.points)
                 if element.positions:
-                    element.positions = updater.update_elevation(element.positions)
+                    positions = updater.update_elevation(element.positions)
+                    element.positions = tuple(positions)
 
     def update_points_elevation(self, updater: IElevationUpdater) -> None:
         """Assign extracted texts to mediums.

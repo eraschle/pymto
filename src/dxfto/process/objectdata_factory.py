@@ -140,7 +140,7 @@ class ObjectDataFactory:
                 object_type=object_type,
                 dimensions=dimensions,
                 layer=layer,
-                positions=[position],
+                positions=(position,),
                 points=transformed_points,
                 color=color,
             )
@@ -184,7 +184,7 @@ class ObjectDataFactory:
                 object_type=object_type,
                 dimensions=dimensions,
                 layer=layer,
-                positions=[position],
+                positions=(position,),
                 color=color,
             )
 
@@ -214,16 +214,26 @@ class ObjectDataFactory:
             if not points:
                 return None
             if object_type.name.lower().startswith("pipe"):
-                return self._create_round_object_from_polygon(medium, entity, points, object_type)
+                return self._create_round_from_polygon(
+                    medium, entity, points, object_type
+                )
             elif object_type == ObjectType.CABLE_DUCT:
-                return self._create_rectangular_object(medium, entity, points, object_type)
+                return self._create_rectangular_object(
+                    medium, entity, points, object_type
+                )
             shape_type = dxf.detect_shape_type(points)
             if shape_type == "rectangular":
-                return self._create_rectangular_object(medium, entity, points, object_type)
+                return self._create_rectangular_object(
+                    medium, entity, points, object_type
+                )
             elif shape_type == "round":
-                return self._create_round_object_from_polygon(medium, entity, points, object_type)
+                return self._create_round_from_polygon(
+                    medium, entity, points, object_type
+                )
             elif shape_type == "multi_sided":
-                return self._create_multi_sided_object(medium, entity, points, object_type)
+                return self._create_multi_sided_object(
+                    medium, entity, points, object_type
+                )
             else:
                 # Linear or simple shape - treat as line-based
                 return self._create_line_object(medium, entity, points, object_type)
@@ -292,13 +302,17 @@ class ObjectDataFactory:
             object_type=object_type,
             dimensions=dimensions,
             layer=layer,
-            positions=[position],
+            positions=(position,),
             points=points,
             color=color,
         )
 
-    def _create_round_object_from_polygon(
-        self, medium: str, entity: DXFEntity, points: list[Point3D], object_type: ObjectType
+    def _create_round_from_polygon(
+        self,
+        medium: str,
+        entity: DXFEntity,
+        points: list[Point3D],
+        object_type: ObjectType,
     ) -> ObjectData:
         """Create round ObjectData from polygonal points.
 
@@ -330,13 +344,17 @@ class ObjectDataFactory:
             object_type=object_type,
             dimensions=dimensions,
             layer=layer,
-            positions=[position],
+            positions=(position,),
             points=points,
             color=color,
         )
 
     def _create_multi_sided_object(
-        self, medium: str, entity: DXFEntity, points: list[Point3D], object_type: ObjectType
+        self,
+        medium: str,
+        entity: DXFEntity,
+        points: list[Point3D],
+        object_type: ObjectType,
     ) -> ObjectData:
         """Create multi-sided ObjectData from points.
 
@@ -398,6 +416,10 @@ class ObjectDataFactory:
 
         color = self._get_entity_color(entity)
         layer = getattr(entity.dxf, "layer", "0")
+        positions = (
+            points[0],
+            points[-1],
+        )
 
         return ObjectData(
             medium=medium,
@@ -405,6 +427,7 @@ class ObjectDataFactory:
             dimensions=dimensions,
             layer=layer,
             points=points,
+            positions=positions,
             color=color,
         )
 

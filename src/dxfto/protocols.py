@@ -5,7 +5,7 @@ for grouping DXF elements and assigning texts to pipes to be
 easily interchangeable following SOLID principles.
 """
 
-from typing import Protocol
+from typing import Iterable, Protocol
 
 from .models import (
     AssingmentData,
@@ -86,7 +86,7 @@ class IAssignmentStrategy(Protocol):
 
 
 class IElevationUpdater(Protocol):
-    def update_elevation(self, points: list[Point3D]) -> list[Point3D]:
+    def update_elevation(self, points: Iterable[Point3D]) -> list[Point3D]:
         """Update Z coordinates for a list of points using elevation data.
 
         Parameters

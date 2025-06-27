@@ -1,37 +1,59 @@
 [project]
 name = "dxfto"
 version = "0.1.0"
-description = "DXF processor for pipes and shafts with Revit export"
+description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.10"
 dependencies = [
     "click>=8.2.1",
-    "debugpy>=1.8.14",
     "ezdxf>=1.4.2",
-    "lxml>=5.4.0",
-    "numpy>=2.3.1",
-    "scipy>=1.16.0",
+    "lxml>=6.0.0",
+    "numpy>=2.2.6",
+    "scipy>=1.15.3",
 ]
 
 [dependency-groups]
 dev = [
+    "debugpy>=1.8.14",
     "isort>=6.0.1",
     "pyright>=1.1.402",
     "pytest>=8.4.1",
-    "ruff>=0.12.0",
+    "ruff>=0.12.1",
 ]
-
-[tool.pyright]
-stubsPath = "~/workspace/_data_/python/_stubs_"
-exclude = ["docs", ".venv"]
 
 [tool.ruff]
 line-length = 110
 target-version = "py313"
+exclude = [
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".ipynb_checkpoints",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+]
+
+
+[tool.ruff.format]
+line-enging = "auto"
+docstring-code-line-length = "dynamic"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "T20"]
 ignore = ["E501"]
+fixable = ["ALL"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/jrsin/*" = ["UP"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

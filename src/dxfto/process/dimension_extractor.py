@@ -7,6 +7,13 @@ and unit specifications.
 
 import re
 
+ROUND_DIMENSION_PATTERNS = [
+    r"[ØøΦφ]\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?",  # Ø123mm, ø123, Φ123cm, φ123
+    r"DN\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?",  # DN123, DN123mm
+    r"D\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?",  # D123, D123cm
+    r"^(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?$",  # 123mm, 123, 123cm
+]
+
 
 def extract_round(text: str) -> tuple[float, str | None] | None:
     """Extract round dimension from text.
@@ -24,30 +31,29 @@ def extract_round(text: str) -> tuple[float, str | None] | None:
     """
     text_clean = text.strip().upper()
 
-    # Pattern für runde Dimensionen mit optionalen Zeichen und Einheiten
-    patterns = [
-        r"[ØøΦφ]\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?",  # Ø123mm, ø123, Φ123cm, φ123
-        r"DN\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?",  # DN123, DN123mm
-        r"D\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?",  # D123, D123cm
-        r"^(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?$",  # 123mm, 123, 123cm
-    ]
-
-    for pattern in patterns:
+    for pattern in ROUND_DIMENSION_PATTERNS:
         match_result = re.search(pattern, text_clean, re.IGNORECASE)
-        if match_result:
-            try:
-                diameter_str = match_result.group(1).replace(",", ".")
-                unit = match_result.group(2).lower() if match_result.group(2) else None
+        if not match_result:
+            continue
+        diameter_str = match_result.group(1).replace(",", ".")
+        unit = match_result.group(2).lower() if match_result.group(2) else None
 
-                # Zusätzliche Validierung: Stelle sicher, dass es eine gültige Zahl ist
-                if diameter_str.startswith(".") or diameter_str.endswith("."):
-                    continue
+        # Zusätzliche Validierung: Stelle sicher, dass es eine gültige Zahl ist
+        if diameter_str.startswith(".") or diameter_str.endswith("."):
+            continue
 
-                diameter = float(diameter_str)
-                return (diameter, unit)
-            except ValueError:
-                continue
+        diameter = float(diameter_str)
+        return (diameter, unit)
     return None
+
+
+RECT_DIMENSION_PATTERNS = [
+    r"(\d+(?:[.,]\d+)?)\s*x\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?",  # 100x200mm
+    r"(\d+(?:[.,]\d+)?)\s*×\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?",  # 100×200cm
+    r"(\d+(?:[.,]\d+)?)\s*,\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?",  # 100,200m
+    r"(\d+(?:[.,]\d+)?)\s*\*\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?",  # 100*200mm
+    r"(\d+(?:[.,]\d+)?)\s*/\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?",  # 100/200cm
+]
 
 
 def extract_rectangular(text: str) -> tuple[tuple[float, float], str | None] | None:
@@ -66,39 +72,30 @@ def extract_rectangular(text: str) -> tuple[tuple[float, float], str | None] | N
     """
     text_clean = text.strip()
 
-    # Pattern für rechteckige Dimensionen mit verschiedenen Trennzeichen und Einheiten
-    patterns = [
-        r"(\d+(?:[.,]\d+)?)\s*x\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?",  # 100x200mm
-        r"(\d+(?:[.,]\d+)?)\s*×\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?",  # 100×200cm
-        r"(\d+(?:[.,]\d+)?)\s*,\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?",  # 100,200m
-        r"(\d+(?:[.,]\d+)?)\s*\*\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?",  # 100*200mm
-        r"(\d+(?:[.,]\d+)?)\s*/\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?",  # 100/200cm
-    ]
-
-    for pattern in patterns:
+    for pattern in RECT_DIMENSION_PATTERNS:
         match_result = re.search(pattern, text_clean, re.IGNORECASE)
-        if match_result:
-            try:
-                width_str = match_result.group(1).replace(",", ".")
-                height_str = match_result.group(2).replace(",", ".")
-                unit = match_result.group(3).lower() if match_result.group(3) else None
+        if match_result is None:
+            continue
+        try:
+            length_str = match_result.group(1).replace(",", ".")
+            width_str = match_result.group(2).replace(",", ".")
+            unit = match_result.group(3).lower() if match_result.group(3) else None
 
-                # Zusätzliche Validierung: Stelle sicher, dass es gültige Zahlen sind
-                if (
-                    width_str.startswith(".")
-                    or width_str.endswith(".")
-                    or height_str.startswith(".")
-                    or height_str.endswith(".")
-                ):
-                    continue
+            if length_str.startswith("."):
+                length_str = length_str[1:]  # Remove leading dot
+            if length_str.endswith("."):
+                length_str = length_str[:-1]  # Remove trailing dot
+            if width_str.startswith("."):
+                width_str = width_str[1:]  # Remove leading dot
+            if width_str.endswith("."):
+                width_str = width_str[:-1]  # Remove trailing dot
 
-                width = float(width_str)
-                height = float(height_str)
+            length = float(length_str)
+            width = float(width_str)
 
-                return ((width, height), unit)
-            except ValueError:
-                continue
-
+            return ((length, width), unit)
+        except ValueError:
+            continue
     return None
 
 

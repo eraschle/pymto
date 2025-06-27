@@ -123,7 +123,7 @@ class TestObjectData:
             object_type=ObjectType.UNKNOWN,
             dimensions=dims,
             layer="CIRCLE_LAYER",
-            positions=[position],
+            positions=(position,),
             color=(0, 255, 0),
         )
 
@@ -272,7 +272,7 @@ class TestAssingmentData:
             object_type=ObjectType.UNKNOWN,
             dimensions=dims,
             layer="TEST",
-            positions=[position],
+            positions=(position,),
         )
         assignment = AssingmentData()
         assignment.setup(medium="Test Medium", elements=[[element]], texts=[[]])

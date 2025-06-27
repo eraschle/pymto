@@ -172,10 +172,42 @@ class ObjectData:
     object_type: ObjectType
     dimensions: RectangularDimensions | RoundDimensions
     layer: str
-    points: list[Point3D] = field(default_factory=list, repr=False, compare=False)
-    positions: list[Point3D] = field(default_factory=list, repr=False, compare=False)
-    color: tuple[int, int, int] = field(default_factory=tuple, repr=True, compare=True)
     assigned_text: DxfText | None = None
+    color: tuple[int, int, int] = field(default_factory=tuple, repr=True, compare=True)
+
+    """points: list[Point3D]
+        List of points for line-based objects (e.g., pipe, cable duct)."""
+    points: list[Point3D] = field(default_factory=list, repr=False, compare=False)
+
+    """positions: tuple[Point3D]
+        Positions for point-based (single-point) objects (e.g., shaft).
+        and for line-based objects (start- and end-point)."""
+    positions: tuple[Point3D, ...] = field(default_factory=tuple, repr=True, compare=True)
+
+    @property
+    def point(self) -> Point3D:
+        """Single or Start point of the object.
+
+        Returns
+        -------
+        Point3D
+            Point3D representing the position of the object.
+        """
+        return self.positions[0]
+
+    @property
+    def end_point(self) -> Point3D | None:
+        """End point of the line-based object.
+        Point-based objects return None
+
+        Returns
+        -------
+        Point3D | None
+            Point3D representing the end position of the object, or None.
+        """
+        if len(self.positions) == 1:
+            return None
+        return self.positions[-1]
 
     @property
     def is_line_based(self) -> bool:
@@ -186,7 +218,7 @@ class ObjectData:
         bool
             True if the object is line-based, False otherwise.
         """
-        return self.object_type in self.line_based_types
+        return self.end_point is not None
 
     @property
     def is_point_based(self) -> bool:
@@ -197,6 +229,8 @@ class ObjectData:
         bool
             True if the object is point-based, False otherwise.
         """
+        if self.end_point is None:
+            return False
         return self.object_type == ObjectType.SHAFT
 
     @property

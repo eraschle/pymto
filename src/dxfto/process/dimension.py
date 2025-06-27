@@ -62,20 +62,19 @@ class DimensionUpdater:
             rect_result = dim.extract_rectangular(text)
             if rect_result is None:
                 return
-            (width, height), unit = rect_result
+            (length, width), unit = rect_result
 
             if self.do_convert_dimension:
-                # Convert to target unit
                 if unit is None:
                     unit = config.default_unit
+                length = dim.convert_to_unit(length, unit, self.target_unit)
+                length = self.dimension_mapper.snap_dimension(int(length), element.object_type)
                 width = dim.convert_to_unit(width, unit, self.target_unit)
                 width = self.dimension_mapper.snap_dimension(int(width), element.object_type)
-                height = dim.convert_to_unit(height, unit, self.target_unit)
-                self.dimension_mapper.snap_dimension(int(height), element.object_type)
 
-            length, width = sorted([width, height])
+            length, length = sorted([length, width])
             element.dimensions.length = length
-            element.dimensions.width = width
+            element.dimensions.width = length
 
         elif isinstance(element.dimensions, RoundDimensions):
             round_result = dim.extract_round(text)

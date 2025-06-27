@@ -19,7 +19,11 @@ from ..models import (
 
 
 def _export_point(point: Point3D) -> dict[str, float]:
-    return {"x": point.east, "y": point.north, "z": point.altitude}
+    return {
+        "east": point.east,
+        "north": point.north,
+        "altitude": point.altitude,
+    }
 
 
 def _export_points(points: list[Point3D]) -> dict | list[dict] | None:
@@ -33,7 +37,7 @@ def _export_points(points: list[Point3D]) -> dict | list[dict] | None:
     return point_data
 
 
-def _export_color(color: tuple[int, int, int]) -> dict[str, int]:
+def export_color(color: tuple[int, int, int]) -> dict[str, int]:
     return {"r": color[0], "g": color[1], "b": color[2]}
 
 
@@ -127,20 +131,18 @@ class JsonExporter:
             "layer_name": element.layer,
             "dimensions": self._export_dimensions(element.dimensions),
         }
+        element_data["point"] = element.point
+        if end_point := element.end_point:
+            element_data["end-point"] = end_point
+
+        if element.is_line_based:
+            element_data["points"] = _export_points(element.points)
+
         assigned_text = element.assigned_text
         if assigned_text is not None:
             if assigned_text.content is None:
                 assigned_text.content = ""
             element_data["text"] = assigned_text.content.strip()
-
-        if element.positions:
-            element_points = _export_points(element.positions)
-        else:
-            element_points = _export_points(element.points)
-
-        if element_points is not None:
-            element_data["points"] = element_points
-
         return element_data
 
     def _export_dimensions(self, dimensions: RectangularDimensions | RoundDimensions) -> dict[str, Any]:
