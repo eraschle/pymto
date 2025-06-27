@@ -5,14 +5,18 @@ shape characteristics (round, rectangular, multi-sided) and processing type.
 """
 
 import logging
+import math
 
 from ezdxf.entities.circle import Circle
 from ezdxf.entities.dxfentity import DXFEntity
 from ezdxf.entities.line import Line
 from ezdxf.entities.lwpolyline import LWPolyline
 from ezdxf.entities.polyline import Polyline
+from ezdxf import math as ezmath
+from ezdxf.math import Vec2
 
 from ..models import Point3D
+
 
 log = logging.getLogger(__name__)
 
@@ -118,9 +122,109 @@ def detect_shape_type(points: list[Point3D]) -> str:
         return "rectangular"
     elif num_points >= 4:
         return "multi_sided"
-    raise ValueError(
-        f"Cannot determine shape type from points: {num_points} points provided, expected at least 2."
-    )
+    raise ValueError(f"Cannot determine shape type from points: {num_points} points provided, expected at least 2.")
+
+
+def get_angle_from_entity(entity: DXFEntity) -> float:
+    """Get the angle of a DXF entity if available.
+
+    Parameters
+    ----------
+    entity : DXFEntity
+        Entity to extract angle from
+
+    Returns
+    -------
+    float
+        Angle in degrees, or 0.0 if not applicable
+    """
+    try:
+        return entity.dxf.rotation
+        # return entity.dxf.insert.angle_deg
+    except AttributeError:
+        return 0.0
+
+
+def get_polyline_length(self, polyline: LWPolyline) -> float:
+    """Calculate the length of a polyline"""
+    length = 0.0
+    points = polyline.get_points("xy")
+    for idx, point in enumerate(points):
+        if idx == 0:
+            continue
+
+        length += self.distance_between_points(points[idx - 1], point)  # type: ignore
+
+    return length
+
+
+def get_polyline_angle(self, polyline: LWPolyline) -> float:
+    """get angle of two points in polyline"""
+    with polyline.points() as points:
+        p1 = (points[0][0], points[0][1])
+        p2 = (points[-1][0], points[-1][1])
+        angle = self.get_points_angle(p1, p2)
+
+    return angle
+
+
+def get_angle_point_on_line(
+    line: Line | LWPolyline, point: tuple[float, float], threshold: float = 0.5
+) -> float | None:
+    """get angle of point on line or polyline"""
+    if isinstance(line, Line):
+        angle = get_line_angle(line)
+        return angle
+
+    entity_points: list[tuple[float, float]] = line.get_points("xy")  # type: ignore
+    for idx, start_point in enumerate(entity_points):
+        try:
+            end_point = entity_points[idx + 1]
+        except IndexError:
+            continue
+
+        if ezmath.is_point_on_line_2d(Vec2(point), Vec2(start_point), Vec2(end_point), ray=False, abs_tol=threshold):
+            angle = get_points_angle(start_point, end_point)
+            return angle
+
+    return None
+
+
+def get_parallel_angle(lines: list[Line]) -> float | None:
+    """get the angle of first two parallel lines"""
+    all_angles = [get_line_angle(i) for i in lines]
+    all_round = [round(i) for i in all_angles]
+
+    for idx, rounded in enumerate(all_round):
+        if all_round.count(rounded) > 1:
+            return all_angles[idx]
+
+    return None
+
+
+def get_line_angle(line: Line) -> float:
+    """get angle of line"""
+    p1 = line.dxf.start[0], line.dxf.start[1]
+    p2 = line.dxf.end[0], line.dxf.end[1]
+    angle = get_points_angle(p1, p2)
+
+    return angle
+
+
+def get_points_angle(p1: tuple[float, float], p2: tuple[float, float]) -> float:
+    """get angle from two line coordinates"""
+    dx = p2[0] - p1[0]
+    dy = p2[1] - p1[1]
+    return math.degrees(math.atan2(dy, dx))
+
+
+def get_angle_to_line(self, dxf_layers: list[str], dfa_dict: dict) -> float | None:
+    """get angle relative to line"""
+    entities = self.get_entities_by_layer(dxf_layers)
+    point = (dfa_dict["E"], dfa_dict["N"])
+    nearest_entity = self.find_nearest_line_polyline(entities, point, threshold=10.0)
+    if not nearest_entity:
+        return None
 
 
 def is_rectangular(points: list[Point3D]) -> bool:

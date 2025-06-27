@@ -19,7 +19,6 @@ from .models import (
     DxfText,
     Medium,
     MediumConfig,
-    MediumMasterConfig,
     ObjectData,
     ObjectType,
     Point3D,
@@ -67,8 +66,8 @@ class DXFProcessor:
 
         Parameters
         ----------
-        mediums : dict[str, Medium]
-            Dictionary of mediums to process
+        reader : DXFReader
+            Reader instance to load and query DXF entities
 
         Raises
         ------
@@ -84,13 +83,9 @@ class DXFProcessor:
         log.info(f"Processing {len(self.config.mediums)} mediums")
         for medium_name, medium in self.config.mediums.items():
             log.debug(f"Processing medium: {medium_name}")
-            geom_elems, text_elems = self._get_assignment_data(
-                medium_name, medium.config.point_based
-            )
+            geom_elems, text_elems = self._get_assignment_data(medium_name, medium.config.point_based)
             medium.element_data.setup(medium_name, geom_elems, text_elems)
-            geom_elems, text_elems = self._get_assignment_data(
-                medium_name, medium.config.line_based
-            )
+            geom_elems, text_elems = self._get_assignment_data(medium_name, medium.config.line_based)
             medium.line_data.setup(medium_name, geom_elems, text_elems)
 
     def _get_assignment_data(
@@ -116,9 +111,7 @@ class DXFProcessor:
             texts.append(text_elems)
         return geometries, texts
 
-    def _process_assignment(
-        self, medium: str, config: MediumConfig
-    ) -> tuple[list[ObjectData], list[DxfText]]:
+    def _process_assignment(self, medium: str, config: MediumConfig) -> tuple[list[ObjectData], list[DxfText]]:
         """Process a single assignment configuration.
 
         Parameters
@@ -139,9 +132,7 @@ class DXFProcessor:
         texts = self._convert_to_texts(medium, extracted["texts"])
         return geometries, texts
 
-    def _convert_to_objects(
-        self, medium: str, entities: list[DXFEntity], object_type: ObjectType
-    ) -> list[ObjectData]:
+    def _convert_to_objects(self, medium: str, entities: list[DXFEntity], object_type: ObjectType) -> list[ObjectData]:
         """Convert DXF entities to ObjectData using the factory.
 
         Parameters

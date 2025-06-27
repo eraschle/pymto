@@ -8,7 +8,15 @@ import json
 from pathlib import Path
 from typing import Any
 
-from ..models import DxfText, Medium, ObjectData, Point3D, RectangularDimensions, RoundDimensions
+from ..models import (
+    DxfText,
+    Medium,
+    MediumConfig,
+    ObjectData,
+    Point3D,
+    RectangularDimensions,
+    RoundDimensions,
+)
 
 
 def _export_point(point: Point3D) -> dict[str, float]:
@@ -54,12 +62,91 @@ class JsonExporter:
             export_data[medium.name] = self._export_medium(medium)
 
         try:
-            with open(self.output_path, "w", encoding="utf-8") as f:
-                json.dump(export_data, f, indent=2, ensure_ascii=False)
+            with open(self.output_path, "w", encoding="utf-8") as json_file:
+                json.dump(export_data, json_file, indent=2, ensure_ascii=False)
         except OSError as e:
             raise OSError(f"Cannot write JSON file {self.output_path}: {e}") from e
 
-    def _export_dimensions(self, dimensions: RectangularDimensions | RoundDimensions) -> dict[str, Any]:
+    def _export_medium(self, medium: Medium) -> list[dict[str, Any]]:
+        """Export a single medium to dictionary format.
+
+        Parameters
+        ----------
+        medium : Medium
+            Medium containing elements and lines
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            List of elements (pipes and shafts) in the medium
+        """
+        elem_export = []
+        point_based_data = self._get_element_data(medium.element_data.assigned)
+        elem_export.extend(point_based_data)
+
+        line_based_data = self._get_element_data(medium.line_data.assigned)
+        elem_export.extend(line_based_data)
+        return elem_export
+
+    def _get_element_data(
+        self, element_data: list[tuple[list[ObjectData], MediumConfig]]
+    ) -> list[dict[str, Any]]:
+        """Export elements and texts to dictionary format.
+
+        Parameters
+        ----------
+        element_data : list[tuple[list[ObjectData], list[DxfText]]]
+            List of tuples containing elements and their associated texts
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            List of dictionaries containing element and text information
+        """
+        elements_export_data = []
+
+        for elements, _ in element_data:
+            export_data = [self._export_element(elem) for elem in elements]
+            elements_export_data.extend(export_data)
+        return elements_export_data
+
+    def _export_element(self, element: ObjectData) -> dict[str, Any]:
+        """Export a pipe to dictionary format.
+
+        Parameters
+        ----------
+        element : ObjectData
+            Element to export
+
+        Returns
+        -------
+        dict[str, Any]
+            Dictionary containing pipe information
+        """
+        element_data = {
+            "object_type": element.object_type.name.upper(),
+            "layer_name": element.layer,
+            "dimensions": self._export_dimensions(element.dimensions),
+        }
+        assigned_text = element.assigned_text
+        if assigned_text is not None:
+            if assigned_text.content is None:
+                assigned_text.content = ""
+            element_data["text"] = assigned_text.content.strip()
+
+        if element.positions:
+            element_points = _export_points(element.positions)
+        else:
+            element_points = _export_points(element.points)
+
+        if element_points is not None:
+            element_data["points"] = element_points
+
+        return element_data
+
+    def _export_dimensions(
+        self, dimensions: RectangularDimensions | RoundDimensions
+    ) -> dict[str, Any]:
         """Export dimensions to dictionary format.
 
         Parameters
@@ -88,94 +175,3 @@ class JsonExporter:
         if dimensions.height is not None:
             dimension_data["height"] = dimensions.height
         return dimension_data
-
-    def _export_element(self, element: ObjectData) -> dict[str, Any]:
-        """Export a pipe to dictionary format.
-
-        Parameters
-        ----------
-        element : ObjectData
-            Element to export
-
-        Returns
-        -------
-        dict[str, Any]
-            Dictionary containing pipe information
-        """
-        element_data = {
-            "type": element.object_type.name.lower(),
-            "layer": element.layer,
-            "dimensions": self._export_dimensions(element.dimensions),
-        }
-
-        if element.positions:
-            element_points = _export_points(element.positions)
-        else:
-            element_points = _export_points(element.points)
-
-        if element_points is not None:
-            element_data["points"] = element_points
-
-        if element.assigned_text is not None:
-            element_data["assigned_text"] = element.assigned_text.content
-
-        return element_data
-
-    def _export_text(self, text: DxfText) -> dict[str, Any]:
-        text_data: dict[str, Any] = {
-            "text": text.content,
-            "layer": text.layer,
-        }
-        if text.color is not None:
-            text_data["color"] = _export_color(text.color)
-
-        if text.position is not None:
-            text_data["point"] = _export_point(text.position)
-
-        return text_data
-
-    def _get_element_and_text_data(
-        self, element_data: list[tuple[list[ObjectData], list[DxfText]]]
-    ) -> list[dict[str, Any]]:
-        """Export elements and texts to dictionary format.
-
-        Parameters
-        ----------
-        element_data : list[tuple[list[ObjectData], list[DxfText]]]
-            List of tuples containing elements and their associated texts
-
-        Returns
-        -------
-        list[dict[str, Any]]
-            List of dictionaries containing element and text information
-        """
-        export_data = []
-
-        for elems_data, text_data in element_data:
-            for elem in elems_data:
-                export_data.append(self._export_element(elem))
-            for text in text_data:
-                export_data.append(self._export_text(text))
-
-        return export_data
-
-    def _export_medium(self, medium: Medium) -> list[dict[str, Any]]:
-        """Export a single medium to dictionary format.
-
-        Parameters
-        ----------
-        medium : Medium
-            Medium containing elements and lines
-
-        Returns
-        -------
-        list[dict[str, Any]]
-            List of elements (pipes and shafts) in the medium
-        """
-        elem_export = []
-        point_based_data = self._get_element_and_text_data(medium.element_data.data)
-        elem_export.extend(point_based_data)
-
-        line_based_data = self._get_element_and_text_data(medium.line_data.data)
-        elem_export.extend(line_based_data)
-        return elem_export

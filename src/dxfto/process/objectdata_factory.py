@@ -527,7 +527,7 @@ class ObjectDataFactory:
 
         # Try to guess from block name
         if any(keyword in block_name for keyword in ["round", "circle", "rund"]):
-            dimensions = RoundDimensions(diameter=800.0)  # Default 800mm
+            dimensions = RoundDimensions(diameter=800.0)
         else:
             dimensions = RectangularDimensions(length=600.0, width=600.0, angle=0.0)
 

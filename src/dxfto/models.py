@@ -276,8 +276,7 @@ class AssingmentData:
     def get_statistics(self) -> dict[str, int | float]:
         """Berechnet Statistiken für die Zuweisungen."""
         assigned = sum(
-            len([elem for elem in elements if elem.assigned_text is not None])
-            for elements, _ in self.data
+            len([elem for elem in elements if elem.assigned_text is not None]) for elements, _ in self.data
         )
         return {
             "elements": sum(len(elements) for elements, _ in self.data),
@@ -297,9 +296,7 @@ class AssingmentData:
         """
         self._assigned.append((assigned_elements, config))
 
-    def setup(
-        self, medium: str, elements: list[list[ObjectData]], texts: list[list[DxfText]]
-    ) -> None:
+    def setup(self, medium: str, elements: list[list[ObjectData]], texts: list[list[DxfText]]) -> None:
         """Setup assignment data for a medium.
 
         Parameters
