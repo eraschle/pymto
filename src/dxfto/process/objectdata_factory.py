@@ -443,6 +443,7 @@ class ObjectDataFactory:
         Optional[tuple]
             Tuple of (dimensions, geometry_points) or None if analysis failed
         """
+        angle = dxf.get_angle_from_entity(insert_entity)
         if not block_entities:
             return self._default_block_dimensions(insert_entity)
 
@@ -468,14 +469,14 @@ class ObjectDataFactory:
                 length, width = dxf.calculate_rect_dimensions(all_points)
             else:
                 length, width = dxf.calculate_bbox_dimensions(all_points)
-            dimensions = RectangularDimensions(length=length, width=width, angle=0.0)
+            dimensions = RectangularDimensions(length=length, width=width, angle=angle)
         elif shape_type == "round":
             diameter = dxf.estimate_diameter_from(all_points)
             dimensions = RoundDimensions(diameter=diameter)
         else:
             # Multi-sided or complex - use bounding box
             length, width = dxf.calculate_bbox_dimensions(all_points)
-            dimensions = RectangularDimensions(length=length, width=width, angle=0.0)
+            dimensions = RectangularDimensions(length=length, width=width, angle=angle)
 
         return dimensions, all_points
 
