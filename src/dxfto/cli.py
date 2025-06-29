@@ -11,11 +11,11 @@ import click
 
 from dxfto.config import ConfigurationHandler
 
-from .assigners import SpatialTextAssigner, ZoneBasedTextAssigner
 from .io import DXFReader, JsonExporter, LandXMLReader
+from .process.assigners import SpatialTextAssigner, ZoneBasedTextAssigner
 from .process.dimension import DimensionUpdater
 from .process.dimension_mapper import InfrastructureDimensionMapper
-from .processor import DXFProcessor
+from .process.processor import DXFProcessor
 
 
 @click.command()
@@ -40,12 +40,6 @@ from .processor import DXFProcessor
     help="Output JSON file path",
 )
 @click.option(
-    "--grouping",
-    type=click.Choice(["layer", "color"], case_sensitive=False),
-    default="color",
-    help="Grouping strategy: layer or color",
-)
-@click.option(
     "--text-assignment",
     type=click.Choice(["spatial", "zone"], case_sensitive=False),
     default="spatial",
@@ -58,12 +52,6 @@ from .processor import DXFProcessor
     help="Maximum distance for text-to-pipe assignment",
 )
 @click.option(
-    "--color-tolerance",
-    type=float,
-    default=30.0,
-    help="Color tolerance for color-based grouping",
-)
-@click.option(
     "--verbose",
     "-v",
     is_flag=True,
@@ -74,10 +62,8 @@ def process_dxf(
     config: Path,
     landxml: Path | None,
     output: Path | None,
-    grouping: str,
     text_assignment: str,
     max_text_distance: float,
-    color_tolerance: float,
     verbose: bool,
 ) -> None:
     """Process DXF file and export pipe/shaft data for Revit modeling.

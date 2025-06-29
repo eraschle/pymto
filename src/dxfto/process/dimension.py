@@ -19,7 +19,9 @@ from .dimension_mapper import InfrastructureDimensionMapper
 class DimensionUpdater:
     """Class to update dimensions in DXF entities."""
 
-    def __init__(self, target_unit: str, dimension_mapper: InfrastructureDimensionMapper) -> None:
+    def __init__(
+        self, target_unit: str, dimension_mapper: InfrastructureDimensionMapper
+    ) -> None:
         self.target_unit = target_unit
         self.dimension_mapper = dimension_mapper
         self.do_convert_dimension: bool = True
@@ -68,9 +70,13 @@ class DimensionUpdater:
                 if unit is None:
                     unit = config.default_unit
                 length = dim.convert_to_unit(length, unit, self.target_unit)
-                length = self.dimension_mapper.snap_dimension(int(length), element.object_type)
+                length = self.dimension_mapper.snap_dimension(
+                    int(length), element.object_type
+                )
                 width = dim.convert_to_unit(width, unit, self.target_unit)
-                width = self.dimension_mapper.snap_dimension(int(width), element.object_type)
+                width = self.dimension_mapper.snap_dimension(
+                    int(width), element.object_type
+                )
 
             length, length = sorted([length, width])
             element.dimensions.length = length

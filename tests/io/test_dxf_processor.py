@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 from dxfto.config import ConfigurationHandler
 from dxfto.io import DXFReader
 from dxfto.models import LayerData, Medium, MediumConfig, MediumMasterConfig, ObjectType
-from dxfto.processor import DXFProcessor
+from dxfto.process.processor import DXFProcessor
 
 
 @pytest.fixture

@@ -5,6 +5,7 @@ extract elevation data that will be used to set Z coordinates for
 DXF points based on spatial interpolation.
 """
 
+from typing import Iterable
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -104,7 +105,7 @@ class LandXMLReader:
 
         return float(interpolated_z)
 
-    def update_elevation(self, points: list[Point3D]) -> list[Point3D]:
+    def update_elevation(self, points: Iterable[Point3D]) -> list[Point3D]:
         """Update Z coordinates for a list of points using elevation data.
 
         Parameters

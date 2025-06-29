@@ -387,7 +387,7 @@ class ObjectDataFactory:
             object_type=object_type,
             dimensions=dimensions,
             layer=layer,
-            positions=[position],
+            positions=(position,),
             points=points,
             color=color,
         )

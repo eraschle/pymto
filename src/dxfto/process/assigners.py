@@ -9,7 +9,7 @@ import numpy as np
 
 from dxfto.protocols import IAssignmentStrategy
 
-from .models import DxfText, ObjectData, Point3D
+from ..models import DxfText, ObjectData, Point3D
 
 
 class SpatialTextAssigner(IAssignmentStrategy):

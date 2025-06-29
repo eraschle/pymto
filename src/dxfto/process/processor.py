@@ -12,9 +12,9 @@ from ezdxf.entities.dxfentity import DXFEntity
 from ezdxf.entities.mtext import MText
 from ezdxf.entities.text import Text
 
-from .config import ConfigurationHandler
-from .io import DXFEntityExtractor, DXFReader
-from .models import (
+from ..config import ConfigurationHandler
+from ..io import DXFEntityExtractor, DXFReader
+from ..models import (
     AssingmentData,
     DxfText,
     Medium,
@@ -23,8 +23,13 @@ from .models import (
     ObjectType,
     Point3D,
 )
-from .process.objectdata_factory import ObjectDataFactory
-from .protocols import IAssignmentStrategy, IDimensionUpdater, IElevationUpdater, IExporter
+from ..protocols import (
+    IAssignmentStrategy,
+    IDimensionUpdater,
+    IElevationUpdater,
+    IExporter,
+)
+from .objectdata_factory import ObjectDataFactory
 
 log = logging.getLogger(__name__)
 
@@ -83,9 +88,13 @@ class DXFProcessor:
         log.info(f"Processing {len(self.config.mediums)} mediums")
         for medium_name, medium in self.config.mediums.items():
             log.debug(f"Processing medium: {medium_name}")
-            geom_elems, text_elems = self._get_assignment_data(medium_name, medium.config.point_based)
+            geom_elems, text_elems = self._get_assignment_data(
+                medium_name, medium.config.point_based
+            )
             medium.element_data.setup(medium_name, geom_elems, text_elems)
-            geom_elems, text_elems = self._get_assignment_data(medium_name, medium.config.line_based)
+            geom_elems, text_elems = self._get_assignment_data(
+                medium_name, medium.config.line_based
+            )
             medium.line_data.setup(medium_name, geom_elems, text_elems)
 
     def _get_assignment_data(
@@ -130,7 +139,9 @@ class DXFProcessor:
             raise RuntimeError("Processor components not initialized")
 
         extracted = self.extractor.extract_entities(config)
-        geometries = self._convert_to_objects(medium, extracted["geometries"], config.object_type)
+        geometries = self._convert_to_objects(
+            medium, extracted["geometries"], config.object_type
+        )
         texts = self._convert_to_texts(medium, extracted["texts"])
         return geometries, texts
 
@@ -158,12 +169,16 @@ class DXFProcessor:
             if obj_data is not None:
                 objects.append(obj_data)
             else:
-                log.warning(f"Failed to create ObjectData from {entity.dxftype()} entity")
+                log.warning(
+                    f"Failed to create ObjectData from {entity.dxftype()} entity"
+                )
 
         log.debug(f"Converted {len(objects)}/{len(entities)} entities to ObjectData")
         return objects
 
-    def _convert_to_texts(self, medium: str, entities: list[DXFEntity]) -> list[DxfText]:
+    def _convert_to_texts(
+        self, medium: str, entities: list[DXFEntity]
+    ) -> list[DxfText]:
         """Convert DXF text entities to DxfText objects.
 
         Parameters
@@ -268,7 +283,10 @@ class DXFProcessor:
             return (0, 0, 0)
 
     def assign_texts_to(
-        self, assigner: IAssignmentStrategy, handler: AssingmentData, configs: list[MediumConfig]
+        self,
+        assigner: IAssignmentStrategy,
+        handler: AssingmentData,
+        configs: list[MediumConfig],
     ) -> None:
         for (elems, texts), config in zip(handler.data, configs, strict=True):
             assigned = assigner.texts_to_point_based(elems, texts)
@@ -286,7 +304,9 @@ class DXFProcessor:
             # Assign texts to elements
             log.info(f"Assigning elements of {medium.name}")
             log.info("- Assigning texts to POINT BASED elements")
-            self.assign_texts_to(assigner, medium.element_data, medium.config.point_based)
+            self.assign_texts_to(
+                assigner, medium.element_data, medium.config.point_based
+            )
 
             log.info("- Assigning texts to LINE BASED elements")
             self.assign_texts_to(assigner, medium.line_data, medium.config.line_based)
@@ -303,7 +323,9 @@ class DXFProcessor:
             updater.update_elements(medium.element_data)
             updater.update_elements(medium.line_data)
 
-    def _update_elevation(self, updater: IElevationUpdater, assigment: AssingmentData) -> None:
+    def _update_elevation(
+        self, updater: IElevationUpdater, assigment: AssingmentData
+    ) -> None:
         # Texts are assigned to elemtents and onbly the elements data are exported, which
         # means that texts are not updated here.
         for elements, _ in assigment.data:
