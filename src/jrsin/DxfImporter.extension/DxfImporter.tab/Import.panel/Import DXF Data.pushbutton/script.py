@@ -1,337 +1,328 @@
 # -*- coding: utf-8 -*-
 """
 Import DXF Data - pyRevit Button Script
-IronPython 2.7 compatible
-
-This script provides a UI for importing DXF data from JSON files into Revit.
+Simple extension to read revit_data.json and create elements in Revit
+IronPython 3 compatible
 """
 
-import os
+import json
+import re
 
-# Revit API imports
-from Autodesk.Revit.DB import Document, Transaction
-
-# Our custom modules from lib directory
-from data_models import RevitDataReader
-from parameter_manager import RevitParameterManager
-from revit_creator import RevitElementCreator
-
-# pyRevit imports
-from pyrevit import forms, script
-from pyrevit.forms import WPFWindow
-
-
-class DxfImportDialog(WPFWindow):
-    """Main dialog for DXF import configuration"""
-    
-    def __init__(self):
-        # type: () -> None
-        """Initialize the dialog"""
-        self.json_file_path = None
-        self.setup_parameters = True
-        self.family_mapping = self._get_default_family_mapping()
-        self.selected_categories = None
-        
-        # Create simple form using pyRevit forms
-        self._setup_ui()
-    
-    def _setup_ui(self):
-        # type: () -> None
-        """Setup the user interface"""
-        # This is a simplified version - we'll use pyRevit's built-in dialogs
-        pass
-    
-    def _get_default_family_mapping(self):
-        # type: () -> dict
-        """Get default family mapping"""
-        return {
-            "WATER_SPECIAL": {
-                "family_name": "Generic Model",
-                "type_name": "Water Special",
-                "category": "OST_GenericModel",
-            },
-            "WATER_PIPE": {
-                "family_name": "Generic Model", 
-                "type_name": "Water Pipe",
-                "category": "OST_GenericModel",
-            },
-            "SHAFT": {
-                "family_name": "Generic Model",
-                "type_name": "Shaft", 
-                "category": "OST_GenericModel",
-            },
-        }
+from Autodesk.Revit.DB import (
+    XYZ,
+    AdaptiveComponentInstanceUtils,
+    BuiltInCategory,
+    Document,
+    ElementId,
+    FamilyInstance,
+    FamilySymbol,
+    FilteredElementCollector,
+    Parameter,
+    ReferencePoint,
+    StorageType,
+    UnitTypeId,
+    UnitUtils,
+)
+from Autodesk.Revit.DB.Structure import (
+    StructuralType,
+)
+from pyrevit import forms
+from pyrevit.revit import Transaction
 
 
-class DxfImportController(object):
-    """Main controller for DXF import process"""
-    
-    def __init__(self, document: Document):
-        # type: (Document) -> None
-        """Initialize controller with Revit document"""
-        self.document = document
-        self.output = script.get_output()
-        
-        # Initialize components
-        self.data_reader = None
-        self.element_creator = RevitElementCreator(document)
-        self.parameter_manager = RevitParameterManager(document)
-        
-        # Statistics
-        self.stats = {
-            "elements_processed": 0,
-            "elements_created": 0,
-            "elements_failed": 0,
-            "parameters_created": 0,
-        }
-    
-    def select_json_file(self):
-        # type: () -> str or None
-        """Show file selection dialog for JSON file"""
-        try:
-            json_file = forms.pick_file(
-                file_ext='json',
-                title='Select DXF Data JSON File',
-                init_dir=os.path.expanduser('~')
-            )
-            return json_file
-        except Exception:
-            return None
-    
-    def show_import_dialog(self):
-        # type: () -> dict or None
-        """Show configuration dialog and return settings"""
-        # Simple configuration using pyRevit forms
-        options = [
-            "Setup shared parameters",
-            "Skip parameter setup"
-        ]
-        
-        param_choice = forms.CommandSwitchWindow.show(
-            options,
-            message="Choose parameter setup option:"
-        )
-        
-        if param_choice is None:
-            return None
-            
-        setup_parameters = param_choice == "Setup shared parameters"
-        
-        return {
-            "setup_parameters": setup_parameters,
-            "family_mapping": None  # Use default
-        }
-    
-    def run_import(self, json_file_path, settings):
-        # type: (str, dict) -> list
-        """Run the complete import process"""
-        self.output.print_md("# DXF Data Import")
-        self.output.print_md("---")
-        
-        try:
-            # Step 1: Load and analyze data
-            self.output.print_md("## 1. Loading JSON data...")
-            self.data_reader = RevitDataReader(json_file_path)
-            self.data_reader.load_data()
-            
-            data_stats = self.data_reader.get_statistics()
-            self._print_data_statistics(data_stats)
-            
-            # Step 2: Setup parameters if requested
-            if settings.get("setup_parameters", True):
-                self.output.print_md("## 2. Setting up shared parameters...")
-                self._setup_shared_parameters()
-            
-            # Step 3: Create elements
-            self.output.print_md("## 3. Creating Revit elements...")
-            elements = self.data_reader.get_all_elements()
-            created_elements = self._create_elements_batch(elements, settings.get("family_mapping"))
-            
-            # Step 4: Print results
-            self.output.print_md("## 4. Import completed!")
-            self._print_import_results()
-            
-            return created_elements
-            
-        except Exception as e:
-            self.output.print_md("**ERROR:** {}".format(str(e)))
-            if self.element_creator._current_tx:
-                self.element_creator.rollback_transaction()
-            return []
-    
-    def _print_data_statistics(self, stats):
+def get_length_value(value, unit=None):
+    # type: (float, str | None) -> float
+    """Convert length value to internal units based on unit type"""
+    if unit is None or unit.lower() == "m":
+        return value  # No conversion needed
+    if unit.lower() == "mm":
+        return value * 0.001
+    if unit.lower() == "cm":
+        return value * 0.01
+    else:
+        raise ValueError(f"Unknown unit type: {unit}")
+
+
+class ElementData(object):
+    """Represents element data from JSON with support for both point-based and line-based elements"""
+
+    def __init__(self, json_data):
         # type: (dict) -> None
-        """Print statistics about loaded data"""
-        self.output.print_md("**Data Statistics:**")
-        self.output.print_md("- Total categories: {}".format(stats["total_categories"]))
-        self.output.print_md("- Total elements: {}".format(stats["total_elements"]))
-        self.output.print_md("- Unique object types: {}".format(stats["unique_object_types"]))
-        
-        self.output.print_md("**Elements by category:**")
-        for category, count in stats["elements_by_category"].items():
-            self.output.print_md("- {}: {}".format(category, count))
-        
-        self.output.print_md("**Elements by type:**")
-        for obj_type, count in stats["elements_by_type"].items():
-            self.output.print_md("- {}: {}".format(obj_type, count))
-    
-    def _setup_shared_parameters(self):
-        # type: () -> None
-        """Setup shared parameters for the import"""
-        try:
-            created_params = self.parameter_manager.setup_dxf_import_parameters()
-            self.stats["parameters_created"] = len(created_params)
-            self.output.print_md("Created {} shared parameters".format(len(created_params)))
-        except Exception as e:
-            self.output.print_md("**Warning:** Failed to setup shared parameters: {}".format(str(e)))
-            self.output.print_md("Elements will be created without custom parameters")
-    
-    def _create_elements_batch(self, elements, family_mapping):
-        # type: (list, dict or None) -> list
-        """Create elements in batches with progress reporting"""
-        created_elements = []
-        batch_size = 50
-        total_elements = len(elements)
-        
-        self.output.print_md("Creating {} elements in batches of {}...".format(
-            total_elements, batch_size
-        ))
-        
-        # Create progress bar
-        with self.output.progress() as progress:
-            for i in range(0, total_elements, batch_size):
-                batch = elements[i:i + batch_size]
-                batch_num = i // batch_size + 1
-                total_batches = (total_elements + batch_size - 1) // batch_size
-                
-                progress.update_progress(i, total_elements)
-                self.output.print_md("Processing batch {}/{}...".format(batch_num, total_batches))
-                
-                try:
-                    # Create elements in this batch
-                    batch_created = self._create_elements_in_transaction(batch, family_mapping)
-                    created_elements.extend(batch_created)
-                    
-                    # Update statistics
-                    self.stats["elements_processed"] += len(batch)
-                    self.stats["elements_created"] += len(batch_created)
-                    self.stats["elements_failed"] += len(batch) - len(batch_created)
-                    
-                    self.output.print_md("  Created: {}, Failed: {}".format(
-                        len(batch_created), len(batch) - len(batch_created)
-                    ))
-                    
-                except Exception as e:
-                    self.output.print_md("**ERROR** in batch {}: {}".format(batch_num, str(e)))
-                    self.stats["elements_processed"] += len(batch)
-                    self.stats["elements_failed"] += len(batch)
-        
-        return created_elements
-    
-    def _create_elements_in_transaction(self, elements_batch, family_mapping):
-        # type: (list, dict or None) -> list
-        """Create a batch of elements within a single transaction"""
-        created_elements = []
-        
-        # Start transaction for this batch
-        transaction = Transaction(self.document, "Import DXF Elements Batch")
-        transaction.Start()
-        
-        try:
-            for element_data in elements_batch:
-                try:
-                    # Create Revit element
-                    revit_element = self.element_creator.create_element_from_data(
-                        element_data, family_mapping
-                    )
-                    
-                    if revit_element:
-                        # Apply data parameters
-                        self.parameter_manager.apply_element_data_to_parameters(
-                            revit_element, element_data
-                        )
-                        created_elements.append(revit_element)
-                
-                except Exception as e:
-                    self.output.print_md("    Failed to create element: {}".format(str(e)))
-            
-            # Commit transaction
-            transaction.Commit()
-            
-        except Exception as e:
-            # Rollback on error
-            transaction.RollBack()
-            self.output.print_md("    Transaction failed: {}".format(str(e)))
-            created_elements = []
-        
-        return created_elements
-    
-    def _print_import_results(self):
-        # type: () -> None
-        """Print final import statistics"""
-        self.output.print_md("---")
-        self.output.print_md("# IMPORT RESULTS")
-        self.output.print_md("---")
-        self.output.print_md("**Elements processed:** {}".format(self.stats["elements_processed"]))
-        self.output.print_md("**Elements created:** {}".format(self.stats["elements_created"]))
-        self.output.print_md("**Elements failed:** {}".format(self.stats["elements_failed"]))
-        self.output.print_md("**Parameters created:** {}".format(self.stats["parameters_created"]))
-        
-        if self.stats["elements_processed"] > 0:
-            success_rate = (
-                self.stats["elements_created"] * 100.0 / self.stats["elements_processed"]
+        """Initialize ElementData from JSON dictionary"""
+        self.object_type = json_data.get("object_type", "")
+        self.family = json_data.get("family", "")
+        self.family_type = json_data.get("family_type", "")
+        self.dimensions = json_data.get("dimensions", {})
+        self.parameters = json_data.get("parameters", [])
+
+        # Handle both insert_point and line_points
+        self.insert_point = json_data.get("insert_point")
+        self.line_points = json_data.get("line_points", [])
+
+    def is_point_based(self):
+        # type: () -> bool
+        """Check if element is point-based (uses insert_point)"""
+        return self.insert_point is not None
+
+    def is_line_based(self):
+        # type: () -> bool
+        """Check if element is line-based (uses line_points for AdaptiveComponent)"""
+        return len(self.line_points) > 1
+
+    def get_all_points(self):
+        # type: () -> list
+        """Get all points for line-based elements"""
+        return self.line_points if self.line_points else []
+
+    def __repr__(self):
+        # type: () -> str
+        point_type = "point-based" if self.is_point_based() else "line-based"
+        return "ElementData({}, {})".format(self.object_type, point_type)
+
+
+class RevitImporter(object):
+    """Simple importer for DXF data from JSON"""
+
+    def __init__(self, document: Document, project_zero):
+        # type: (Document, dict) -> None
+        self.document = document
+        self.project_zero = project_zero
+
+    def load_json_data(self, json_path):
+        # type: (str) -> dict
+        """Load JSON data from file"""
+        with open(json_path, "r") as f:
+            return json.load(f)
+
+    def get_family_collector(self):
+        # type: () -> FilteredElementCollector
+        """Get collector for Generic Model families"""
+        collector = FilteredElementCollector(self.document)
+        collector = collector.OfCategory(BuiltInCategory.OST_GenericModel)  # pyright: ignore[reportArgumentType]
+        return collector.OfClass(FamilySymbol)
+
+    def get_first_family_symbol(self, family: str):
+        # type: (str) -> FamilySymbol | None
+        """Get first available Generic Model family symbol"""
+        collector = self.get_family_collector()
+        for symbol in collector.ToElements():
+            if not isinstance(symbol, FamilySymbol):
+                continue
+            if symbol.FamilyName != family:
+                continue
+            return symbol
+        return None
+
+    def get_family_symbol(self, family_name: str, type_name: str):
+        # type: (str, str) -> FamilySymbol | None
+        """Get first available Generic Model family symbol"""
+        collector = self.get_family_collector()
+        family_symbol = None
+        for symbol in collector.ToElements():
+            if not isinstance(symbol, FamilySymbol):
+                continue
+            if symbol.FamilyName != family_name:
+                continue
+            family_symbol = symbol
+            if symbol.Name != type_name:
+                continue
+            if not symbol.IsActive:
+                symbol.Activate()
+            return symbol
+        if family_symbol is None:
+            raise ValueError("Family symbol not found: {}, {}".format(family_name, type_name))
+        family_symbol = family_symbol.Duplicate(type_name)
+        if not isinstance(family_symbol, FamilySymbol):
+            raise ValueError("Failed to duplicate family symbol: {}, {}".format(family_name, type_name))
+        if not family_symbol.IsActive:
+            family_symbol.Activate()
+        return family_symbol
+
+    def create_xyz_from_point(self, point_data):
+        # type: (dict) -> XYZ
+        """Convert point data to Revit XYZ"""
+        east_coord = point_data.get("east", 0.0) - self.project_zero["East"]
+        east = UnitUtils.ConvertToInternalUnits(east_coord, UnitTypeId.Meters)
+        north_coord = point_data.get("north", 0.0) - self.project_zero["North"]
+        north = UnitUtils.ConvertToInternalUnits(north_coord, UnitTypeId.Meters)
+        alt_coord = point_data.get("altitude", 0.0) - self.project_zero["Altitude"]
+        alt = UnitUtils.ConvertToInternalUnits(alt_coord, UnitTypeId.Meters)
+        return XYZ(east, north, alt)
+
+    def create_element(self, element_data: ElementData, family_symbol: FamilySymbol):
+        # type: (ElementData, FamilySymbol) -> list[FamilyInstance]
+        """Create Revit element from ElementData"""
+        if element_data.is_point_based():
+            return self.create_point_based_element(element_data, family_symbol)
+        elif element_data.is_line_based():
+            return self.create_line_based_element(element_data, family_symbol)
+        raise ValueError("ElementData is neither point-based or line-based, got: {}".format(element_data))
+
+    def create_point_based_element(self, element_data: ElementData, family_symbol: FamilySymbol):
+        # type: (ElementData, FamilySymbol) -> list[FamilyInstance]
+        """Create point-based element (normal FamilyInstance)"""
+        if element_data.insert_point is None:
+            raise ValueError("ElementData is not point-based, Did you check is_point_based() first?")
+
+        position = self.create_xyz_from_point(element_data.insert_point)
+        instance = self.document.Create.NewFamilyInstance(  # pyright: ignore[reportAttributeAccessIssue]
+            position, family_symbol, StructuralType.NonStructural
+        )
+
+        self.set_element_parameters(instance, element_data)
+        return [instance]
+
+    def _get_reference_point(self, element_id: ElementId):
+        # type: (ElementId) -> ReferencePoint
+        """Get reference point from element ID"""
+        ref_point = self.document.GetElement(element_id)
+        if not isinstance(ref_point, ReferencePoint):
+            raise ValueError("ElementId {} is not a ReferencePoint".format(element_id))
+        return ref_point
+
+    def create_line_based_element(self, element_data: ElementData, family_symbol: FamilySymbol):
+        # type: (ElementData, FamilySymbol) -> list[FamilyInstance]
+        """Create line-based element (AdaptiveComponent)"""
+        instances = []
+        all_points = element_data.get_all_points()
+        if len(all_points) < 2:
+            raise ValueError(
+                "ElementData is not line-based, Did you check is_line_based() first? "
+                "Expected at least 2 points, got: {}".format(len(all_points))
             )
-            self.output.print_md("**Success rate:** {:.1f}%".format(success_rate))
+        for idx, point in enumerate(all_points):
+            if idx == 0:
+                continue
+            instance = AdaptiveComponentInstanceUtils.CreateAdaptiveComponentInstance(self.document, family_symbol)
+            adaptive_points = AdaptiveComponentInstanceUtils.GetInstancePlacementPointElementRefIds(instance)
+
+            start_point = self.create_xyz_from_point(all_points[idx - 1])
+            end_point = self.create_xyz_from_point(point)
+            try:
+                start_ref = self._get_reference_point(adaptive_points[0])
+                start_ref.Position = start_point
+
+                end_ref = self._get_reference_point(adaptive_points[1])
+                end_ref.Position = end_point
+            except Exception as ex:
+                print(
+                    f"Failed to set adaptive points for {element_data.family} - {element_data.family_type} ({len(all_points)}): {ex}"
+                )
+                continue
+
+            self.set_element_parameters(instance, element_data)
+            instances.append(instance)
+        return instances
+
+    def _get_parameter_value(self, param: Parameter, param_data):
+        # type: (Parameter, dict) -> str | int | float | None
+        """Set parameter value with unit conversion if needed"""
+        value = param_data["value"]
+        if value is None:
+            return None
+
+        unit_type = param_data.get("unit", None)
+        if param.StorageType == StorageType.ElementId:
+            raise NotImplementedError("ElementId parameters are not supported in this script")
+        if param.StorageType == StorageType.Double:
+            if unit_type is None:
+                return float(value)
+            if unit_type.lower() in ["mm", "cm", "m"]:
+                value = get_length_value(value, unit=unit_type)
+                return UnitUtils.ConvertToInternalUnits(float(value), UnitTypeId.Meters)
+            if unit_type.lower() in ["degree", "grad"]:
+                return UnitUtils.ConvertToInternalUnits(float(value), UnitTypeId.Degrees)
+            raise ValueError(f"Unknown unit type: {unit_type}")
+        if param.StorageType == StorageType.Integer:
+            if param_data.get("value_type", None) == "bool":
+                return 1 if bool(value) else 0
+            return int(value)
+        value = str(value)
+
+        return str(value)
+
+    def _set_parameter_value(self, param: Parameter, param_data):
+        # type: (Parameter, dict) -> None
+        """Set parameter value with unit conversion if needed"""
+        value = self._get_parameter_value(param=param, param_data=param_data)
+        if value is None:
+            return
+        try:
+            param.Set(value)  # pyright: ignore[reportArgumentType]
+        except Exception as ex:
+            print(f"Failed to set parameter {param.Definition.Name}: {ex}")
+
+    def set_element_parameters(self, instance: FamilyInstance, element_data: ElementData):
+        # type: (FamilyInstance, ElementData) -> None
+        """Set parameters on element instance"""
+        for param_data in element_data.parameters:
+            param = instance.LookupParameter(param_data["name"])
+            if param is None or param.IsReadOnly:
+                continue
+            self._set_parameter_value(param=param, param_data=param_data)
+
+    def import_data(self, json_path):
+        # type: (str) -> int
+        """Import all data from JSON file"""
+        json_data = self.load_json_data(json_path)
+
+        created_count = 0
+
+        # Start transaction
+        with Transaction(name="Import Revit Data", doc=self.document):
+            # Process each category
+            for medium, elements in json_data.items():
+                print(f"Processing medium: {medium} with {len(elements)} elements")
+                for element_json in elements:
+                    # Create ElementData object from JSON
+                    element_data = ElementData(element_json)
+
+                    family_symbol = self.get_family_symbol(element_data.family, element_data.family_type)
+                    if family_symbol is None:
+                        print(f"Family symbol not found for {element_data.family} - {element_data.family_type}")
+                        continue
+
+                    instances = self.create_element(element_data, family_symbol)
+                    created_count += len(instances)
+
+        return created_count
 
 
 def main():
     # type: () -> None
-    """Main function executed when button is clicked"""
+    """Main function"""
     doc = __revit__.ActiveUIDocument.Document
-    output = script.get_output()
-    
-    if not doc:
-        forms.alert("No active Revit document found.", exitscript=True)
-    
-    # Create controller
-    controller = DxfImportController(doc)
-    
+
+    if doc is None:
+        forms.alert("No active Revit document found")
+        return
+
     # Select JSON file
-    output.print_md("# DXF Data Import Tool")
-    output.print_md("Select a JSON file containing DXF data to import...")
-    
-    json_file_path = controller.select_json_file()
-    if not json_file_path:
-        forms.alert("No file selected. Import cancelled.", exitscript=True)
-    
-    if not os.path.exists(json_file_path):
-        forms.alert("Selected file does not exist: {}".format(json_file_path), exitscript=True)
-    
-    # Show configuration dialog
-    settings = controller.show_import_dialog()
-    if settings is None:
-        forms.alert("Import cancelled by user.", exitscript=True)
-    
-    # Run import
-    try:
-        created_elements = controller.run_import(json_file_path, settings)
-        
-        if created_elements:
-            forms.alert(
-                "Import completed successfully!\nCreated {} elements.".format(len(created_elements)),
-                title="Import Complete"
-            )
-        else:
-            forms.alert(
-                "Import completed but no elements were created.\nCheck the output window for details.",
-                title="Import Complete"
-            )
-    
-    except Exception as e:
-        forms.alert("Import failed: {}".format(str(e)), title="Import Error")
+    json_file = forms.pick_file(file_ext="json", title="revit_data.json Datei auswählen")
+    if isinstance(json_file, list):
+        json_file = json_file[0]
+
+    if json_file is None:
+        forms.alert("Keine JSON Datei ausgewählt")
+        return
+
+    # Select JSON file
+    project_zero_path = forms.pick_file(file_ext="json", title="Project Koordinaten Datei auswählen")
+    if isinstance(project_zero_path, list):
+        project_zero_path = project_zero_path[0]
+
+    if project_zero_path is None:
+        forms.alert("Keine Projekt Koordinaten Datei ausgewählt")
+        return
+
+    project_zero = json.loads(open(project_zero_path, "r").read())
+    project_zero = project_zero["Projektnullpunkt"]
+
+    importer = RevitImporter(document=doc, project_zero=project_zero)
+    count = importer.import_data(json_file)
+
+    forms.alert("Import completed! Created {} elements".format(count))
 
 
-# Execute main function when script is run
 if __name__ == "__main__":
-
     main()

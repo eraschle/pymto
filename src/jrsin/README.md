@@ -1,235 +1,151 @@
 # jrsin - JSON Revit Import Package
 
-Ein Python-Paket zum Importieren von DXF-Daten aus JSON-Dateien in Autodesk Revit, kompatibel mit IronPython 2.7 und RevitPythonShell.
+Eine vereinfachte PyRevit Extension zum Importieren von DXF-Daten aus JSON-Dateien in Autodesk Revit, kompatibel mit IronPython 3.
 
 ## Übersicht
 
-Das `jrsin` Paket liest JSON-Daten aus der `revit_data.json` Datei und erstellt entsprechende Revit-Elemente mit automatischer Typerstellung und Parameterverwaltung.
+Die `jrsin` Extension liest JSON-Daten aus der `revit_data.json` Datei und erstellt entsprechende Revit-Elemente als Generic Models.
 
 ## Funktionen
 
-- **IronPython 2.7 Kompatibilität**: Vollständig kompatibel mit RevitPythonShell
-- **Automatische Typerstellung**: Erstellt neue Family-Typen basierend auf Elementdimensionen
-- **Parameter-Management**: Richtet Shared Parameters für DXF-Importdaten ein
-- **Batch-Verarbeitung**: Effiziente Verarbeitung großer Datenmengen
-- **Fehlerbehandlung**: Robuste Fehlerbehandlung und Fortschrittsberichterstattung
+- **IronPython 3 Kompatibilität**: Vollständig kompatibel mit pyRevit
+- **Einfache Implementierung**: Minimaler Code ohne komplexe Klassenhierarchien
+- **Automatische Elementerstellung**: Erstellt Generic Model Instanzen an den angegebenen Koordinaten
+- **Parameter-Support**: Setzt Parameter aus JSON-Daten auf erstellte Elemente
 
 ## Struktur
 
 ```
-src/jrsin/
-├── __init__.py                 # Paket-Initialisierung
-├── data_models.py             # Datenmodelle für JSON-Parsing
-├── revit_creator.py           # Revit-Element- und Typ-Erstellung
-├── parameter_manager.py       # Shared Parameter Management
-├── revit_import_script.py     # Hauptskript für RevitPythonShell
-└── README.md                  # Diese Dokumentation
+src/jrsin/DxfImporter.extension/
+├── DxfImporter.tab/
+│   └── Import.panel/
+│       └── Import DXF Data.pushbutton/
+│           ├── bundle.yaml
+│           └── script.py              # Hauptskript (vereinfacht)
+├── README.md                          # Diese Dokumentation  
+└── __init__.py                        # Extension Initialisierung
 ```
 
 ## Installation und Verwendung
 
-### 1. Vorbereitung
+### 1. Installation
 
-1. Kopieren Sie das gesamte `src/jrsin/` Verzeichnis an einen zugänglichen Ort
-2. Stellen Sie sicher, dass die `revit_data.json` Datei verfügbar ist
+Die Extension ist bereits als pyRevit Extension strukturiert:
 
-### 2. Konfiguration
+1. Die Extension wird automatisch von pyRevit erkannt
+2. Starten Sie Revit neu, um die Extension zu laden
+3. Das "Import DXF Data" Button erscheint im DxfImporter Tab
 
-Öffnen Sie `revit_import_script.py` und aktualisieren Sie:
+### 2. Verwendung
 
-```python
-# Pfad zur JSON-Datei anpassen
-JSON_FILE_PATH = r"C:\Pfad\zu\Ihrer\revit_data.json"
+1. Öffnen Sie ein Revit-Projekt
+2. Stellen Sie sicher, dass mindestens eine Generic Model Family geladen ist
+3. Klicken Sie auf "Import DXF Data" 
+4. Wählen Sie die `revit_data.json` Datei aus
+5. Die Elemente werden automatisch importiert
 
-# Family-Mapping anpassen (optional)
-CUSTOM_FAMILY_MAPPING = {
-    "WATER_SPECIAL": {
-        "family_name": "Ihre Custom Family",
-        "type_name": "Spezieller Typ",
-        "category": BuiltInCategory.OST_GenericModel
+## JSON-Datenformat
+
+Die Extension erwartet folgendes JSON-Format:
+
+```json
+{
+  "Kategorie Name": [
+    {
+      "object_type": "WATER_SPECIAL",
+      "family": "family_name", 
+      "family_type": "type_name",
+      "dimensions": {
+        "radius": 100.0,
+        "diameter": 200.0
+      },
+      "line_points": [
+        {
+          "east": 2810860.018,
+          "north": 1184014.392, 
+          "altitude": 1440.609
+        }
+      ],
+      "parameters": [
+        {
+          "name": "Durchmesser",
+          "value": 200.0,
+          "value_type": "float",
+          "unit": "m"
+        }
+      ]
     }
+  ]
 }
 ```
 
-### 3. Ausführung in RevitPythonShell
+## Implementierung
 
-1. Öffnen Sie Revit und ein Projekt
-2. Starten Sie RevitPythonShell
-3. Führen Sie das Skript aus:
+Die Extension verwendet eine einfache Klasse `SimpleRevitImporter`:
 
-```python
-# Option 1: Direkt die Datei ausführen
-exec(open(r'C:\Pfad\zu\jrsin\revit_import_script.py').read())
+### Hauptfunktionen
 
-# Option 2: Module importieren und custom verwenden
-import sys
-sys.path.append(r'C:\Pfad\zu\src')
+- `load_json_data()`: Lädt JSON-Daten
+- `get_generic_family_symbol()`: Findet Generic Model Family
+- `create_xyz_from_point()`: Konvertiert Koordinaten zu Revit XYZ
+- `create_element()`: Erstellt Revit-Element
+- `import_data()`: Importiert alle Daten
 
-from jrsin.revit_import_script import RevitImportController
-controller = RevitImportController(doc, r'C:\Pfad\zu\revit_data.json')
-elements = controller.run_import()
-```
+### Koordinaten-Konvertierung
 
-## Klassen-Referenz
+- East/North/Altitude werden von Metern zu Revit-internen Einheiten konvertiert
+- Verwendet `UnitUtils.ConvertToInternalUnits()` mit `UnitTypeId.Meters`
 
-### RevitDataReader
+### Parameter-Handling
 
-Liest und parst JSON-Daten:
+- Versucht numerische Werte als `float` zu setzen
+- Fallback auf `string` wenn numerische Konvertierung fehlschlägt
+- Ignoriert schreibgeschützte Parameter
 
-```python
-reader = RevitDataReader("pfad/zu/revit_data.json")
-reader.load_data()
-elements = reader.get_all_elements()
-stats = reader.get_statistics()
-```
+## Vereinfachungen gegenüber der alten Version
 
-### RevitElementCreator
-
-Erstellt Revit-Elemente und Family-Typen:
-
-```python
-creator = RevitElementCreator(doc)
-creator.start_transaction("Elemente erstellen")
-element = creator.create_element_from_data(element_data, family_mapping)
-creator.commit_transaction()
-```
-
-### RevitParameterManager
-
-Verwaltet Shared Parameters:
-
-```python
-param_mgr = RevitParameterManager(doc)
-created_params = param_mgr.setup_dxf_import_parameters()
-param_mgr.apply_element_data_to_parameters(element, element_data)
-```
-
-### RevitImportController
-
-Hauptcontroller für den Import-Prozess:
-
-```python
-controller = RevitImportController(doc, json_file_path)
-elements = controller.run_import(family_mapping, setup_parameters=True)
-```
-
-## Standard-Parameter
-
-Das System erstellt automatisch folgende Shared Parameters:
-
-- **DXF_ObjectType**: Original DXF Objekttyp
-- **DXF_LayerName**: Original DXF Layer-Name  
-- **DXF_PointCount**: Anzahl der Punkte in der ursprünglichen Geometrie
-- **DXF_Diameter/Radius/Width/Height**: Elementdimensionen
-- **DXF_CenterX/Y/Z**: Zentrumskoordinaten
-- **DXF_ImportDate**: Import-Datum
-
-## Family-Mapping
-
-Das System verwendet ein konfigurierbares Family-Mapping:
-
-```python
-family_mapping = {
-    "OBJECT_TYPE": {
-        "family_name": "Name der Revit Family",
-        "type_name": "Typ-Name", 
-        "category": BuiltInCategory.OST_Category
-    }
-}
-```
-
-Typ-Namen werden automatisch basierend auf Dimensionen generiert:
-- `WATER_SPECIAL_D200` (Durchmesser 200)
-- `SHAFT_W100_H200` (Breite 100, Höhe 200)
+1. **Keine komplexen Datenmodelle**: Arbeitet direkt mit JSON-Dictionaries
+2. **Keine Typ-Erstellung**: Verwendet vorhandene Generic Model Families
+3. **Keine Shared Parameter**: Setzt nur vorhandene Parameter
+4. **Keine Batch-Verarbeitung**: Alle Elemente in einer Transaktion
+5. **Keine fehlerhafte Transaktions-Verschachtelung**: Einfache Transaction-Verwendung
 
 ## Fehlerbehandlung
 
-Das System bietet umfangreiche Fehlerbehandlung:
+- Überprüft auf aktives Revit-Dokument
+- Validiert JSON-Dateiauswahl
+- Überprüft Verfügbarkeit von Generic Model Families
+- Try-catch für Parameter-Setzen
 
-- Validierung der JSON-Datei
-- Überprüfung der Revit-Dokumentzugänglichkeit
-- Transaktions-Rollback bei Fehlern
-- Detaillierte Fehler- und Fortschrittsberichte
+## Kompatibilität
 
-## Anpassung
-
-### Custom Family-Mapping
-
-```python
-custom_mapping = {
-    "WATER_SPECIAL": {
-        "family_name": "Meine Wasser Family",
-        "type_name": "Speziell",
-        "category": BuiltInCategory.OST_PipeAccessory
-    }
-}
-```
-
-### Custom Parameter
-
-```python
-custom_params = {
-    "Mein_Parameter": {
-        "type": SpecTypeId.String.Text,
-        "is_instance": True,
-        "description": "Benutzerdefinierter Parameter"
-    }
-}
-param_mgr.create_project_parameters_for_elements(custom_params)
-```
-
-## Batch-Verarbeitung
-
-Das System verarbeitet Elemente in Batches (standardmäßig 50 pro Batch) für optimale Performance:
-
-```python
-created_elements = creator.create_elements_from_data_list(
-    elements_data, 
-    family_mapping, 
-    batch_size=100
-)
-```
+- **IronPython 3** (pyRevit)
+- **Revit 2019+** 
+- **Windows** Betriebssystem
+- **pyRevit** Framework
 
 ## Troubleshooting
 
 ### Häufige Probleme
 
-1. **"Revit API not available"**
-   - Stellen Sie sicher, dass das Skript in RevitPythonShell läuft
+1. **"No Generic Model family found"**
+   - Laden Sie eine Generic Model Family in das Projekt
 
-2. **"JSON file not found"**
-   - Überprüfen Sie den Pfad in `JSON_FILE_PATH`
+2. **"No file selected"**
+   - Stellen Sie sicher, dass die JSON-Datei existiert und zugänglich ist
 
-3. **"No shared parameter file found"**
-   - Erstellen Sie eine Shared Parameter Datei in Revit
-   - Oder deaktivieren Sie Parameter-Setup: `setup_parameters=False`
+3. **Elemente werden nicht erstellt**
+   - Überprüfen Sie das JSON-Format
+   - Stellen Sie sicher, dass `line_points` nicht leer ist
 
-4. **"Family not found"**
-   - Laden Sie die benötigten Families in das Projekt
-   - Oder passen Sie das Family-Mapping an verfügbare Families an
+4. **Parameter werden nicht gesetzt**
+   - Parameter müssen bereits in der Family definiert sein
+   - Extension erstellt keine neuen Parameter
 
-### Debug-Modus
+## Entwicklung
 
-Für Debugging können Sie einzelne Komponenten testen:
-
-```python
-# Data Reader testen
-reader = test_data_reader()
-
-# Einzelnes Element erstellen
-element_data = reader.get_all_elements()[0]
-creator = RevitElementCreator(doc)
-creator.start_transaction()
-element = creator.create_element_from_data(element_data)
-creator.commit_transaction()
-```
-
-## Kompatibilität
-
-- **IronPython 2.7** (RevitPythonShell)
-- **Revit 2019+** (getestet)
-- **Windows** Betriebssystem
-
-## Lizenz
-
-Dieses Projekt ist Teil des dxfto-Packages und folgt dessen Lizenzbestimmungen.
+Die Extension ist bewusst einfach gehalten:
+- Ein einzelnes Script-File
+- Minimale Klassenhierarchie
+- Direkte JSON-Verarbeitung
+- Standard pyRevit-Patterns
