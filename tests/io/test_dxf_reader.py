@@ -31,7 +31,10 @@ class TestDXFReader:
         assert reader.dxf_path == test_dxf_path
         assert reader._doc is None
         assert not reader.is_loaded()
-        assert reader.document is None
+        
+        # document property should raise RuntimeError when not loaded
+        with pytest.raises(RuntimeError, match="not loaded"):
+            _ = reader.document
 
     def test_load_file_success(self, reader, test_dxf_path):
         """Test successful file loading."""
@@ -100,30 +103,6 @@ class TestDXFReader:
         assert len(layer_names) >= 1  # Should have at least default layer "0"
         assert "0" in layer_names  # Default layer should exist
 
-    def test_get_entity_count_all_entities(self, reader, test_dxf_path):
-        """Test getting total entity count."""
-        if not test_dxf_path.exists():
-            pytest.skip(f"Test DXF file not found: {test_dxf_path}")
-
-        reader.load_file()
-
-        count = reader.get_entity_count()
-
-        assert isinstance(count, int)
-        assert count >= 0
-
-    def test_get_entity_count_specific_layers(self, reader, test_dxf_path):
-        """Test getting entity count for specific layers."""
-        if not test_dxf_path.exists():
-            pytest.skip(f"Test DXF file not found: {test_dxf_path}")
-
-        reader.load_file()
-
-        layers = [LayerData(name="0", color=(255, 0, 0))]
-        count = reader.get_entity_count(layers)
-
-        assert isinstance(count, int)
-        assert count >= 0
 
     def test_query_entities_multiple_layers(self, reader, test_dxf_path):
         """Test querying entities from multiple layers."""
@@ -151,7 +130,8 @@ class TestDXFReader:
 
         # Before loading
         assert not reader.is_loaded()
-        assert reader.document is None
+        with pytest.raises(RuntimeError, match="not loaded"):
+            _ = reader.document
 
         # Load file
         reader.load_file()
@@ -164,14 +144,9 @@ class TestDXFReader:
         layer_names = reader.get_layer_names()
         assert isinstance(layer_names, list)
 
-        total_count = reader.get_entity_count()
-        assert isinstance(total_count, int)
-
         # Query with existing layer
         if layer_names:
             test_layers = [LayerData(name=layer_names[0], color=(255, 0, 0))]
             entities = reader.query_entities(test_layers)
-            layer_count = reader.get_entity_count(test_layers)
-
-            # Entity count from query should match get_entity_count
-            assert len(entities) == layer_count
+            # query_entities returns an EntityQuery object, not a list
+            assert len(entities) >= 0

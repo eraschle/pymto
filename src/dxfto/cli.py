@@ -10,7 +10,7 @@ from pathlib import Path
 import click
 
 from .config import ConfigurationHandler
-from .io import DXFReader, JsonExporter, LandXMLReader
+from .io import JsonExporter, LandXMLReader
 from .process.assigners import SpatialTextAssigner
 from .process.creator import MediumObjectCreator
 from .process.dimension import DimensionUpdater
@@ -67,7 +67,6 @@ def process_dxf(
         output = dxf_file.with_suffix(".json")
 
     try:
-        # Load configuration file
         handler = ConfigurationHandler(config)
         handler.load_config()
 
@@ -168,7 +167,7 @@ def create_config(config_file: Path, dxf_file: Path | None) -> None:
         DXF file to create JSON config output from
 
     """
-    sample_config = {
+    config = {
         "Abwasserleitung": {
             "Leitung": [
                 {
@@ -221,17 +220,17 @@ def create_config(config_file: Path, dxf_file: Path | None) -> None:
         },
     }
     if dxf_file:
-        reader = DXFReader(dxf_path=dxf_file)
-        object_layers = reader.get_layer_names()
-        text_layers = reader.get_layer_names()
-        block_names = reader.get_layer_names()
-        sample_config["Abwasserleitung"]["Element"].append({"Dxf": dxf_file})
+        # reader = DXFReader(dxf_path=dxf_file)
+        # object_layers = reader.get_layer_names()
+        # text_layers = reader.get_layer_names()
+        # block_names = reader.get_layer_names()
+        config["Abwasserleitung"]["Element"].append({"Dxf": dxf_file})
 
     try:
         import json
 
         with open(config_file, "w", encoding="utf-8") as f:
-            json.dump(sample_config, f, indent=2, ensure_ascii=False)
+            json.dump(config, f, indent=2, ensure_ascii=False)
 
         click.echo(f"Sample configuration created: {config_file}")
         click.echo("Edit this file to match your DXF layer structure.")

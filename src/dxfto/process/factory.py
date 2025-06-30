@@ -170,7 +170,7 @@ class ObjectDataFactory:
 
             # Analyze block geometry
             block_entities = self._get_block_entities(entity)
-            shape_analysis = self._analyze_block_shape(entity, block_entities, config)
+            shape_analysis = self._analyze_block_shape(entity, block_entities)
 
             if shape_analysis is None:
                 return None
@@ -496,7 +496,9 @@ class ObjectDataFactory:
             color=_get_entity_color(entity),
         )
 
-    def _create_bulge_point_based_object(self, entity: DXFEntity, config: MediumConfig) -> ObjectData:
+    def _create_bulge_point_based_object(
+        self, entity: DXFEntity, config: MediumConfig
+    ) -> ObjectData:
         """Create line-based ObjectData from points.
 
         Parameters
@@ -527,7 +529,9 @@ class ObjectDataFactory:
             color=_get_entity_color(entity),
         )
 
-    def _create_round_line_based(self, entity: DXFEntity, points: list[Point3D], config: MediumConfig) -> ObjectData:
+    def _create_round_line_based(
+        self, entity: DXFEntity, points: list[Point3D], config: MediumConfig
+    ) -> ObjectData:
         """Create line-based ObjectData from points.
 
         Parameters
@@ -559,7 +563,9 @@ class ObjectDataFactory:
             color=_get_entity_color(entity),
         )
 
-    def _create_round_point_based(self, entity: DXFEntity, points: list[Point3D], config: MediumConfig) -> ObjectData:
+    def _create_round_point_based(
+        self, entity: DXFEntity, points: list[Point3D], config: MediumConfig
+    ) -> ObjectData:
         """Create line-based ObjectData from points.
 
         Parameters
@@ -614,7 +620,7 @@ class ObjectDataFactory:
         return self._block_cache[block_name]
 
     def _analyze_block_shape(
-        self, insert_entity: Insert, block_entities: list[DXFEntity], config: MediumConfig
+        self, insert_entity: Insert, block_entities: list[DXFEntity]
     ) -> tuple | None:
         """Analyze block geometry to determine shape and dimensions.
 
@@ -637,7 +643,7 @@ class ObjectDataFactory:
         # Check for circular blocks (containing circles)
         circles = [e for e in block_entities if e.dxftype() == "CIRCLE"]
         if circles:
-            return self._analyze_circular_block(circles, config)
+            return self._analyze_circular_block(circles)
 
         # Extract all geometry points from block entities
         all_points = []
@@ -667,7 +673,7 @@ class ObjectDataFactory:
 
         return dimensions, all_points
 
-    def _analyze_circular_block(self, circles: list[DXFEntity], config: MediumConfig) -> tuple:
+    def _analyze_circular_block(self, circles: list[DXFEntity]) -> tuple:
         """Analyze block containing circles to determine dimensions.
 
         Parameters
@@ -722,7 +728,9 @@ class ObjectDataFactory:
 
         return dimensions, []
 
-    def _transform_block_geometry(self, points: list[Point3D], insert_entity: Insert) -> list[Point3D]:
+    def _transform_block_geometry(
+        self, points: list[Point3D], insert_entity: Insert
+    ) -> list[Point3D]:
         """Transform block geometry points to world coordinates.
 
         Parameters

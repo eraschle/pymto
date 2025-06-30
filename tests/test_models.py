@@ -121,6 +121,8 @@ class TestObjectData:
         obj = ObjectData(
             medium="Test Medium",
             object_type=ObjectType.UNKNOWN,
+            family="Test Family",
+            family_type="Test Type",
             dimensions=dims,
             layer="CIRCLE_LAYER",
             positions=(position,),
@@ -148,6 +150,8 @@ class TestObjectData:
         obj = ObjectData(
             medium="Test Medium",
             object_type=ObjectType.UNKNOWN,
+            family="Test Family",
+            family_type="Test Type",
             dimensions=dims,
             layer="RECT_LAYER",
             points=points,
@@ -157,7 +161,7 @@ class TestObjectData:
         assert obj.dimensions == dims
         assert obj.layer == "RECT_LAYER"
         assert obj.points == points
-        assert obj.positions == []  # Default empty list
+        assert obj.positions == ()  # Default empty tuple
         assert obj.color == (0, 0, 255)
 
     def test_object_data_with_assigned_text(self):
@@ -175,6 +179,8 @@ class TestObjectData:
         obj = ObjectData(
             medium="Test Medium",
             object_type=ObjectType.UNKNOWN,
+            family="Test Family",
+            family_type="Test Type",
             dimensions=dims,
             layer="SHAFT_LAYER",
             assigned_text=assigned_text,
@@ -218,11 +224,11 @@ class TestLayerData:
         assert layer.name == "PIPES"
         assert layer.color == (0, 255, 0)
 
-    def test_layer_data_post_init_none_color(self):
-        """Test LayerData post-init with None color."""
+    def test_layer_data_none_color(self):
+        """Test LayerData with None color."""
         layer = LayerData(name="DEFAULT", color=None)
         assert layer.name == "DEFAULT"
-        assert layer.color == (0, 0, 0)  # Should be set to black
+        assert layer.color is None  # Color remains None
 
     def test_layer_data_string_color(self):
         """Test LayerData with string color."""
@@ -235,7 +241,7 @@ class TestAssignmentConfig:
     """Test AssignmentConfig class."""
 
     def test_assignment_config_creation(self):
-        """Test AssignmentConfig creation."""
+        """Test MediumConfig creation."""
         geometry_layers = [
             LayerData(name="PIPES", color=(0, 255, 0)),
             LayerData(name="SHAFTS", color=(255, 0, 0)),
@@ -248,6 +254,9 @@ class TestAssignmentConfig:
             medium="Test Medium",
             geometry=geometry_layers,
             text=text_layers,
+            family="Test Family",
+            family_type="Test Type",
+            elevation_offset=0.0,
             default_unit="mm",
             object_type=ObjectType.UNKNOWN,
         )
@@ -261,7 +270,7 @@ class TestAssingmentData:
     def test_assignment_data_creation(self):
         """Test AssingmentData creation."""
         assignment = AssingmentData()
-        assert assignment.data == []
+        assert assignment.assigned == []
 
     def test_add_element(self):
         """Test adding element to assignment data."""
@@ -270,40 +279,50 @@ class TestAssingmentData:
         element = ObjectData(
             medium="Test Medium",
             object_type=ObjectType.UNKNOWN,
+            family="Test Family",
+            family_type="Test Family Type",
             dimensions=dims,
             layer="TEST",
             positions=(position,),
         )
-        assignment = AssingmentData()
-        assignment.setup(medium="Test Medium", elements=[[element]], texts=[[]])
 
-        assert len(assignment.data) == 1
-        assert len(assignment.data[0]) == 2
-        elem_data, text_data = assignment.data[0]
-        assert len(elem_data) == 1
-        assert len(text_data) == 0
-        assert elem_data[0] == element
-
-    def test_add_text(self):
-        """Test adding text to assignment data."""
-        position = Point3D(east=0.0, north=0.0, altitude=0.0)
-        text = DxfText(
+        config = MediumConfig(
             medium="Test Medium",
-            content="Test",
-            position=position,
-            layer="TEXT",
-            color=(0, 0, 0),
+            geometry=[LayerData(name="TEST", color=(255, 0, 0))],
+            text=[LayerData(name="TEXT", color=(0, 0, 0))],
+            family="Test Family",
+            family_type="Test Family Type",
+            elevation_offset=0.0,
+            default_unit="mm",
+            object_type=ObjectType.UNKNOWN,
         )
 
         assignment = AssingmentData()
-        assignment.setup(medium="Test Medium", elements=[[]], texts=[[text]])
+        assignment.add_assignment(config, [element])
 
-        assert len(assignment.data) == 1
-        assert len(assignment.data[0]) == 2
-        elem_data, text_data = assignment.data[0]
-        assert len(elem_data) == 0
-        assert len(text_data) == 1
-        assert text_data[0] == text
+        assert len(assignment.assigned) == 1
+        assert assignment.assigned[0][0] == [element]
+        assert assignment.assigned[0][1] == config
+
+    def test_add_text(self):
+        """Test adding text to assignment data."""
+        config = MediumConfig(
+            medium="Test Medium",
+            geometry=[LayerData(name="GEOM", color=(255, 0, 0))],
+            text=[LayerData(name="TEXT", color=(0, 0, 0))],
+            family="Test Family",
+            family_type="Test Type",
+            elevation_offset=0.0,
+            default_unit="mm",
+            object_type=ObjectType.UNKNOWN,
+        )
+
+        assignment = AssingmentData()
+        assignment.add_assignment(config, [])
+
+        assert len(assignment.assigned) == 1
+        assert assignment.assigned[0][0] == []  # Empty elements list
+        assert assignment.assigned[0][1] == config
 
 
 class TestMedium:
@@ -320,6 +339,9 @@ class TestMedium:
             text=text_layers,
             default_unit="mm",
             object_type=ObjectType.UNKNOWN,
+            elevation_offset=0.0,
+            family="Test Family",
+            family_type="Test Family Type",
         )
         lines_config = MediumConfig(
             medium="Test Medium",
@@ -327,6 +349,9 @@ class TestMedium:
             text=text_layers,
             default_unit="mm",
             object_type=ObjectType.UNKNOWN,
+            elevation_offset=0.0,
+            family="Test Family",
+            family_type="Test Family Type",
         )
         master = MediumMasterConfig(
             medium="Abwasserleitung",
@@ -341,5 +366,5 @@ class TestMedium:
         assert medium.config.point_based[0] == elements_config
         assert len(medium.config.line_based) == 1
         assert medium.config.line_based[0] == lines_config
-        assert isinstance(medium.element_data, AssingmentData)
+        assert isinstance(medium.point_data, AssingmentData)
         assert isinstance(medium.line_data, AssingmentData)

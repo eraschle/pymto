@@ -77,7 +77,9 @@ def create_test_dxf():
 
     # 10. Create block with rectangle and diagonal cross
     rect_cross_block = doc.blocks.new(name="RECT_CROSS_SHAFT")
-    rect_cross_block.add_lwpolyline([(-2.5, -2), (2.5, -2), (2.5, 2), (-2.5, 2), (-2.5, -2)], close=True)
+    rect_cross_block.add_lwpolyline(
+        [(-2.5, -2), (2.5, -2), (2.5, 2), (-2.5, 2), (-2.5, -2)], close=True
+    )
     rect_cross_block.add_line((-2.5, -2), (2.5, 2))  # Diagonal 1
     rect_cross_block.add_line((-2.5, 2), (2.5, -2))  # Diagonal 2
     msp.add_blockref("RECT_CROSS_SHAFT", (45, 25))
@@ -98,7 +100,8 @@ def create_test_dxf():
     msp.add_text("HEX_1", dxfattribs={"layer": "TEXT", "insert": (60, 5)})
 
     # Save DXF file
-    output_path = Path("/home/elyo/workspace/work/dxfto/test_entities.dxf")
+    parent_dir = Path(__file__).parent
+    output_path = parent_dir / "test_entities.dxf"
     doc.saveas(output_path)
     log.info(f"Test DXF file created: {output_path}")
 
