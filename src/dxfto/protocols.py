@@ -97,6 +97,23 @@ class IDimensionUpdater(Protocol):
         ...
 
 
+class IRevitFamilyNameUpdater(Protocol):
+    """Protocol for update family and family type names of medium on their elements."""
+
+    def update_elements(self, assigment: AssingmentData) -> None:
+        """Update family and family type names of all elements in the assignment data container.
+
+        This method should iterate through all elements in the assignment and
+        replace placeholder names with actual values of the element's.
+
+        Parameters
+        ----------
+        assignment : AssingmentData
+            Assignment data containing elements and their assigned texts
+        """
+        ...
+
+
 class IExporter(Protocol):
     """Protocol for exporting media data to a specified format."""
 

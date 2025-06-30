@@ -5,7 +5,7 @@
                 "Unit": "mm",
                 "Category": "water",
                 "Family": "Wasser - Leitung",
-                "FamilyType": "Wasser Gemeinde",
+                "FamilyType": "Wasser Gemeinde {dimension}",
                 "Geometrie": [
                     {
                         "Name": "wkn_leitung"
@@ -23,7 +23,7 @@
                 "Unit": "cm",
                 "Category": "water_special",
                 "Family": "Wasser - Schacht",
-                "FamilyType": "Wasser Gemeinde",
+                "FamilyType": "Wasser Gemeinde {dimension}",
                 "Geometrie": [
                     {
                         "Name": "wkn_bauwerk"
@@ -39,7 +39,7 @@
                 "Unit": "cm",
                 "Category": "water_special",
                 "Family": "Wasser - Schacht",
-                "FamilyType": "Wasser Gemeinde",
+                "FamilyType": "Spezialbauwerk Gemeinde {dimension}",
                 "Geometrie": [
                     {
                         "Name": "Spezialbauwerk",
@@ -89,7 +89,7 @@
                 "Unit": "mm",
                 "Category": "water",
                 "Family": "Wasser - Leitung",
-                "FamilyType": "Wasser Privat",
+                "FamilyType": "Privat {dimension}",
                 "Geometrie": [
                     {
                         "Name": "wkn_privat_leitung"
@@ -137,7 +137,7 @@
                 "Unit": "mm",
                 "Category": "waste_water",
                 "Family": "Abwasser - Leitung",
-                "FamilyType": "Schmutzabwasser Gemeinde",
+                "FamilyType": "Schmutzabwasser Gemeinde {dimension}",
                 "Geometrie": [
                     {
                         "Name": "was_leitung"
@@ -155,7 +155,7 @@
                 "Unit": "cm",
                 "Category": "Shaft",
                 "Family": "Abwasser - Schacht",
-                "FamilyType": "Schmutzabwasser Gemeinde",
+                "FamilyType": "Schmutzabwasser Gemeinde {dimension}",
                 "Geometrie": [
                     {
                         "Name": "was_bauwerk"
@@ -175,7 +175,7 @@
                 "Unit": "mm",
                 "Category": "waste_water",
                 "Family": "Abwasser - Leitung",
-                "FamilyType": "Schmutzabwasser Privat",
+                "FamilyType": "Schmutzabwasser Privat {dimension}",
                 "Geometrie": [
                     {
                         "Name": "was_privat_leitung"
@@ -193,7 +193,7 @@
                 "Unit": "cm",
                 "Category": "Shaft",
                 "Family": "Abwasser - Schacht",
-                "FamilyType": "Schmutzabwasser Privat",
+                "FamilyType": "Schmutzabwasser Privat {dimension}",
                 "Geometrie": [
                     {
                         "Name": "Normschacht--T-",
@@ -226,7 +226,7 @@
                 "Unit": "mm",
                 "Category": "waste_water",
                 "Family": "Abwasser - Leitung",
-                "FamilyType": "Regenabwasser Gemeinde",
+                "FamilyType": "Regenabwasser Gemeinde {dimension}",
                 "Geometrie": [
                     {
                         "Name": "war_leitung"
@@ -244,7 +244,7 @@
                 "Unit": "cm",
                 "Category": "Shaft",
                 "Family": "Abwasser - Schacht",
-                "FamilyType": "Regenabwasser Gemeinde",
+                "FamilyType": "Regenabwasser Gemeinde {dimension}",
                 "Geometrie": [
                     {
                         "Name": "Normschacht--T-",
@@ -269,7 +269,7 @@
                 "Unit": "mm",
                 "Category": "waste_water",
                 "Family": "Abwasser - Leitung",
-                "FamilyType": "Regenabwasser Privat",
+                "FamilyType": "Regenabwasser Privat {dimension}",
                 "Geometrie": [
                     {
                         "Name": "war_privat_leitung"
@@ -287,7 +287,7 @@
                 "Unit": "cm",
                 "Category": "Shaft",
                 "Family": "Abwasser - Schacht",
-                "FamilyType": "Regenabwasser Privat",
+                "FamilyType": "Regenabwasser Privat {dimension}",
                 "Geometrie": [
                     {
                         "Name": "Normschacht--T-",
@@ -312,7 +312,7 @@
                 "Unit": "mm",
                 "Category": "waste_water",
                 "Family": "Abwasser - Leitung",
-                "FamilyType": "Mischabwasser Gemeinde",
+                "FamilyType": "Mischabwasser Gemeinde {dimension}",
                 "Geometrie": [
                     {
                         "Name": "was-r_leitung"
@@ -330,7 +330,7 @@
                 "Unit": "cm",
                 "Category": "Shaft",
                 "Family": "Abwasser - Schacht",
-                "FamilyType": "Mischabwasser Gemeinde",
+                "FamilyType": "Mischabwasser Gemeinde {dimension}",
                 "Geometrie": [
                     {
                         "Name": "Normschacht--T-",
@@ -355,7 +355,7 @@
                 "Unit": "mm",
                 "Category": "waste_water",
                 "Family": "Abwasser - Leitung",
-                "FamilyType": "Mischabwasser Privat",
+                "FamilyType": "Mischabwasser Privat {dimension}",
                 "Geometrie": [
                     {
                         "Name": "was-r_privat_leitung"
@@ -373,7 +373,7 @@
                 "Unit": "cm",
                 "Category": "Shaft",
                 "Family": "Abwasser - Schacht",
-                "FamilyType": "Mischabwasser Privat",
+                "FamilyType": "Mischabwasser Privat {dimension}",
                 "Geometrie": [
                     {
                         "Name": "Normschacht--T-",
@@ -398,7 +398,7 @@
                 "Unit": "mm",
                 "Category": "water",
                 "Family": "Abwasser - Leitung",
-                "FamilyType": "Bewässerung",
+                "FamilyType": "Bewässerung {dimension}",
                 "Geometrie": [
                     {
                         "Name": "bew_leitung"
@@ -416,7 +416,7 @@
                 "Unit": "cm",
                 "Category": "Shaft",
                 "Family": "Abwasser - Schacht",
-                "FamilyType": "Bewässerung",
+                "FamilyType": "Bewässerung {dimension}",
                 "Geometrie": [
                     {
                         "Name": "bew_bauwerk",

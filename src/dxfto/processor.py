@@ -16,6 +16,7 @@ from .protocols import (
     IElevationUpdater,
     IExporter,
     IObjectCreator,
+    IRevitFamilyNameUpdater,
 )
 
 log = logging.getLogger(__name__)
@@ -110,6 +111,16 @@ class DXFProcessor:
         ----------
         updater : IElevationUpdater
             Elevation updater to apply to points in mediums
+        """
+        for medium in self.mediums:
+            updater.update_elements(medium.point_data)
+            updater.update_elements(medium.line_data)
+
+    def update_family_and_types(self, updater: IRevitFamilyNameUpdater) -> None:
+        """Update family and family types for all mediums.
+
+        This method iterates through all mediums and updates their
+        family and family types using the configured updater.
         """
         for medium in self.mediums:
             updater.update_elements(medium.point_data)

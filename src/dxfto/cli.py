@@ -15,6 +15,7 @@ from .process.assigners import SpatialTextAssigner
 from .process.creator import MediumObjectCreator
 from .process.dimension import DimensionUpdater
 from .process.dimension_mapper import DimensionMapper
+from .process.revit_updater import RevitFamilyNameUpdater
 from .processor import DXFProcessor
 
 
@@ -91,18 +92,21 @@ def process_dxf(
             click.echo("Updating points elevation from LandXML...")
             processor.update_points_elevation(landxml_reader)
 
+        revit_updater = RevitFamilyNameUpdater()
+        processor.update_family_and_types(revit_updater)
+
         exporter = JsonExporter(output)
         processor.export_data(exporter)
 
         click.echo(f"Processed {dxf_file}")
         click.echo(f"Output: {output}")
-        _orint_statistic(processor)
+        _print_statistic(processor)
 
     except Exception as e:
         raise click.ClickException(f"Processing failed: {e}") from e
 
 
-def _orint_statistic(processor: DXFProcessor):
+def _print_statistic(processor: DXFProcessor):
     click.echo("\n" + "=" * 85)
     click.echo("TEXT ASSIGNMENT STATISTICS")
     click.echo("=" * 85)
