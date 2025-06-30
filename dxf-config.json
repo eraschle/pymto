@@ -3,15 +3,17 @@
         "Leitung": [
             {
                 "Unit": "mm",
-                "Shape": "water",
+                "Category": "water",
+                "Family": "Wasser - Leitung",
+                "FamilyType": "Wasser Gemeinde",
                 "Geometrie": [
                     {
-                        "Name": "Leitung--Hauptleitungen-"
+                        "Name": "wkn_leitung"
                     }
                 ],
                 "Text": [
                     {
-                        "Name": "Material-Durchmesser-Hauptleitu"
+                        "Name": "wkn_leitung_text"
                     }
                 ]
             }
@@ -19,78 +21,26 @@
         "Element": [
             {
                 "Unit": "cm",
-                "Shape": "water_special",
+                "Category": "water_special",
+                "Family": "Wasser - Schacht",
+                "FamilyType": "Wasser Gemeinde",
                 "Geometrie": [
                     {
-                        "Name": "Sonderbauwerk--Fl-che-",
-                        "Farbe": [
-                            110,
-                            110,
-                            110
-                        ]
-                    },
-                    {
-                        "Name": "Spezialbauwerk",
-                        "Farbe": 250,
-                        "Block": "Spezialbauwerk"
+                        "Name": "wkn_bauwerk"
                     }
                 ],
-                "Text": []
+                "Text": [
+                    {
+                        "Name": "wkn_bauwerk_text"
+                    }
+                ]
             },
             {
                 "Unit": "cm",
-                "Shape": "gate_value",
+                "Category": "water_special",
+                "Family": "Wasser - Schacht",
+                "FamilyType": "Wasser Gemeinde",
                 "Geometrie": [
-                    {
-                        "Name": "Armatur",
-                        "Farbe": 160,
-                        "Block": "Armatur_2"
-                    }
-                ],
-                "Text": []
-            }
-        ]
-    },
-    "Wassert Privat": {
-        "Leitung": [
-            {
-                "Unit": "mm",
-                "Shape": "water",
-                "Geometrie": [
-                    {
-                        "Name": "Leitung--Nebenleitungen-",
-                        "Farbe": [
-                            0,
-                            72,
-                            255
-                        ]
-                    }
-                ],
-                "Text": [
-                    {
-                        "Name": "Material-Durchmesser-Nebenleitu",
-                        "Farbe": [
-                            0,
-                            72,
-                            255
-                        ]
-                    }
-                ]
-            }
-        ],
-        "Element": [
-            {
-                "Unit": "cm",
-                "Shape": "water_special",
-                "Geometrie": [
-                    {
-                        "Name": "Sonderbauwerk--Fl-che-",
-                        "Farbe": [
-                            110,
-                            110,
-                            110
-                        ]
-                    },
                     {
                         "Name": "Spezialbauwerk",
                         "Farbe": 250,
@@ -99,18 +49,15 @@
                 ],
                 "Text": [
                     {
-                        "Name": "Name-Spezialbauwerk--L-",
-                        "Farbe": [
-                            0,
-                            72,
-                            255
-                        ]
+                        "Name": "wkn_bauwerk_text"
                     }
                 ]
             },
             {
                 "Unit": "cm",
-                "Shape": "gate_value",
+                "Category": "gate_value",
+                "Family": "Wasser - Schacht",
+                "FamilyType": "Wasser Schieber Gemeinde",
                 "Geometrie": [
                     {
                         "Name": "Armatur",
@@ -119,32 +66,38 @@
                     }
                 ],
                 "Text": []
+            },
+            {
+                "Unit": "cm",
+                "Category": "hydrant",
+                "Family": "Wasser - Schacht",
+                "FamilyType": "Wasser Hydrant Gemeinde",
+                "Geometrie": [
+                    {
+                        "Name": "Hydrant",
+                        "Farbe": 160,
+                        "Block": "Hydrant_1"
+                    }
+                ],
+                "Text": []
             }
         ]
     },
-    "Abwasser_Orange": {
+    "Wasser Privat": {
         "Leitung": [
             {
                 "Unit": "mm",
-                "Shape": "waste_water",
+                "Category": "water",
+                "Family": "Wasser - Leitung",
+                "FamilyType": "Wasser Privat",
                 "Geometrie": [
                     {
-                        "Name": "Leitung--Nebenleitungen-",
-                        "Farbe": [
-                            0,
-                            72,
-                            255
-                        ]
+                        "Name": "wkn_privat_leitung"
                     }
                 ],
                 "Text": [
                     {
-                        "Name": "Haltung--L-",
-                        "Farbe": [
-                            0,
-                            0,
-                            255
-                        ]
+                        "Name": "wkn_privat_leitung_text"
                     }
                 ]
             }
@@ -152,39 +105,47 @@
         "Element": [
             {
                 "Unit": "cm",
-                "Shape": "Shaft",
-                "Geometrie": [
-                    {}
-                ],
-                "Text": [
-                    {}
-                ]
-            }
-        ]
-    },
-    "Abwasser_Orange": {
-        "Leitung": [
-            {
-                "Unit": "mm",
-                "Shape": "waste_water",
+                "Category": "water_special",
+                "Family": "Wasser - Schacht",
+                "FamilyType": "Wasser Privat",
                 "Geometrie": [
                     {
-                        "Name": "Haltung--T-",
-                        "Farbe": [
-                            255,
-                            130,
-                            130
-                        ]
+                        "Name": "wkn_privat_bauwerk"
+                    },
+                    {
+                        "Name": "Spezialbauwerk",
+                        "Farbe": 250,
+                        "Block": "Spezialbauwerk"
+                    },
+                    {
+                        "Name": "Armatur",
+                        "Farbe": 160,
+                        "Block": "Armatur_2"
                     }
                 ],
                 "Text": [
                     {
-                        "Name": "Haltung--L-",
-                        "Farbe": [
-                            255,
-                            0,
-                            0
-                        ]
+                        "Name": "wkn_privat_bauwerk_text"
+                    }
+                ]
+            }
+        ]
+    },
+    "Schmutzabwasser Gemeinde": {
+        "Leitung": [
+            {
+                "Unit": "mm",
+                "Category": "waste_water",
+                "Family": "Abwasser - Leitung",
+                "FamilyType": "Schmutzabwasser Gemeinde",
+                "Geometrie": [
+                    {
+                        "Name": "was_leitung"
+                    }
+                ],
+                "Text": [
+                    {
+                        "Name": "was_leitung_text"
                     }
                 ]
             }
@@ -192,12 +153,55 @@
         "Element": [
             {
                 "Unit": "cm",
-                "Shape": "Shaft",
+                "Category": "Shaft",
+                "Family": "Abwasser - Schacht",
+                "FamilyType": "Schmutzabwasser Gemeinde",
+                "Geometrie": [
+                    {
+                        "Name": "was_bauwerk"
+                    }
+                ],
+                "Text": [
+                    {
+                        "Name": "was_bauwerk_text"
+                    }
+                ]
+            }
+        ]
+    },
+    "Schmutzabwasser Privat": {
+        "Leitung": [
+            {
+                "Unit": "mm",
+                "Category": "waste_water",
+                "Family": "Abwasser - Leitung",
+                "FamilyType": "Schmutzabwasser Privat",
+                "Geometrie": [
+                    {
+                        "Name": "was_privat_leitung"
+                    }
+                ],
+                "Text": [
+                    {
+                        "Name": "was_privat_leitung_text"
+                    }
+                ]
+            }
+        ],
+        "Element": [
+            {
+                "Unit": "cm",
+                "Category": "Shaft",
+                "Family": "Abwasser - Schacht",
+                "FamilyType": "Schmutzabwasser Privat",
                 "Geometrie": [
                     {
                         "Name": "Normschacht--T-",
                         "Farbe": 13,
                         "Block": "Normschacht--T-125_7_0"
+                    },
+                    {
+                        "Name": "was_privat_bauwerk"
                     }
                 ],
                 "Text": [
@@ -208,34 +212,29 @@
                             0,
                             255
                         ]
+                    },
+                    {
+                        "Name": "was_privat_bauwerk_text"
                     }
                 ]
             }
         ]
     },
-    "Abwasser_Violett": {
+    "Regenabwasser Gemeinde": {
         "Leitung": [
             {
                 "Unit": "mm",
-                "Shape": "waste_water",
+                "Category": "waste_water",
+                "Family": "Abwasser - Leitung",
+                "FamilyType": "Regenabwasser Gemeinde",
                 "Geometrie": [
                     {
-                        "Name": "Haltung--T-",
-                        "Farbe": [
-                            130,
-                            130,
-                            255
-                        ]
+                        "Name": "war_leitung"
                     }
                 ],
                 "Text": [
                     {
-                        "Name": "Haltung--L-",
-                        "Farbe": [
-                            0,
-                            0,
-                            230
-                        ]
+                        "Name": "war_leitung_text"
                     }
                 ]
             }
@@ -243,58 +242,42 @@
         "Element": [
             {
                 "Unit": "cm",
-                "Shape": "Shaft",
+                "Category": "Shaft",
+                "Family": "Abwasser - Schacht",
+                "FamilyType": "Regenabwasser Gemeinde",
                 "Geometrie": [
                     {
                         "Name": "Normschacht--T-",
                         "Farbe": 173,
                         "Block": "Normschacht--T-142_5_0"
+                    },
+                    {
+                        "Name": "war_bauwerk"
                     }
                 ],
                 "Text": [
                     {
-                        "Name": "Normschacht-Nummer--L-",
-                        "Farbe": [
-                            0,
-                            0,
-                            255
-                        ]
+                        "Name": "war_bauwerk_text"
                     }
                 ]
             }
         ]
     },
-    "Abwasser_Magenta": {
+    "Regenabwasser Privat": {
         "Leitung": [
             {
                 "Unit": "mm",
-                "Shape": "waste_water",
+                "Category": "waste_water",
+                "Family": "Abwasser - Leitung",
+                "FamilyType": "Regenabwasser Privat",
                 "Geometrie": [
                     {
-                        "Name": "Haltung--T-",
-                        "Farbe": [
-                            169,
-                            0,
-                            230
-                        ]
-                    },
-                    {
-                        "Name": "Haltung--T-",
-                        "Farbe": [
-                            169,
-                            130,
-                            230
-                        ]
+                        "Name": "war_privat_leitung"
                     }
                 ],
                 "Text": [
                     {
-                        "Name": "Haltung--L-",
-                        "Farbe": [
-                            169,
-                            0,
-                            230
-                        ]
+                        "Name": "war_privat_leitung_text"
                     }
                 ]
             }
@@ -302,22 +285,108 @@
         "Element": [
             {
                 "Unit": "cm",
-                "Shape": "Shaft",
+                "Category": "Shaft",
+                "Family": "Abwasser - Schacht",
+                "FamilyType": "Regenabwasser Privat",
                 "Geometrie": [
                     {
                         "Name": "Normschacht--T-",
                         "Farbe": 203,
                         "Block": "Normschacht--T-125_4_0"
+                    },
+                    {
+                        "Name": "war_privat_bauwerk"
                     }
                 ],
                 "Text": [
                     {
-                        "Name": "Normschacht-Nummer--L-",
-                        "Farbe": [
-                            169,
-                            0,
-                            230
-                        ]
+                        "Name": "war_privat_leitung_text"
+                    }
+                ]
+            }
+        ]
+    },
+    "Mischabwasser Gemeinde": {
+        "Leitung": [
+            {
+                "Unit": "mm",
+                "Category": "waste_water",
+                "Family": "Abwasser - Leitung",
+                "FamilyType": "Mischabwasser Gemeinde",
+                "Geometrie": [
+                    {
+                        "Name": "was-r_leitung"
+                    }
+                ],
+                "Text": [
+                    {
+                        "Name": "was-r_leitung_text"
+                    }
+                ]
+            }
+        ],
+        "Element": [
+            {
+                "Unit": "cm",
+                "Category": "Shaft",
+                "Family": "Abwasser - Schacht",
+                "FamilyType": "Mischabwasser Gemeinde",
+                "Geometrie": [
+                    {
+                        "Name": "Normschacht--T-",
+                        "Farbe": 173,
+                        "Block": "Normschacht--T-142_5_0"
+                    },
+                    {
+                        "Name": "was-r_bauwerk"
+                    }
+                ],
+                "Text": [
+                    {
+                        "Name": "was-r_bauwerk_text"
+                    }
+                ]
+            }
+        ]
+    },
+    "Mischabwasser Privat": {
+        "Leitung": [
+            {
+                "Unit": "mm",
+                "Category": "waste_water",
+                "Family": "Abwasser - Leitung",
+                "FamilyType": "Mischabwasser Privat",
+                "Geometrie": [
+                    {
+                        "Name": "was-r_privat_leitung"
+                    }
+                ],
+                "Text": [
+                    {
+                        "Name": "was-r_privat_leitung_text"
+                    }
+                ]
+            }
+        ],
+        "Element": [
+            {
+                "Unit": "cm",
+                "Category": "Shaft",
+                "Family": "Abwasser - Schacht",
+                "FamilyType": "Mischabwasser Privat",
+                "Geometrie": [
+                    {
+                        "Name": "Normschacht--T-",
+                        "Farbe": 203,
+                        "Block": "Normschacht--T-125_4_0"
+                    },
+                    {
+                        "Name": "was-r_privat_bauwerk"
+                    }
+                ],
+                "Text": [
+                    {
+                        "Name": "was-r_privat_leitung_text"
                     }
                 ]
             }
@@ -327,7 +396,9 @@
         "Leitung": [
             {
                 "Unit": "mm",
-                "Shape": "water",
+                "Category": "water",
+                "Family": "Abwasser - Leitung",
+                "FamilyType": "Bewässerung",
                 "Geometrie": [
                     {
                         "Name": "bew_leitung"
@@ -343,7 +414,9 @@
         "Element": [
             {
                 "Unit": "cm",
-                "Shape": "Shaft",
+                "Category": "Shaft",
+                "Family": "Abwasser - Schacht",
+                "FamilyType": "Bewässerung",
                 "Geometrie": [
                     {
                         "Name": "bew_bauwerk",

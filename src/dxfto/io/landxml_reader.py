@@ -5,14 +5,14 @@ extract elevation data that will be used to set Z coordinates for
 DXF points based on spatial interpolation.
 """
 
-from typing import Iterable
 import xml.etree.ElementTree as ET
+from collections.abc import Iterable
 from pathlib import Path
 
 import numpy as np
 from scipy.spatial import KDTree
 
-from ..models import Point3D
+from ..models import AssingmentData, MediumConfig, Point3D
 
 
 class LandXMLReader:
@@ -84,7 +84,7 @@ class LandXMLReader:
             Interpolated Z coordinate (elevation)
         """
         if not self.elevation_points or self._kdtree is None:
-            return 0.0
+            raise RuntimeError("Elevation points not loaded or KDTree not initialized")
 
         # Find nearest elevation points
         query_point = np.array([x, y])
@@ -99,13 +99,23 @@ class LandXMLReader:
         total_weight = np.sum(weights)
 
         interpolated_z = (
-            sum(weights[i] * self.elevation_points[int(idx)].altitude for i, idx in enumerate(indices))
-            / total_weight
+            sum(weights[i] * self.elevation_points[int(idx)].altitude for i, idx in enumerate(indices)) / total_weight
         )
 
         return float(interpolated_z)
 
-    def update_elevation(self, points: Iterable[Point3D]) -> list[Point3D]:
+    def update_elements(self, assigment: AssingmentData) -> None:
+        # Texts are assigned to elemtents and onbly the elements data are exported, which
+        # means that texts are not updated here.
+        for elements, _ in assigment.assigned:
+            for element in elements:
+                if element.points:
+                    element.points = self._update_elevation(element.points)
+                if element.positions:
+                    positions = self._update_elevation(element.positions)
+                    element.positions = tuple(positions)
+
+    def _update_elevation(self, points: Iterable[Point3D]) -> list[Point3D]:
         """Update Z coordinates for a list of points using elevation data.
 
         Parameters

@@ -141,7 +141,9 @@ class DXFReader:
                     if aci_color.name != layer_color:
                         continue
                     return True
-            log.warning(f"No able to find color for {entity} in layer {layer.name} with color {layer.color}")
+            log.warning(
+                f"No able to find color for {entity} in layer {layer.name} with color {layer.color}"
+            )
             return False
 
         query = f'*[layer=="{layer.name}"]'
@@ -149,14 +151,20 @@ class DXFReader:
         return self._doc.modelspace().query(query).filter(color_filter)
 
     @property
-    def document(self) -> Drawing | None:
+    def document(self) -> Drawing:
         """Get the loaded DXF document.
 
         Returns
         -------
         Drawing | None
             Loaded DXF document or None if not loaded
+        Raises
+        ------
+        RuntimeError
+            If DXF file is not loaded
         """
+        if self._doc is None:
+            raise RuntimeError("DXF file not loaded. Call load_file() first.")
         return self._doc
 
     def is_loaded(self) -> bool:

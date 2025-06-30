@@ -31,7 +31,7 @@ class ConfigurationHandler:
         self.config_path = config_path
         self.mediums: dict[str, Medium] = {}
 
-    def _create_layers(self, layer_data: list[dict]) -> list[LayerData]:
+    def _create_layer_data(self, layer_data: list[dict]) -> list[LayerData]:
         layers = []
         for layer_info in layer_data:
             layers.append(
@@ -80,13 +80,16 @@ class ConfigurationHandler:
         log.warning(f"Unknown shape type: {shape}, defaulting to UNKNOWN")
         return ObjectType.UNKNOWN
 
-    def _create_medium_config(self, medium_name: str, medium_config: dict) -> MediumConfig:
+    def _create_medium_config(self, medium_name: str, config: dict) -> MediumConfig:
         return MediumConfig(
             medium=medium_name,
-            object_type=self._create_default_shape(medium_config.get("Shape", "NONE")),
-            default_unit=self._create_default_unit(medium_config.get("Unit", "mm")),
-            geometry=self._create_layers(medium_config.get("Geometrie", [])),
-            text=self._create_layers(medium_config.get("Text", [])),
+            geometry=self._create_layer_data(config.get("Geometrie", [])),
+            text=self._create_layer_data(config.get("Text", [])),
+            family=config.get("Family", "NO FAMILY"),
+            family_type=config.get("FamilyType", "NO FAMILY TYPE"),
+            object_type=self._create_default_shape(config.get("Category", "NONE")),
+            default_unit=self._create_default_unit(config.get("Unit", "mm")),
+            elevation_offset=config.get("ElevationOffset", 0.0),
         )
 
     def _create_medium_configs(self, medium: str, configs: list[dict]) -> list[MediumConfig]:

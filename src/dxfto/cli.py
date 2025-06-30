@@ -9,13 +9,13 @@ from pathlib import Path
 
 import click
 
-from dxfto.config import ConfigurationHandler
-
+from .config import ConfigurationHandler
 from .io import DXFReader, JsonExporter, LandXMLReader
-from .process.assigners import SpatialTextAssigner, ZoneBasedTextAssigner
+from .process.assigners import SpatialTextAssigner
+from .process.creator import MediumObjectCreator
 from .process.dimension import DimensionUpdater
-from .process.dimension_mapper import InfrastructureDimensionMapper
-from .process.processor import DXFProcessor
+from .process.dimension_mapper import DimensionMapper
+from .processor import DXFProcessor
 
 
 @click.command()
@@ -27,11 +27,9 @@ from .process.processor import DXFProcessor
     "config",
     type=click.Path(exists=True, path_type=Path),
 )
-@click.option(
-    "--landxml",
-    "-l",
+@click.argument(
+    "landxml",
     type=click.Path(exists=True, path_type=Path),
-    help="LandXML file for elevation data (DGM)",
 )
 @click.option(
     "--output",
@@ -40,31 +38,17 @@ from .process.processor import DXFProcessor
     help="Output JSON file path",
 )
 @click.option(
-    "--text-assignment",
-    type=click.Choice(["spatial", "zone"], case_sensitive=False),
-    default="spatial",
-    help="Text assignment strategy: spatial or zone",
-)
-@click.option(
     "--max-text-distance",
     type=float,
     default=1.0,
     help="Maximum distance for text-to-pipe assignment",
 )
-@click.option(
-    "--verbose",
-    "-v",
-    is_flag=True,
-    help="Verbose output",
-)
 def process_dxf(
     dxf_file: Path,
     config: Path,
-    landxml: Path | None,
+    landxml: Path,
     output: Path | None,
-    text_assignment: str,
     max_text_distance: float,
-    verbose: bool,
 ) -> None:
     """Process DXF file and export pipe/shaft data for Revit modeling.
 
@@ -76,8 +60,6 @@ def process_dxf(
         DXF_FILE: Path to the DXF file to process
         CONFIG: JSON configuration with assignment rules
     """
-    if verbose:
-        click.echo(f"Processing DXF file: {dxf_file}")
 
     # Set default output path if not provided
     if output is None:
@@ -88,93 +70,67 @@ def process_dxf(
         handler = ConfigurationHandler(config)
         handler.load_config()
 
-        # Load and process DXF file
-        if verbose:
-            click.echo("Loading DXF file...")
-
-        reader = DXFReader(dxf_file)
-        reader.load_file()
-
         processor = DXFProcessor(handler)
-        processor.extract_mediums(reader)
-        # Group elements by medium (already handled by config loading)
-        if verbose:
-            click.echo("Using configuration-based grouping...")
+        extrator = MediumObjectCreator(dxf_path=dxf_file)
+        processor.extract_mediums(extractor=extrator)
 
-        if text_assignment.lower() == "zone":
-            text_assigner = ZoneBasedTextAssigner(max_distance=max_text_distance)
-        else:
-            text_assigner = SpatialTextAssigner(max_distance=max_text_distance)
-
+        text_assigner = SpatialTextAssigner(max_distance=max_text_distance)
         click.echo("Assigning texts to elements...")
         processor.assign_texts_to_mediums(text_assigner)
 
         click.echo("Updating dimensions based on assigned texts...")
-        dim_mapper = InfrastructureDimensionMapper()
+        dim_mapper = DimensionMapper()
         dimension_updater = DimensionUpdater(target_unit="m", dimension_mapper=dim_mapper)
         processor.update_dimensions(dimension_updater)
 
         # Process LandXML if provided
         if landxml:
             landxml_reader = LandXMLReader(landxml)
-
-            if verbose:
-                click.echo(f"Loading LandXML file: {landxml}")
             landxml_reader.load_file()
 
             click.echo("Updating points elevation from LandXML...")
             processor.update_points_elevation(landxml_reader)
 
-        # Assign texts to elements
-        if verbose:
-            click.echo(f"Assigning texts using {text_assignment} strategy...")
-
-        # Statistik-Tabelle für Text-Zuweisungen
-        if verbose:
-            click.echo("\n" + "=" * 85)
-            click.echo("TEXT ASSIGNMENT STATISTICS")
-            click.echo("=" * 85)
-            click.echo(
-                f"{'Medium':<25} {'Total Elem.':>12} {'Total Text':>12} {'Elem. w/ Text':>15} {'% Assigned':>12}"
-            )
-            click.echo("-" * 85)
-
-            # Statistiken für jedes Medium ausgeben
-            for medium in processor.mediums:
-                # Kombiniere Statistiken von element_data und line_data
-                elem_stats = medium.element_data.get_statistics()
-                line_stats = medium.line_data.get_statistics()
-
-                total_elems = elem_stats["elements"] + line_stats["elements"]
-                total_texts = elem_stats["texts"] + line_stats["texts"]
-                assigned_elems = elem_stats["assigned"] + line_stats["assigned"]
-                assigned_perc = (assigned_elems / total_texts * 100) if total_elems > 0 else 0
-
-                click.echo(
-                    f"{medium.name:<25} "
-                    f"{total_elems:>12} "
-                    f"{total_texts:>12} "
-                    f"{assigned_elems:>15} "
-                    f"{assigned_perc:>11.1f}%"
-                )
-
-            click.echo("-" * 85)
-
-        click.echo(f"Exporting to JSON: {output}")
         exporter = JsonExporter(output)
         processor.export_data(exporter)
 
-        if verbose:
-            click.echo("Processing completed successfully!")
-
-        # Summary output
         click.echo(f"Processed {dxf_file}")
         click.echo(f"Output: {output}")
-        click.echo(f"Lines: {sum(len(m.line_data.assigned) for m in processor.mediums)}")
-        click.echo(f"Elements: {sum(len(m.element_data.assigned) for m in processor.mediums)}")
+        _orint_statistic(processor)
 
     except Exception as e:
         raise click.ClickException(f"Processing failed: {e}") from e
+
+
+def _orint_statistic(processor: DXFProcessor):
+    click.echo("\n" + "=" * 85)
+    click.echo("TEXT ASSIGNMENT STATISTICS")
+    click.echo("=" * 85)
+    click.echo(
+        f"{'Medium':<25} {'Total Elem.':>12} {'Total Text':>12} {'Elem. w/ Text':>15} {'% Assigned':>12}"
+    )
+    click.echo("-" * 85)
+
+    for medium in processor.mediums:
+        elem_stats = medium.get_point_statistics()
+        line_stats = medium.get_line_statistics()
+
+        total_elems = elem_stats["elements"] + line_stats["elements"]
+        total_texts = elem_stats["texts"] + line_stats["texts"]
+        assigned_elems = elem_stats["assigned"] + line_stats["assigned"]
+        assigned_perc = (assigned_elems / total_texts * 100) if total_elems > 0 else 0
+
+        click.echo(
+            f"{medium.name:<25} "
+            f"{total_elems:>12} "
+            f"{total_texts:>12} "
+            f"{assigned_elems:>15} "
+            f"{assigned_perc:>11.1f}%"
+        )
+    click.echo("-" * 85)
+
+    click.echo(f"Total Objects: {sum([medium.get_point_total() for medium in processor.mediums])}")
+    click.echo(f"Total Lines: {sum([medium.get_line_total() for medium in processor.mediums])}")
 
 
 @click.group()
@@ -191,76 +147,81 @@ def main() -> None:
 
 @main.command()
 @click.argument("config_file", type=click.Path(path_type=Path))
-def create_config(config_file: Path) -> None:
+@click.option(
+    "--dxf-file",
+    "-d",
+    type=click.Path(exists=True, path_type=Path),
+    help="DXF file to create JSON config output from",
+)
+def create_config(config_file: Path, dxf_file: Path | None) -> None:
     """Create a sample configuration file for layer-based grouping.
 
-    CONFIG_FILE: Path where the configuration file will be created
+    Parameters
+    ----------
+    config_file
+        Path to the JSON configuration file
+    dxf
+        DXF file to create JSON config output from
+
     """
     sample_config = {
         "Abwasserleitung": {
-            "Leitung": {
-                "Geometrie": [
-                    {
-                        "Name": "PIPE_SEWER",
-                        "Farbe": "Braun",
-                    },
-                    {
-                        "Name": "SHAFT_SEWER_2",
-                        "Farbe": "Farbe 15",
-                    },
-                ],
-                "Text": [
-                    {
-                        "Name": "TEXT_PIPE_DIMENSION",
-                        "Farbe": [255, 100, 100],
-                    }
-                ],
-            },
-            "Element": {
-                "Geometrie": [
-                    {
-                        "Name": "SHAFT_SEWER",
-                        "Farbe": [200, 0, 0],
-                    },
-                    {
-                        "Name": "SHAFT_SEWER_2",
-                        "Farbe": "Farbe 15",
-                    },
-                ],
-                "Text": [
-                    {
-                        "Name": "TEXT_SEWER",
-                        "Farbe": [255, 100, 100],
-                    }
-                ],
-            },
-        },
-        "Wasserleitung": {
-            "Leitung": {
-                "Geometrie": [
-                    {
-                        "Layer": "PIPE_WATER",
-                        "Farbe": [0, 0, 255],
-                    }
-                ],
-                "Text": [
-                    {
-                        "Layer": "TEXT_WATER",
-                        "Farbe": [100, 100, 255],
-                    }
-                ],
-            },
-            "Element": {
-                "Geometrie": [
-                    {
-                        "Layer": "SHAFT_WATER",
-                        "Farbe": [0, 0, 200],
-                    }
-                ],
-                "Text": [],
-            },
+            "Leitung": [
+                {
+                    "Unit": "mm",
+                    "Category": "water",
+                    "Family": "FAMILY-NAME",
+                    "FamilyType": "FAMILY-TYPE-NAME",
+                    "Geometrie": [
+                        {
+                            "Name": "PIPE_SEWER",
+                            "Farbe": "Braun",
+                        },
+                        {
+                            "Name": "SHAFT_SEWER_2",
+                            "Farbe": "Farbe 15",
+                            "Block": "Block name",
+                        },
+                    ],
+                    "Text": [
+                        {
+                            "Name": "TEXT_PIPE_DIMENSION",
+                        }
+                    ],
+                }
+            ],
+            "Element": [
+                {
+                    "Unit": "mm",
+                    "Category": "water",
+                    "Family": "FAMILY-NAME",
+                    "FamilyType": "FAMILY-TYPE-NAME",
+                    "Geometrie": [
+                        {
+                            "Name": "SHAFT_SEWER",
+                            "Farbe": [200, 0, 0],
+                        },
+                        {
+                            "Name": "SHAFT_SEWER_2",
+                            "Farbe": "Farbe 15",
+                        },
+                    ],
+                    "Text": [
+                        {
+                            "Name": "TEXT_SEWER",
+                            "Farbe": [255, 100, 100],
+                        }
+                    ],
+                }
+            ],
         },
     }
+    if dxf_file:
+        reader = DXFReader(dxf_path=dxf_file)
+        object_layers = reader.get_layer_names()
+        text_layers = reader.get_layer_names()
+        block_names = reader.get_layer_names()
+        sample_config["Abwasserleitung"]["Element"].append({"Dxf": dxf_file})
 
     try:
         import json

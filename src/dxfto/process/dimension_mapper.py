@@ -189,7 +189,7 @@ INFRASTRUCTURE_STANDARDS = {
 }
 
 
-class InfrastructureDimensionMapper:
+class DimensionMapper:
     """
     Wie ein erfahrener Tiefbauingenieur, der sofort die richtige Norm-Dimension erkennt.
     Analogie: Ein Magnet-System mit verschiedenen 'Kraftfeldern' je nach Infrastruktur-Typ.
@@ -198,12 +198,13 @@ class InfrastructureDimensionMapper:
     def __init__(self, standards: dict[ObjectType, DimensionStandard] | None = None):
         self.standards = standards or INFRASTRUCTURE_STANDARDS
 
-    def snap_dimension(self, measured_value: int, infra_type: ObjectType) -> int:
+    def snap_dimension(self, measured_value: float, infra_type: ObjectType) -> float:
         """Snappt zu nächster Standard-Dimension"""
 
-        standard = self.standards[infra_type]
+        standard = self.standards.get(infra_type)
+        if not standard:
+            return measured_value
         dimensions = standard.dimensions
-
         if not dimensions:
             return measured_value
 
@@ -225,3 +226,9 @@ class InfrastructureDimensionMapper:
             return best_match
         else:
             return measured_value  # Außerhalb Toleranz
+
+    def round_dimension(self, value: float) -> float:
+        """Rundet Dimension auf 5er-Schritte"""
+        value_in_cm = value * 100
+        value_in_cm = round(value_in_cm / 5) * 5
+        return value_in_cm / 100

@@ -7,7 +7,7 @@ processed from DXF files: shafts (Schächte), pipes (Leitungen), and texts.
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import numpy as np
 
@@ -23,9 +23,29 @@ class ObjectType(Enum):
     PIPE_WASTEWATER = "waste_water"  # Abwasser Leitung
     WATER_SPECIAL = "water_special"  # Wasser Spezialbauwerk
     WASTE_WATER_SPECIAL = "waser_water_special"  # Abwasser Spezialbauwerk
-    PIPE_GAS = "gas"
-    CABLE_DUCT = "duct"  # Kabekanal
     CATE_VALUE = "gate_value"  # Schieber
+    HYDRANT = "hydrant"  # Hydrant
+    PIPE_GAS = "gas"
+    CABLE_DUCT = "cable_duct"  # Kabekanal
+
+
+@dataclass
+class Parameter:
+    name: str
+    value: Any
+    value_type: str
+    unit: str | None = field(default=None)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert parameter to dictionary format."""
+        param_dict = {
+            "name": self.name,
+            "value": self.value,
+            "value_type": self.value_type,
+        }
+        if self.unit is not None:
+            param_dict["unit"] = self.unit
+        return param_dict
 
 
 @dataclass(frozen=True)
@@ -110,6 +130,35 @@ class RectangularDimensions:
     angle: float
     height: float | None = None
 
+    def to_parameters(self) -> list[Parameter]:
+        """Get parameters as a dictionary."""
+        return [
+            Parameter(
+                name="Länge",
+                value=self.length,
+                value_type="float",
+                unit="m",
+            ),
+            Parameter(
+                name="Breite",
+                value=self.width,
+                value_type="float",
+                unit="m",
+            ),
+            Parameter(
+                name="XY rotation (azimuth)",
+                value=self.angle,
+                value_type="float",
+                unit="Degree",
+            ),
+            Parameter(
+                name="Höhe",
+                value=self.height if self.height is not None else 0.0,
+                value_type="float",
+                unit="m",
+            ),
+        ]
+
 
 @dataclass
 class RoundDimensions:
@@ -125,6 +174,23 @@ class RoundDimensions:
 
     diameter: float
     height: float | None = None
+
+    def to_parameters(self) -> list[Parameter]:
+        """Get parameters as a dictionary."""
+        return [
+            Parameter(
+                name="Durchmesser",
+                value=self.diameter,
+                value_type="float",
+                unit="m",
+            ),
+            Parameter(
+                name="Höhe",
+                value=self.height if self.height is not None else 0.0,
+                value_type="float",
+                unit="m",
+            ),
+        ]
 
 
 @dataclass
@@ -149,6 +215,16 @@ class DxfText:
     layer: str
     color: tuple[int, int, int]
 
+    def to_parameters(self) -> list[Parameter]:
+        """Get parameters as a dictionary."""
+        return [
+            Parameter(
+                name="Text",
+                value=self.content,
+                value_type="string",
+            )
+        ]
+
 
 @dataclass
 class ObjectData:
@@ -170,19 +246,22 @@ class ObjectData:
 
     medium: str
     object_type: ObjectType
+    family: str
+    family_type: str
     dimensions: RectangularDimensions | RoundDimensions
     layer: str
     assigned_text: DxfText | None = None
     color: tuple[int, int, int] = field(default_factory=tuple, repr=True, compare=True)
 
     """points: list[Point3D]
-        List of points for line-based objects (e.g., pipe, cable duct)."""
+        List of points for line-based objects."""
     points: list[Point3D] = field(default_factory=list, repr=False, compare=False)
 
     """positions: tuple[Point3D]
-        Positions for point-based (single-point) objects (e.g., shaft).
+        Positions for point-based (single-point) objects.
         and for line-based objects (start- and end-point)."""
     positions: tuple[Point3D, ...] = field(default_factory=tuple, repr=True, compare=True)
+    parameters: list[Parameter] = field(default_factory=list, repr=False, compare=False, init=False)
 
     @property
     def point(self) -> Point3D:
@@ -229,9 +308,7 @@ class ObjectData:
         bool
             True if the object is point-based, False otherwise.
         """
-        if self.end_point is None:
-            return False
-        return self.object_type == ObjectType.SHAFT
+        return self.end_point is None
 
     @property
     def should_be_round(self) -> bool:
@@ -244,19 +321,40 @@ class ObjectData:
         """
         return self.object_type.name.startswith("PIPE") or self.object_type == ObjectType.SHAFT
 
+    def get_parameters(self) -> list[Parameter]:
+        """Get parameters for the object.
 
-@dataclass
+        Returns
+        -------
+        list[Parameter]
+            List of parameters associated with the object.
+        """
+        params = []
+        if self.assigned_text is not None:
+            params.extend(self.assigned_text.to_parameters())
+        if isinstance(self.dimensions, RectangularDimensions):
+            params.extend(self.dimensions.to_parameters())
+        if isinstance(self.dimensions, RoundDimensions):
+            params.extend(self.dimensions.to_parameters())
+        params.extend(self.parameters)
+        return params
+
+
+@dataclass(slots=True)
 class LayerData:
     name: str = field(repr=True, compare=True)
     color: str | int | tuple[int, int, int] | None = field(repr=True, compare=True)
     block: str | None = field(default=None, repr=True, compare=True)
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True)
 class MediumConfig:
     medium: str
     geometry: list[LayerData]
     text: list[LayerData]
+    family: str
+    family_type: str
+    elevation_offset: float
     default_unit: str
     object_type: ObjectType
 
@@ -282,53 +380,24 @@ class MediumMasterConfig:
     line_based: list[MediumConfig] = field(default_factory=list, repr=True, compare=True)
 
 
-class AssingmentData:
-    """Configuration per medium of DXF elements.
+AssingmentGroup = tuple[list[ObjectData], list[DxfText]]
 
-    Parameters
-    ----------
-    elements : list[ObjectData]
-        List of elements assigned to this medium
-    texts : list[DxfText]
-        List of texts assigned to this medium
+
+class ExtractedData:
+    """Container for extracted DXF data.
+
+    This class holds the extracted data from a DXF file, including
+    pipes, shafts, and texts. It provides methods to access and manipulate
+    the data.
     """
 
     def __init__(self) -> None:
-        self._data: list[tuple[list[ObjectData], list[DxfText]]] = []
-        self._assigned: list[tuple[list[ObjectData], MediumConfig]] = []
+        self._extracted: list[AssingmentGroup] = []
 
     @property
-    def data(self) -> list[tuple[list[ObjectData], list[DxfText]]]:
-        """Get all elements assigned to this medium."""
-        return self._data
-
-    @property
-    def assigned(self) -> list[tuple[list[ObjectData], MediumConfig]]:
-        """Get all elements that have been assigned texts."""
-        return self._assigned
-
-    def get_statistics(self) -> dict[str, int | float]:
-        """Berechnet Statistiken für die Zuweisungen."""
-        assigned = sum(
-            len([elem for elem in elements if elem.assigned_text is not None]) for elements, _ in self.data
-        )
-        return {
-            "elements": sum(len(elements) for elements, _ in self.data),
-            "texts": sum(len(texts) for _, texts in self.data),
-            "assigned": assigned,
-        }
-
-    def add_assignment(self, config: MediumConfig, assigned_elements: list[ObjectData]) -> None:
-        """Add an assignment of elements to a medium configuration.
-
-        Parameters
-        ----------
-        config : MediumConfig
-            Configuration for the medium
-        assigned_elements : list[ObjectData]
-            List of elements assigned to this medium
-        """
-        self._assigned.append((assigned_elements, config))
+    def extracted(self) -> list[AssingmentGroup]:
+        """Get all extracted data."""
+        return self._extracted
 
     def setup(self, medium: str, elements: list[list[ObjectData]], texts: list[list[DxfText]]) -> None:
         """Setup assignment data for a medium.
@@ -350,7 +419,39 @@ class AssingmentData:
                 elem_data.medium = medium
             for text_data in text_group:
                 text_data.medium = medium
-            self._data.append((elem_group, text_group))
+            self._extracted.append((elem_group, text_group))
+
+
+class AssingmentData:
+    """Configuration per medium of DXF elements.
+
+    Parameters
+    ----------
+    elements : list[ObjectData]
+        List of elements assigned to this medium
+    texts : list[DxfText]
+        List of texts assigned to this medium
+    """
+
+    def __init__(self) -> None:
+        self._assigned: list[tuple[list[ObjectData], MediumConfig]] = []
+
+    @property
+    def assigned(self) -> list[tuple[list[ObjectData], MediumConfig]]:
+        """Get all elements that have been assigned texts."""
+        return self._assigned
+
+    def add_assignment(self, config: MediumConfig, elements: list[ObjectData]) -> None:
+        """Add an assignment of elements to a medium configuration.
+
+        Parameters
+        ----------
+        config : MediumConfig
+            Configuration for the medium
+        elements : list[ObjectData]
+            List of elements assigned to this medium
+        """
+        self._assigned.append((elements, config))
 
 
 @dataclass(frozen=True)
@@ -371,5 +472,44 @@ class Medium:
 
     name: str
     config: MediumMasterConfig
-    element_data: AssingmentData = field(default_factory=AssingmentData, repr=False, compare=False)
+
+    extracted_point: ExtractedData = field(default_factory=ExtractedData, repr=False, compare=False)
+    extracted_line: ExtractedData = field(default_factory=ExtractedData, repr=False, compare=False)
+
+    point_data: AssingmentData = field(default_factory=AssingmentData, repr=False, compare=False)
     line_data: AssingmentData = field(default_factory=AssingmentData, repr=False, compare=False)
+
+    def _get_statistics(
+        self,
+        extracted: list[tuple[list[ObjectData], list[DxfText]]],
+        assigned: list[tuple[list[ObjectData], MediumConfig]],
+    ) -> dict[str, int | float]:
+        """Calculate statistics for extracted and assigned elements."""
+        assigned_count = sum(
+            len([elem for elem in elements if elem.assigned_text is not None]) for elements, _ in assigned
+        )
+        return {
+            "elements": sum(len(elements) for elements, _ in extracted),
+            "texts": sum(len(texts) for _, texts in extracted),
+            "assigned": assigned_count,
+        }
+
+    def get_point_statistics(self) -> dict[str, int | float]:
+        """Calculate statistics for point based assignments."""
+        return self._get_statistics(self.extracted_point.extracted, self.point_data.assigned)
+
+    def get_line_statistics(self) -> dict[str, int | float]:
+        """Calculate statistics for line based assignments."""
+        return self._get_statistics(self.extracted_line.extracted, self.line_data.assigned)
+
+    def _get_total(self, assigned: list[tuple[list[ObjectData], MediumConfig]]) -> int:
+        """Calculate the total number of assigned elements."""
+        return sum([len(elems) for elems, _ in assigned])
+
+    def get_point_total(self) -> int:
+        """Calculate the total number of assigned point elements."""
+        return sum([len(elems) for elems, _ in self.point_data.assigned])
+
+    def get_line_total(self) -> int:
+        """Calculate the total number of assigned line elements."""
+        return sum([len(elems) for elems, _ in self.line_data.assigned])

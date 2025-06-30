@@ -13,20 +13,18 @@ from ..models import (
     RoundDimensions,
 )
 from . import dimension_extractor as dim
-from .dimension_mapper import InfrastructureDimensionMapper
+from .dimension_mapper import DimensionMapper
 
 
 class DimensionUpdater:
     """Class to update dimensions in DXF entities."""
 
-    def __init__(
-        self, target_unit: str, dimension_mapper: InfrastructureDimensionMapper
-    ) -> None:
+    def __init__(self, target_unit: str, dimension_mapper: DimensionMapper) -> None:
         self.target_unit = target_unit
-        self.dimension_mapper = dimension_mapper
+        self.dim_mapper = dimension_mapper
         self.do_convert_dimension: bool = True
 
-    def update_elements(self, assignment: AssingmentData) -> None:
+    def update_elements(self, assigment: AssingmentData) -> None:
         """Update dimensions of all elements in the assignment data container.
 
         This method should iterate through all elements in the assignment
@@ -37,7 +35,7 @@ class DimensionUpdater:
         assignment : AssingmentData
             Assignment data containing elements and their assigned texts
         """
-        for elements, config in assignment.assigned:
+        for elements, config in assigment.assigned:
             for element in elements:
                 self.update_dimension(element, config=config)
 
@@ -70,17 +68,11 @@ class DimensionUpdater:
                 if unit is None:
                     unit = config.default_unit
                 length = dim.convert_to_unit(length, unit, self.target_unit)
-                length = self.dimension_mapper.snap_dimension(
-                    int(length), element.object_type
-                )
                 width = dim.convert_to_unit(width, unit, self.target_unit)
-                width = self.dimension_mapper.snap_dimension(
-                    int(width), element.object_type
-                )
 
-            length, length = sorted([length, width])
-            element.dimensions.length = length
-            element.dimensions.width = length
+            length, width = sorted([length, width])
+            element.dimensions.length = self.dim_mapper.round_dimension(length)
+            element.dimensions.width = self.dim_mapper.round_dimension(width)
 
         elif isinstance(element.dimensions, RoundDimensions):
             round_result = dim.extract_round(text)
@@ -92,5 +84,6 @@ class DimensionUpdater:
             if self.do_convert_dimension:
                 if unit is None:
                     unit = config.default_unit
+                diameter = self.dim_mapper.snap_dimension(diameter, element.object_type)
                 diameter = dim.convert_to_unit(diameter, unit, self.target_unit)
-            element.dimensions.diameter = diameter
+            element.dimensions.diameter = self.dim_mapper.round_dimension(diameter)

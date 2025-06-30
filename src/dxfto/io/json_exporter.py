@@ -30,10 +30,6 @@ def _export_points(points: list[Point3D]) -> dict | list[dict] | None:
     """Export a list of Point3D to a list of dictionaries."""
     points = [point for point in points if point is not None]
     point_data = [_export_point(point) for point in points]
-    if len(point_data) == 0:
-        return None
-    if len(point_data) == 1:
-        return point_data[0]
     return point_data
 
 
@@ -84,7 +80,7 @@ class JsonExporter:
             List of elements (pipes and shafts) in the medium
         """
         elem_export = []
-        point_based_data = self._get_element_data(medium.element_data.assigned)
+        point_based_data = self._get_element_data(medium.point_data.assigned)
         elem_export.extend(point_based_data)
 
         line_based_data = self._get_element_data(medium.line_data.assigned)
@@ -113,6 +109,36 @@ class JsonExporter:
             elements_export_data.extend(export_data)
         return elements_export_data
 
+    def _get_param(
+        self, name: str, value: Any, value_type: str, unit: str | None = None
+    ) -> dict[str, Any]:
+        param = {
+            "name": name,
+            "value": value,
+            "type": value_type,
+        }
+        if unit is not None:
+            param["unit"] = unit
+        return param
+
+    def _get_parameters(self, element: ObjectData) -> list[dict[str, Any]]:
+        """Export parameters of an element to dictionary format.
+
+        Parameters
+        ----------
+        element : ObjectData
+            Element whose parameters to export
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            List of dictionaries containing parameter information
+        """
+        parameters = []
+        for param in element.get_parameters():
+            parameters.append(param.to_dict())
+        return parameters
+
     def _export_element(self, element: ObjectData) -> dict[str, Any]:
         """Export a pipe to dictionary format.
 
@@ -128,24 +154,22 @@ class JsonExporter:
         """
         element_data = {
             "object_type": element.object_type.name.upper(),
-            "layer_name": element.layer,
+            "family": element.family,
+            "family_type": element.family_type,
+            # "layer_name": element.layer,
             "dimensions": self._export_dimensions(element.dimensions),
         }
-        element_data["point"] = element.point
-        if end_point := element.end_point:
-            element_data["end-point"] = end_point
+        if element.is_point_based:
+            element_data["insert_point"] = _export_point(element.point)
+        elif element.is_line_based:
+            element_data["line_points"] = _export_points(element.points)
 
-        if element.is_line_based:
-            element_data["points"] = _export_points(element.points)
-
-        assigned_text = element.assigned_text
-        if assigned_text is not None:
-            if assigned_text.content is None:
-                assigned_text.content = ""
-            element_data["text"] = assigned_text.content.strip()
+        element_data["parameters"] = self._get_parameters(element)
         return element_data
 
-    def _export_dimensions(self, dimensions: RectangularDimensions | RoundDimensions) -> dict[str, Any]:
+    def _export_dimensions(
+        self, dimensions: RectangularDimensions | RoundDimensions
+    ) -> dict[str, Any]:
         """Export dimensions to dictionary format.
 
         Parameters

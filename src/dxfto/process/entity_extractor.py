@@ -32,7 +32,7 @@ class DXFEntityExtractor:
         """
         self.reader = dxf_reader
 
-    def extract_entities(self, config: MediumConfig) -> dict[str, list[DXFEntity]]:
+    def extract_entities(self, config: MediumConfig) -> tuple[list[DXFEntity], list[DXFEntity]]:
         """Extract entities categorized by type.
 
         Parameters
@@ -45,10 +45,9 @@ class DXFEntityExtractor:
         dict[str, list[DXFEntity]]
             Dictionary with 'elements', 'lines', and 'texts' keys
         """
-        return {
-            "geometries": self._extract_geometry_entities(config),
-            "texts": self._extract_text_entities(config),
-        }
+        geometries = self._extract_geometry_entities(config)
+        texts = self._extract_text_entities(config)
+        return geometries, texts
 
     def _extract_geometry_entities(self, config: MediumConfig) -> list[DXFEntity]:
         """Extract geometry entities from specified layers.

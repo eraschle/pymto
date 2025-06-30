@@ -8,13 +8,11 @@ This package provides:
 """
 
 from .dxf_reader import DXFReader
-from .entity_extractor import DXFEntityExtractor
 from .json_exporter import JsonExporter
 from .landxml_reader import LandXMLReader
 
 __all__ = [
     "DXFReader",
-    "DXFEntityExtractor",
     "LandXMLReader",
     "JsonExporter",
 ]

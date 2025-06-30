@@ -33,47 +33,72 @@ def extract_points_from(entity: DXFEntity) -> list[Point3D]:
     List[Point3D]
         List of extracted points
     """
-    points = []
+    point_values = []
 
     if isinstance(entity, Line):
         start = entity.dxf.start
         end = entity.dxf.end
-        points = [
+        point_values = [
             Point3D(east=start.x, north=start.y, altitude=0.0),
             Point3D(east=end.x, north=end.y, altitude=0.0),
         ]
     elif isinstance(entity, Polyline):
         for point in entity.points():
-            points.append(Point3D(east=point.x, north=point.y, altitude=0.0))
+            point_values.append(Point3D(east=point.x, north=point.y, altitude=0.0))
     elif isinstance(entity, LWPolyline):
         for point in entity.get_points("xy"):
-            points.append(Point3D(east=point[0], north=point[1], altitude=0.0))
+            point_values.append(Point3D(east=point[0], north=point[1], altitude=0.0))
     elif isinstance(entity, Circle):
         # For circles, return center point
         center = entity.dxf.center
-        points = [Point3D(east=center.x, north=center.y, altitude=0.0)]
+        point_values = [Point3D(east=center.x, north=center.y, altitude=0.0)]
 
-    return points
+    return point_values
 
 
-def is_closed(points: list[Point3D]) -> bool:
-    """Check if a shape defined by points is closed (first point == last point).
+def has_bulge_value(entity: DXFEntity) -> bool:
+    """Check if a polyline entity has bulge values.
 
     Parameters
     ----------
-    points : List[Point3D]
-        List of points defining the shape
+    entity : DXFEntity
+        Entity to check
 
     Returns
     -------
     bool
-        True if shape is closed
+        True if entity has bulge values
     """
-    if len(points) < 3:
+    if not isinstance(entity, LWPolyline):
         return False
+    return any(point[-1] != 0.0 for point in entity.get_points())
 
-    # Check if first and last points are the same
-    return points[0].distance_2d(points[-1]) < 1e-6
+
+def _get_bulge_start_index(entity: LWPolyline) -> int:
+    for idx, point_values in enumerate(entity.get_points()):
+        if point_values[-1] == 0.0:
+            continue
+        return idx
+    raise ValueError("No bulge found in polyline entity.")
+
+
+def get_bulge_center_and_diameter(entity: DXFEntity) -> tuple[Point3D, float]:
+    """Get the center point and diameter of a bulge in a polyline."""
+    if not isinstance(entity, LWPolyline):
+        raise TypeError("Entity must be a LWPolyline with bulge values.")
+    if not has_bulge_value(entity):
+        raise ValueError("Entity does not have bulge values. Did you check with has_bulge_value?")
+    points_vec2 = entity.get_points("xy")
+    start_index = _get_bulge_start_index(entity)
+    start = points_vec2[start_index]
+    end = points_vec2[(start_index + 1) % len(points_vec2)]
+    bulge_value = entity.get_points()[start_index][-1]
+    center = ezmath.bulge_center(start_point=start, end_point=end, bulge=bulge_value)
+    radius = ezmath.bulge_radius(start_point=start, end_point=end, bulge=bulge_value)
+    return (
+        Point3D(east=center.x, north=center.y, altitude=0.0),
+        radius * 2.0,  # Diameter
+    )
 
 
 def is_closed_polyline(entity: DXFEntity) -> bool:
@@ -114,16 +139,14 @@ def detect_shape_type(points: list[Point3D]) -> str:
     elif num_points == 2:
         return "linear"
     elif num_points < 4:
-        return "linear"
+        return "bulge"  # Assume 3 points must be a bulge or arc
     elif is_near_circular(points):
         return "round"
     elif num_points == 4 and is_rectangular(points):
         return "rectangular"
     elif num_points >= 4:
         return "multi_sided"
-    raise ValueError(
-        f"Cannot determine shape type from points: {num_points} points provided, expected at least 2."
-    )
+    raise ValueError(f"Cannot determine shape type from points: {num_points} points provided, expected at least 2.")
 
 
 def get_angle_from_entity(entity: DXFEntity) -> float:
@@ -184,9 +207,7 @@ def get_angle_point_on_line(
         except IndexError:
             continue
 
-        if ezmath.is_point_on_line_2d(
-            Vec2(point), Vec2(start_point), Vec2(end_point), ray=False, abs_tol=threshold
-        ):
+        if ezmath.is_point_on_line_2d(Vec2(point), Vec2(start_point), Vec2(end_point), ray=False, abs_tol=threshold):
             angle = get_points_angle(start_point, end_point)
             return angle
 
@@ -221,11 +242,11 @@ def get_points_angle(p1: tuple[float, float], p2: tuple[float, float]) -> float:
     return math.degrees(math.atan2(dy, dx))
 
 
-def get_angle_to_line(self, dxf_layers: list[str], dfa_dict: dict) -> float | None:
+def get_angle_to_line(self, dxf_layers: list[str], dfa_dict: dict, threshold: float) -> float | None:
     """get angle relative to line"""
     entities = self.get_entities_by_layer(dxf_layers)
     point = (dfa_dict["E"], dfa_dict["N"])
-    nearest_entity = self.find_nearest_line_polyline(entities, point, threshold=10.0)
+    nearest_entity = self.find_nearest_line_polyline(entities, point, threshold=threshold)
     if not nearest_entity:
         return None
 
