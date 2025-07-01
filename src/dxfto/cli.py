@@ -46,7 +46,7 @@ from .processor import DXFProcessor, IExporter
 @click.option(
     "--max-text-distance",
     type=float,
-    default=1.0,
+    default=5.0,
     help="Maximum distance for text-to-pipe assignment",
 )
 @click.option(

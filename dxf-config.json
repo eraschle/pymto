@@ -5,7 +5,8 @@
                 "Unit": "mm",
                 "Category": "water",
                 "Family": "Wasser - Leitung",
-                "FamilyType": "Wasser Gemeinde {dimension}",
+                "FamilyType": "Gemeinde {dimension}",
+                "FDK_ID": "RhB_WL_015",
                 "ElevationOffset": 1.0,
                 "Geometrie": [
                     {
@@ -22,9 +23,10 @@
         "Element": [
             {
                 "Unit": "cm",
-                "Category": "water_special",
+                "Category": "shaft",
                 "Family": "Wasser - Schacht",
-                "FamilyType": "Wasser Gemeinde {dimension}",
+                "FamilyType": "Gemeinde {dimension}",
+                "FDK_ID": "RhB_WL_019",
                 "Geometrie": [
                     {
                         "Name": "wkn_bauwerk"
@@ -39,8 +41,9 @@
             {
                 "Unit": "cm",
                 "Category": "water_special",
-                "Family": "Wasser - Schacht",
-                "FamilyType": "Spezialbauwerk Gemeinde {dimension}",
+                "Family": "Wasser - Spezialbauwerk",
+                "FamilyType": "Gemeinde {dimension}",
+                "FDK_ID": "RhB_WL_020",
                 "Geometrie": [
                     {
                         "Name": "Spezialbauwerk",
@@ -58,7 +61,8 @@
                 "Unit": "cm",
                 "Category": "gate_value",
                 "Family": "Wasser - Schacht",
-                "FamilyType": "Wasser Schieber Gemeinde",
+                "FamilyType": "Armatur Gemeinde",
+                "FDK_ID": "RhB_WL_019",
                 "Geometrie": [
                     {
                         "Name": "Armatur",
@@ -72,7 +76,8 @@
                 "Unit": "cm",
                 "Category": "hydrant",
                 "Family": "Wasser - Schacht",
-                "FamilyType": "Wasser Hydrant Gemeinde",
+                "FamilyType": "Hydrant Gemeinde",
+                "FDK_ID": "RhB_XX_004",
                 "Geometrie": [
                     {
                         "Name": "Hydrant",
@@ -91,6 +96,7 @@
                 "Category": "water",
                 "Family": "Wasser - Leitung",
                 "FamilyType": "Privat {dimension}",
+                "FDK_ID": "RhB_WL_015",
                 "ElevationOffset": 1.0,
                 "Geometrie": [
                     {
@@ -107,22 +113,13 @@
         "Element": [
             {
                 "Unit": "cm",
-                "Category": "water_special",
+                "Category": "shaft",
                 "Family": "Wasser - Schacht",
-                "FamilyType": "Wasser Privat",
+                "FamilyType": "Privat {dimension}",
+                "FDK_ID": "RhB_WL_019",
                 "Geometrie": [
                     {
                         "Name": "wkn_privat_bauwerk"
-                    },
-                    {
-                        "Name": "Spezialbauwerk",
-                        "Farbe": 250,
-                        "Block": "Spezialbauwerk"
-                    },
-                    {
-                        "Name": "Armatur",
-                        "Farbe": 160,
-                        "Block": "Armatur_2"
                     }
                 ],
                 "Text": [
@@ -130,6 +127,40 @@
                         "Name": "wkn_privat_bauwerk_text"
                     }
                 ]
+            },
+            {
+                "Unit": "cm",
+                "Category": "water_special",
+                "Family": "Wasser - Spezialbauwerk",
+                "FamilyType": "Privat {dimension}",
+                "FDK_ID": "RhB_WL_020",
+                "Geometrie": [
+                    {
+                        "Name": "Spezialbauwerk",
+                        "Farbe": 250,
+                        "Block": "Spezialbauwerk"
+                    }
+                ],
+                "Text": [
+                    {
+                        "Name": "wkn_privat_bauwerk_text"
+                    }
+                ]
+            },
+            {
+                "Unit": "cm",
+                "Category": "gate_value",
+                "Family": "Wasser - Schacht",
+                "FamilyType": "Schieber Privat",
+                "FDK_ID": "RhB_XX_004",
+                "Geometrie": [
+                    {
+                        "Name": "Armatur",
+                        "Farbe": 160,
+                        "Block": "Armatur_2"
+                    }
+                ],
+                "Text": []
             }
         ]
     },
@@ -139,7 +170,8 @@
                 "Unit": "mm",
                 "Category": "waste_water",
                 "Family": "Abwasser - Leitung",
-                "FamilyType": "Schmutzabwasser Gemeinde {dimension}",
+                "FamilyType": "WAS Gemeinde {dimension}",
+                "FDK_ID": "RhB_WL_001",
                 "ElevationOffset": 1.2,
                 "Geometrie": [
                     {
@@ -158,7 +190,8 @@
                 "Unit": "cm",
                 "Category": "Shaft",
                 "Family": "Abwasser - Schacht",
-                "FamilyType": "Schmutzabwasser Gemeinde {dimension}",
+                "FamilyType": "WAS Gemeinde {dimension}",
+                "FDK_ID": "RhB_WL_012",
                 "Geometrie": [
                     {
                         "Name": "was_bauwerk"
@@ -178,7 +211,8 @@
                 "Unit": "mm",
                 "Category": "waste_water",
                 "Family": "Abwasser - Leitung",
-                "FamilyType": "Schmutzabwasser Privat {dimension}",
+                "FamilyType": "WAS-H Privat {dimension}",
+                "FDK_ID": "RhB_WL_001",
                 "ElevationOffset": 1.2,
                 "Geometrie": [
                     {
@@ -197,7 +231,8 @@
                 "Unit": "cm",
                 "Category": "Shaft",
                 "Family": "Abwasser - Schacht",
-                "FamilyType": "Schmutzabwasser Privat {dimension}",
+                "FamilyType": "WAS-H Privat {dimension}",
+                "FDK_ID": "RhB_WL_012",
                 "Geometrie": [
                     {
                         "Name": "Normschacht--T-",
@@ -230,7 +265,8 @@
                 "Unit": "mm",
                 "Category": "waste_water",
                 "Family": "Abwasser - Leitung",
-                "FamilyType": "Regenabwasser Gemeinde {dimension}",
+                "FamilyType": "WAR-R Gemeinde {dimension}",
+                "FDK_ID": "RhB_WL_006",
                 "ElevationOffset": 1.2,
                 "Geometrie": [
                     {
@@ -249,7 +285,8 @@
                 "Unit": "cm",
                 "Category": "Shaft",
                 "Family": "Abwasser - Schacht",
-                "FamilyType": "Regenabwasser Gemeinde {dimension}",
+                "FamilyType": "WAR-R Gemeinde {dimension}",
+                "FDK_ID": "RhB_WL_012",
                 "Geometrie": [
                     {
                         "Name": "Normschacht--T-",
@@ -274,7 +311,8 @@
                 "Unit": "mm",
                 "Category": "waste_water",
                 "Family": "Abwasser - Leitung",
-                "FamilyType": "Regenabwasser Privat {dimension}",
+                "FamilyType": "WAR-R Privat {dimension}",
+                "FDK_ID": "RhB_WL_006",
                 "ElevationOffset": 1.2,
                 "Geometrie": [
                     {
@@ -293,7 +331,8 @@
                 "Unit": "cm",
                 "Category": "Shaft",
                 "Family": "Abwasser - Schacht",
-                "FamilyType": "Regenabwasser Privat {dimension}",
+                "FamilyType": "WAR-R Privat {dimension}",
+                "FDK_ID": "RhB_WL_012",
                 "Geometrie": [
                     {
                         "Name": "Normschacht--T-",
@@ -318,7 +357,8 @@
                 "Unit": "mm",
                 "Category": "waste_water",
                 "Family": "Abwasser - Leitung",
-                "FamilyType": "Mischabwasser Gemeinde {dimension}",
+                "FamilyType": "WAS-R Gemeinde {dimension}",
+                "FDK_ID": "RhB_WL_001",
                 "ElevationOffset": 1.2,
                 "Geometrie": [
                     {
@@ -337,7 +377,8 @@
                 "Unit": "cm",
                 "Category": "Shaft",
                 "Family": "Abwasser - Schacht",
-                "FamilyType": "Mischabwasser Gemeinde {dimension}",
+                "FamilyType": "WAS-R Gemeinde {dimension}",
+                "FDK_ID": "RhB_WL_012",
                 "Geometrie": [
                     {
                         "Name": "Normschacht--T-",
@@ -362,7 +403,8 @@
                 "Unit": "mm",
                 "Category": "waste_water",
                 "Family": "Abwasser - Leitung",
-                "FamilyType": "Mischabwasser Privat {dimension}",
+                "FamilyType": "WAS-R Privat {dimension}",
+                "FDK_ID": "RhB_WL_001",
                 "ElevationOffset": 1.2,
                 "Geometrie": [
                     {
@@ -381,7 +423,8 @@
                 "Unit": "cm",
                 "Category": "Shaft",
                 "Family": "Abwasser - Schacht",
-                "FamilyType": "Mischabwasser Privat {dimension}",
+                "FamilyType": "WAS-R Privat {dimension}",
+                "FDK_ID": "RhB_WL_012",
                 "Geometrie": [
                     {
                         "Name": "Normschacht--T-",
@@ -407,6 +450,7 @@
                 "Category": "water",
                 "Family": "Abwasser - Leitung",
                 "FamilyType": "Bewässerung {dimension}",
+                "FDK_ID": "",
                 "ElevationOffset": 1.2,
                 "Geometrie": [
                     {
@@ -426,6 +470,7 @@
                 "Category": "Shaft",
                 "Family": "Abwasser - Schacht",
                 "FamilyType": "Bewässerung {dimension}",
+                "FDK_ID": "",
                 "Geometrie": [
                     {
                         "Name": "bew_bauwerk",
