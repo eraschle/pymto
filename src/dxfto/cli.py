@@ -16,7 +16,7 @@ from .process.creator import MediumObjectCreator
 from .process.dimension import DimensionUpdater
 from .process.dimension_mapper import DimensionMapper
 from .process.revit_updater import RevitFamilyNameUpdater
-from .processor import DXFProcessor
+from .processor import DXFProcessor, IExporter
 
 
 @click.command()
@@ -77,6 +77,7 @@ def process_dxf(
         text_assigner = SpatialTextAssigner(max_distance=max_text_distance)
         click.echo("Assigning texts to elements...")
         processor.assign_texts_to_mediums(text_assigner)
+        _print_assignment_statistic(processor)
 
         click.echo("Updating dimensions based on assigned texts...")
         dim_mapper = DimensionMapper()
@@ -96,22 +97,17 @@ def process_dxf(
 
         exporter = JsonExporter(output)
         processor.export_data(exporter)
-
-        click.echo(f"Processed {dxf_file}")
-        click.echo(f"Output: {output}")
-        _print_statistic(processor)
+        _print_export_statistic(exporter)
 
     except Exception as e:
         raise click.ClickException(f"Processing failed: {e}") from e
 
 
-def _print_statistic(processor: DXFProcessor):
+def _print_assignment_statistic(processor: DXFProcessor):
     click.echo("\n" + "=" * 85)
     click.echo("TEXT ASSIGNMENT STATISTICS")
     click.echo("=" * 85)
-    click.echo(
-        f"{'Medium':<25} {'Total Elem.':>12} {'Total Text':>12} {'Elem. w/ Text':>15} {'% Assigned':>12}"
-    )
+    click.echo(f"{'Medium':<25} {'Total Elem.':>12} {'Total Text':>12} {'Elem. w/ Text':>15} {'% Assigned':>12}")
     click.echo("-" * 85)
 
     for medium in processor.mediums:
@@ -124,16 +120,29 @@ def _print_statistic(processor: DXFProcessor):
         assigned_perc = (assigned_elems / total_texts * 100) if total_elems > 0 else 0
 
         click.echo(
-            f"{medium.name:<25} "
-            f"{total_elems:>12} "
-            f"{total_texts:>12} "
-            f"{assigned_elems:>15} "
-            f"{assigned_perc:>11.1f}%"
+            f"{medium.name:<25} {total_elems:>12} {total_texts:>12} {assigned_elems:>15} {assigned_perc:>11.1f}%"
         )
     click.echo("-" * 85)
 
     click.echo(f"Total Objects: {sum([medium.get_point_total() for medium in processor.mediums])}")
     click.echo(f"Total Lines: {sum([medium.get_line_total() for medium in processor.mediums])}")
+
+
+def _print_export_statistic(exporter: IExporter):
+    click.echo("\n" + "=" * 85)
+    click.echo("EXPORT STATISTICS")
+    click.echo("=" * 85)
+    click.echo(f"{'Medium':<25} {'Total Elem.':>12} {'Exported':>12} {'Not Exported':>15} {'% Percentage':>11}")
+    click.echo("-" * 85)
+
+    for medium, statistics in exporter.get_exported_statistics().items():
+        exported = statistics["exported"]
+        not_exported = statistics["not_exported"]
+        total = statistics["total"]
+        export_perc = (exported / total * 100) if total > 0 else 0
+        click.echo(f"{medium:<25} {total:>12} {exported:>12} {not_exported:>15} {export_perc:>11.1f}%")
+
+    click.echo("-" * 85)
 
 
 @click.group()

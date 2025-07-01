@@ -90,32 +90,32 @@ class LandXMLReader:
         query_point = np.array([x, y])
         distances, indices = self._kdtree.query(query_point, k=min(4, len(self.elevation_points)))
 
-        if isinstance(indices, int):
-            # Single nearest point
-            return self.elevation_points[indices].altitude
+        # Handle both scalar and array cases for distances and indices
+        if np.isscalar(distances):
+            # Single nearest point case
+            return self.elevation_points[int(indices)].altitude
 
-        # Inverse distance weighting interpolation
+        # Multiple points - inverse distance weighting interpolation
         weights = 1.0 / (distances + 1e-10)  # Add small epsilon to avoid division by zero
         total_weight = np.sum(weights)
 
         interpolated_z = (
             sum(weights[i] * self.elevation_points[int(idx)].altitude for i, idx in enumerate(indices)) / total_weight
         )
-
         return float(interpolated_z)
 
     def update_elements(self, assigment: AssingmentData) -> None:
         # Texts are assigned to elemtents and onbly the elements data are exported, which
         # means that texts are not updated here.
-        for elements, _ in assigment.assigned:
+        for elements, config in assigment.assigned:
             for element in elements:
                 if element.points:
-                    element.points = self._update_elevation(element.points)
+                    element.points = self._update_elevation(element.points, config)
                 if element.positions:
-                    positions = self._update_elevation(element.positions)
+                    positions = self._update_elevation(element.positions, config)
                     element.positions = tuple(positions)
 
-    def _update_elevation(self, points: Iterable[Point3D]) -> list[Point3D]:
+    def _update_elevation(self, points: Iterable[Point3D], config: MediumConfig) -> list[Point3D]:
         """Update Z coordinates for a list of points using elevation data.
 
         Parameters
@@ -132,6 +132,7 @@ class LandXMLReader:
 
         for point in points:
             z_elevation = self.get_elevation(point.east, point.north)
+            z_elevation -= config.elevation_offset
             updated_point = Point3D(east=point.east, north=point.north, altitude=z_elevation)
             updated_points.append(updated_point)
 
@@ -176,8 +177,8 @@ class LandXMLReader:
         if len(coords) < 3:
             return None
         return Point3D(
-            east=float(coords[0]),
-            north=float(coords[1]),
+            north=float(coords[0]),
+            east=float(coords[1]),
             altitude=float(coords[2]),
         )
 

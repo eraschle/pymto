@@ -6,6 +6,7 @@
                 "Category": "water",
                 "Family": "Wasser - Leitung",
                 "FamilyType": "Wasser Gemeinde {dimension}",
+                "ElevationOffset": 1.0,
                 "Geometrie": [
                     {
                         "Name": "wkn_leitung"
@@ -90,6 +91,7 @@
                 "Category": "water",
                 "Family": "Wasser - Leitung",
                 "FamilyType": "Privat {dimension}",
+                "ElevationOffset": 1.0,
                 "Geometrie": [
                     {
                         "Name": "wkn_privat_leitung"
@@ -138,6 +140,7 @@
                 "Category": "waste_water",
                 "Family": "Abwasser - Leitung",
                 "FamilyType": "Schmutzabwasser Gemeinde {dimension}",
+                "ElevationOffset": 1.2,
                 "Geometrie": [
                     {
                         "Name": "was_leitung"
@@ -176,6 +179,7 @@
                 "Category": "waste_water",
                 "Family": "Abwasser - Leitung",
                 "FamilyType": "Schmutzabwasser Privat {dimension}",
+                "ElevationOffset": 1.2,
                 "Geometrie": [
                     {
                         "Name": "was_privat_leitung"
@@ -227,6 +231,7 @@
                 "Category": "waste_water",
                 "Family": "Abwasser - Leitung",
                 "FamilyType": "Regenabwasser Gemeinde {dimension}",
+                "ElevationOffset": 1.2,
                 "Geometrie": [
                     {
                         "Name": "war_leitung"
@@ -270,6 +275,7 @@
                 "Category": "waste_water",
                 "Family": "Abwasser - Leitung",
                 "FamilyType": "Regenabwasser Privat {dimension}",
+                "ElevationOffset": 1.2,
                 "Geometrie": [
                     {
                         "Name": "war_privat_leitung"
@@ -313,6 +319,7 @@
                 "Category": "waste_water",
                 "Family": "Abwasser - Leitung",
                 "FamilyType": "Mischabwasser Gemeinde {dimension}",
+                "ElevationOffset": 1.2,
                 "Geometrie": [
                     {
                         "Name": "was-r_leitung"
@@ -356,6 +363,7 @@
                 "Category": "waste_water",
                 "Family": "Abwasser - Leitung",
                 "FamilyType": "Mischabwasser Privat {dimension}",
+                "ElevationOffset": 1.2,
                 "Geometrie": [
                     {
                         "Name": "was-r_privat_leitung"
@@ -399,6 +407,7 @@
                 "Category": "water",
                 "Family": "Abwasser - Leitung",
                 "FamilyType": "Bewässerung {dimension}",
+                "ElevationOffset": 1.2,
                 "Geometrie": [
                     {
                         "Name": "bew_leitung"
