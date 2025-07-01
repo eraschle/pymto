@@ -130,3 +130,13 @@ class IExporter(Protocol):
         None
         """
         ...
+
+    def get_exported_statistics(self) -> dict[str, dict[str, int]]:
+        """Get statistics of exported media.
+
+        Returns
+        -------
+        dict[str, dict[str, int]]
+            Statistics of exported elements grouped by medium
+        """
+        ...

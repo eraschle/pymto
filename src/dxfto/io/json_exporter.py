@@ -53,6 +53,8 @@ class JsonExporter:
             Path where the JSON file will be saved
         """
         self.output_path = output_path
+        self.exported_elements: dict[str, list[ObjectData]] = {}
+        self.not_exported_elements: dict[str, list[ObjectData]] = {}
 
     def export_data(self, mediums: list[Medium]) -> None:
         export_data = {}
@@ -65,6 +67,24 @@ class JsonExporter:
                 json.dump(export_data, json_file, indent=2, ensure_ascii=False)
         except OSError as e:
             raise OSError(f"Cannot write JSON file {self.output_path}: {e}") from e
+
+    def get_exported_statistics(self) -> dict[str, Any]:
+        """Get statistics of exported elements.
+
+        Returns
+        -------
+        dict[str, Any]
+            Dictionary containing statistics of exported elements
+        """
+        statistics = {}
+        for medium, elements in self.exported_elements.items():
+            not_exported = self.not_exported_elements.get(medium, [])
+            statistics[medium] = {
+                "exported": len(elements),
+                "not_exported": len(not_exported),
+                "total": len(elements) + len(not_exported),
+            }
+        return statistics
 
     def _export_medium(self, medium: Medium) -> list[dict[str, Any]]:
         """Export a single medium to dictionary format.
@@ -87,6 +107,25 @@ class JsonExporter:
         elem_export.extend(line_based_data)
         return elem_export
 
+    def _append_exported_elements(
+        self, config: MediumConfig, export: list[dict | None], elements: list[ObjectData]
+    ) -> None:
+        exported_idx = [idx for idx in range(len(export)) if export[idx] is not None]
+        exported_elements = [elements[idx] for idx in exported_idx]
+        if config.medium not in self.exported_elements:
+            self.exported_elements[config.medium] = []
+        self.exported_elements[config.medium].extend(exported_elements)
+
+    def _append_not_exported_elements(
+        self, config: MediumConfig, export: list[dict | None], elements: list[ObjectData]
+    ) -> None:
+        not_exp_idx = [idx for idx in range(len(export)) if export[idx] is None]
+        not_exported_data = [elements[idx] for idx in not_exp_idx]
+
+        if config.medium not in self.not_exported_elements:
+            self.not_exported_elements[config.medium] = []
+        self.not_exported_elements[config.medium].extend(not_exported_data)
+
     def _get_element_data(self, element_data: list[tuple[list[ObjectData], MediumConfig]]) -> list[dict[str, Any]]:
         """Export elements and texts to dictionary format.
 
@@ -102,10 +141,12 @@ class JsonExporter:
         """
         elements_export_data = []
 
-        for elements, _ in element_data:
-            export_data = [self._export_element(elem) for elem in elements]
-            export_data = [data for data in export_data if data is not None]
+        for elements, config in element_data:
+            result = [self._export_element(elem) for elem in elements]
+            export_data = [data for data in result if data is not None]
             elements_export_data.extend(export_data)
+            self._append_exported_elements(config, result, elements)
+            self._append_not_exported_elements(config, result, elements)
         return elements_export_data
 
     def _get_param(self, name: str, value: Any, value_type: str, unit: str | None = None) -> dict[str, Any]:
@@ -136,7 +177,7 @@ class JsonExporter:
             parameters.append(param.to_dict())
         return parameters
 
-    def _export_element(self, element: ObjectData):
+    def _export_element(self, element: ObjectData) -> dict[str, Any] | None:
         """Export a pipe to dictionary format.
 
         Parameters
@@ -161,7 +202,6 @@ class JsonExporter:
         elif element.is_line_based:
             element_data["line_points"] = _export_points(element.points)
         else:
-            print(f"Unknown element type: {element_data}")
             return None
 
         element_data["parameters"] = self._get_parameters(element)
