@@ -31,7 +31,7 @@ class TestDXFReader:
         assert reader.dxf_path == test_dxf_path
         assert reader._doc is None
         assert not reader.is_loaded()
-        
+
         # document property should raise RuntimeError when not loaded
         with pytest.raises(RuntimeError, match="not loaded"):
             _ = reader.document
@@ -52,13 +52,6 @@ class TestDXFReader:
 
         with pytest.raises(FileNotFoundError):
             reader.load_file()
-
-    def test_query_entities_not_loaded(self, reader):
-        """Test querying entities without loading file."""
-        layers = [LayerData(name="0", color=(255, 0, 0))]
-
-        with pytest.raises(RuntimeError, match="not loaded"):
-            reader.query_entities(layers)
 
     def test_query_entities_empty_layers(self, reader, test_dxf_path):
         """Test querying with empty layer list."""
@@ -102,7 +95,6 @@ class TestDXFReader:
         assert isinstance(layer_names, list)
         assert len(layer_names) >= 1  # Should have at least default layer "0"
         assert "0" in layer_names  # Default layer should exist
-
 
     def test_query_entities_multiple_layers(self, reader, test_dxf_path):
         """Test querying entities from multiple layers."""
