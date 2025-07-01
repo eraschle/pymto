@@ -109,8 +109,28 @@ class Point3D:
         return np.sqrt(dx**2 + dy**2)
 
 
-@dataclass
-class RectangularDimensions:
+class ADimensions:
+    def __init__(self, height: float | None = None) -> None:
+        self._height = Parameter("Height", height if height is not None else 0.0, "float", "m")
+
+    @property
+    def height(self) -> float | None:
+        """Get the height of the rectangular shape."""
+        return self._height.value
+
+    @height.setter
+    def height(self, value: float | None) -> None:
+        """Set the height of the rectangular shape."""
+        if value is None or value < 0:
+            raise ValueError("Height must be a non-negative value.")
+        self._height.value = float(value)
+
+    def to_parameters(self) -> list[Parameter]:
+        """Get parameters as a dictionary."""
+        return [value for _, value in self.__dict__.items() if isinstance(value, Parameter)]
+
+
+class RectangularDimensions(ADimensions):
     """Dimensions for rectangular shapes.
 
     Parameters
@@ -125,43 +145,47 @@ class RectangularDimensions:
         Height of the rectangular shape (optional)
     """
 
-    length: float
-    width: float
-    angle: float
-    height: float | None = None
+    def __init__(self, length: float, width: float, angle: float, height: float | None = None) -> None:
+        super().__init__(height)
+        self._length = Parameter("Length", length, "float", "m")
+        self._width = Parameter("Width", width, "float", "m")
+        self._angle = Parameter("Angle", angle % 360, "float", "Degree")
 
-    def to_parameters(self) -> list[Parameter]:
-        """Get parameters as a dictionary."""
-        return [
-            Parameter(
-                name="Width",
-                value=self.length,
-                value_type="float",
-                unit="m",
-            ),
-            Parameter(
-                name="Depth",
-                value=self.width,
-                value_type="float",
-                unit="m",
-            ),
-            Parameter(
-                name="XY rotation (azimuth)",
-                value=self.angle,
-                value_type="float",
-                unit="Degree",
-            ),
-            Parameter(
-                name="Height",
-                value=self.height if self.height is not None else 0.0,
-                value_type="float",
-                unit="m",
-            ),
-        ]
+    @property
+    def length(self) -> float:
+        """Get the length of the rectangular shape."""
+        return self._length.value
+
+    @length.setter
+    def length(self, value: float) -> None:
+        """Set the length of the rectangular shape."""
+        if value <= 0:
+            raise ValueError("Length must be a positive value.")
+        self._length.value = float(value)
+
+    @property
+    def width(self) -> float:
+        """Get the width of the rectangular shape."""
+        return self._width.value
+
+    @width.setter
+    def width(self, value: float) -> None:
+        """Set the width of the rectangular shape."""
+        if value <= 0:
+            raise ValueError("Width must be a positive value.")
+        self._width.value = float(value)
+
+    @property
+    def angle(self) -> float:
+        """Get the rotation angle of the rectangular shape."""
+        return self._angle.value
+
+    @angle.setter
+    def angle(self, value: float) -> None:
+        self._angle.value = float(value) % 360  # Normalize angle to [0, 360)
 
 
-@dataclass
-class RoundDimensions:
+class RoundDimensions(ADimensions):
     """Dimensions for round shapes.
 
     Parameters
@@ -172,25 +196,21 @@ class RoundDimensions:
         Height of the round shape (optional)
     """
 
-    diameter: float
-    height: float | None = None
+    def __init__(self, diameter: float, height: float | None = None) -> None:
+        super().__init__(height)
+        """Initialize RoundDimensions with diameter and optional height."""
+        self._diameter = diameter
 
-    def to_parameters(self) -> list[Parameter]:
-        """Get parameters as a dictionary."""
-        return [
-            Parameter(
-                name="Diameter",
-                value=self.diameter,
-                value_type="float",
-                unit="m",
-            ),
-            Parameter(
-                name="Height",
-                value=self.height if self.height is not None else 0.0,
-                value_type="float",
-                unit="m",
-            ),
-        ]
+    @property
+    def diameter(self) -> float:
+        return self._diameter
+
+    @diameter.setter
+    def diameter(self, value: float) -> None:
+        """Set the diameter of the round shape."""
+        if value <= 0:
+            raise ValueError("Diameter must be a positive value.")
+        self._diameter = float(value)
 
 
 @dataclass

@@ -8,7 +8,6 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-
 from ...models import ObjectData, ObjectType, Point3D
 from .compatibilty import IMediumCompatibilityStrategy, PrefixBasedCompatibility
 

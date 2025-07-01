@@ -15,7 +15,7 @@ from ezdxf.entities.lwpolyline import LWPolyline
 from ezdxf.entities.polyline import Polyline
 from ezdxf.math import Vec2
 
-from ..models import Point3D
+from ..models import ObjectType, Point3D
 
 log = logging.getLogger(__name__)
 
@@ -54,6 +54,28 @@ def extract_points_from(entity: DXFEntity) -> list[Point3D]:
         point_values = [Point3D(east=center.x, north=center.y, altitude=0.0)]
 
     return point_values
+
+
+def get_default_line_diameter(object_type: ObjectType) -> float:
+    diameter = 0.0
+    if object_type == ObjectType.PIPE_WATER:
+        diameter = 50.0
+    elif object_type == ObjectType.PIPE_GAS:
+        diameter = 50.0
+    elif object_type == ObjectType.PIPE_WASTEWATER:
+        diameter = 150.0
+    if diameter > 0.0:
+        diameter /= 1000
+    return diameter
+
+
+def get_default_point_diameter(object_type: ObjectType) -> float:
+    diameter = 0.0
+    if object_type == ObjectType.SHAFT:
+        diameter = 1000.0
+    if diameter > 0.0:
+        diameter /= 1000
+    return diameter
 
 
 def has_bulge_value(entity: DXFEntity) -> bool:

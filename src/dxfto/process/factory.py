@@ -399,15 +399,8 @@ class ObjectDataFactory:
         ObjectData
             Created ObjectData with round dimensions
         """
-        diameter = 0.0
-        if config.object_type == ObjectType.PIPE_WATER:
-            diameter = 50.0
-        elif config.object_type == ObjectType.PIPE_GAS:
-            diameter = 50.0
-        elif config.object_type == ObjectType.PIPE_WASTEWATER:
-            diameter = 150.0
-        if diameter > 0.0:
-            diameter /= 1000
+        diameter = dxf.get_default_line_diameter(config.object_type)
+
         return ObjectData(
             medium=config.medium,
             object_type=config.object_type,
@@ -544,8 +537,8 @@ class ObjectDataFactory:
         ObjectData
             Created ObjectData with default round dimensions
         """
-        diameter = 150.0 if config.object_type == ObjectType.PIPE_WASTEWATER else 50.0
-        dimensions = RoundDimensions(diameter=diameter / 1000)
+        diameter = dxf.get_default_line_diameter(config.object_type)
+        dimensions = RoundDimensions(diameter=diameter)
 
         return ObjectData(
             medium=config.medium,
@@ -578,7 +571,7 @@ class ObjectDataFactory:
         """
         dimensions = RoundDimensions(diameter=1.0)
         if "pipe" in config.object_type.name.lower():
-            diameter = 150.0 if config.object_type == ObjectType.PIPE_WASTEWATER else 50.0
+            diameter = dxf.get_default_line_diameter(config.object_type)
             dimensions = RoundDimensions(diameter=diameter / 1000)
 
         return ObjectData(
