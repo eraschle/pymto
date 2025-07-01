@@ -14,6 +14,11 @@ from .io import JsonExporter, LandXMLReader
 from .process.assigners import SpatialTextAssigner
 from .process.creator import MediumObjectCreator
 from .process.dimension import DimensionMapper, DimensionUpdater
+from .process.gradient.adjuster import (
+    GradientAdjustmentParams,
+    PipelineGradientAdjuster,
+    PrefixBasedCompatibility,
+)
 from .process.revit_updater import RevitFamilyNameUpdater
 from .processor import DXFProcessor, IExporter
 
@@ -90,6 +95,16 @@ def process_dxf(
 
             click.echo("Updating points elevation from LandXML...")
             processor.update_points_elevation(landxml_reader)
+
+        gradient = PipelineGradientAdjuster(
+            params=GradientAdjustmentParams(
+                manhole_search_radius=100, min_gradient_percent=0.1, max_gradient_percent=10
+            ),
+            compatibility=PrefixBasedCompatibility(separator=" "),
+        )
+        adjustment_result = processor.adjustment_pipe_gardiant(gradient)
+        if len(adjustment_result) > 0:
+            click.echo("Adjusting pipe gradients based on shaft elevations...")
 
         revit_updater = RevitFamilyNameUpdater()
         processor.update_family_and_types(revit_updater)

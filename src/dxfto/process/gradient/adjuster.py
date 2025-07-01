@@ -8,6 +8,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
+
 from ...models import ObjectData, ObjectType, Point3D
 from .compatibilty import IMediumCompatibilityStrategy, PrefixBasedCompatibility
 
@@ -60,13 +61,11 @@ class PipelineGradientAdjuster:
         self.params = params or GradientAdjustmentParams()
         self.compatibility = compatibility or PrefixBasedCompatibility()
 
-    def adjust_gradients_by(self, objects: list[ObjectData]) -> list[PipelineAdjustment]:
+    def adjust_gradients_by(self, elements: list[ObjectData]) -> list[PipelineAdjustment]:
         """Adjust pipeline gradients considering medium compatibility."""
+        medium_groups = self._group_objects_by(elements)
+
         adjustments = []
-
-        # Group objects by compatibility groups
-        medium_groups = self._group_objects_by(objects)
-
         for group_id, group_objects in medium_groups.items():
             log.info(f"Adjusting gradients for compatibility group: {group_id}")
             group_adjustments = self._adjust_medium_group(group_objects)
@@ -168,13 +167,11 @@ class PipelineGradientAdjuster:
         for manhole in manholes:
             if not manhole.is_point_based:
                 continue
-
             # Check medium compatibility using strategy
             if not self.compatibility.are_compatible(pipeline_medium, manhole.medium):
                 continue
 
             distance = point.distance_2d(manhole.point)
-
             if distance <= self.params.manhole_search_radius and distance < min_distance:
                 min_distance = distance
                 nearest_manhole = manhole

@@ -495,6 +495,15 @@ class Medium:
             "assigned": assigned_count,
         }
 
+    def get_assignment_elements(self) -> list[ObjectData]:
+        """Get all assigned elements for this medium."""
+        assigned_elements = []
+        for elements, _ in self.point_data.assigned:
+            assigned_elements.extend(elements)
+        for elements, _ in self.line_data.assigned:
+            assigned_elements.extend(elements)
+        return assigned_elements
+
     def get_point_statistics(self) -> dict[str, int | float]:
         """Calculate statistics for point based assignments."""
         return self._get_statistics(self.extracted_point.extracted, self.point_data.assigned)

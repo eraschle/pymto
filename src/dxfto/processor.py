@@ -8,6 +8,11 @@ orchestrator pattern.
 import logging
 from collections.abc import Iterable
 
+from dxfto.process.gradient.adjuster import (
+    PipelineAdjustment,
+    PipelineGradientAdjuster,
+)
+
 from .config import ConfigurationHandler
 from .models import Medium
 from .protocols import (
@@ -104,6 +109,25 @@ class DXFProcessor:
             updater.update_elements(medium.point_data)
             updater.update_elements(medium.line_data)
 
+    def adjustment_pipe_gardiant(self, gradient: PipelineGradientAdjuster) -> list[PipelineAdjustment]:
+        """Adjust elements in mediums based on compatibility strategy.
+
+        Parameters
+        ----------
+        updater : MediumConfig
+            Configuration for the medium to adjust elements"""
+        elements = []
+        for medium in self.mediums:
+            for elems, _ in medium.point_data.assigned:
+                elements.extend(elems)
+            for elems, _ in medium.line_data.assigned:
+                elements.extend(elems)
+
+        asjustment_result = []
+        reports = gradient.adjust_gradients_by(elements=elements)
+        asjustment_result.extend(reports)
+        return asjustment_result
+
     def update_points_elevation(self, updater: IElevationUpdater) -> None:
         """Assign extracted texts to mediums.
 
@@ -119,8 +143,10 @@ class DXFProcessor:
     def update_family_and_types(self, updater: IRevitFamilyNameUpdater) -> None:
         """Update family and family types for all mediums.
 
-        This method iterates through all mediums and updates their
-        family and family types using the configured updater.
+        Parameters
+        ----------
+        updater : IRevitFamilyNameUpdater
+            Revit family name updater to apply to mediums
         """
         for medium in self.mediums:
             updater.update_elements(medium.point_data)
