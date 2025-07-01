@@ -96,6 +96,16 @@ class IDimensionUpdater(Protocol):
         """
         ...
 
+    def round_parameter_values(self, assigment: AssingmentData) -> None:
+        """Round parameters of all dimensions of a single element.
+
+        Parameters
+        ----------
+        assignment : AssingmentData
+            Assignment data containing elements and their assigned texts
+        """
+        ...
+
 
 class IRevitFamilyNameUpdater(Protocol):
     """Protocol for update family and family type names of medium on their elements."""

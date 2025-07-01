@@ -110,6 +110,18 @@ class DXFProcessor:
             updater.update_elements(medium.point_data)
             updater.update_elements(medium.line_data)
 
+    def round_parameter_values(self, updater: IDimensionUpdater) -> None:
+        """Update dimensions of elements and lines in mediums.
+
+        Parameters
+        ----------
+        updater : IDimensionUpdater
+            Dimension updater to apply to elements and lines
+        """
+        for medium in self.config.mediums.values():
+            updater.round_parameter_values(medium.point_data)
+            updater.round_parameter_values(medium.line_data)
+
     def adjustment_pipe_gardiant(self, gradient: PipelineGradientAdjuster) -> list[PipelineAdjustment]:
         """Adjust elements in mediums based on compatibility strategy.
 

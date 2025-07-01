@@ -9,6 +9,7 @@ from ...models import (
     AssingmentData,
     MediumConfig,
     ObjectData,
+    Parameter,
     RectangularDimensions,
     RoundDimensions,
 )
@@ -38,6 +39,18 @@ class DimensionUpdater:
         for elements, config in assigment.assigned:
             for element in elements:
                 self.update_dimension(element, config=config)
+                self.update_parameters(element)
+
+    def round_parameter_values(self, assigment: AssingmentData) -> None:
+        """Round parameters of all dimensions of a single element.
+
+        Parameters
+        ----------
+        assignment : AssingmentData
+            Assignment data containing elements and their assigned texts
+        """
+        for elements, _ in assigment.assigned:
+            for element in elements:
                 self.update_parameters(element)
 
     def update_dimension(self, element: ObjectData, config: MediumConfig) -> None:
@@ -89,7 +102,7 @@ class DimensionUpdater:
                 diameter = dim.convert_to_unit(diameter, unit, self.target_unit)
             element.dimensions.diameter = self.dim_mapper.round_dimension(diameter)
 
-    def update_parameters(self, element: ObjectData) -> ObjectData:
+    def update_parameters(self, element: ObjectData) -> None:
         """Update prameters of the element by rounding the values.
 
         Parameters
@@ -98,7 +111,6 @@ class DimensionUpdater:
             The element whose parameters are to be updated
         """
         for param in element.get_parameters():
-            if not isinstance(param.value, (int | float)):
+            if not isinstance(param.value, (float | int)):
                 continue
             param.value = self.dim_mapper.round_dimension(param.value)
-        return element
