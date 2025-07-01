@@ -40,6 +40,19 @@ class PipelineAdjustment:
     medium_compatibility: str
 
 
+@dataclass
+class CoverToPipeHeight:
+    """Record of cover-to-pipe height calculation."""
+
+    shaft: ObjectData
+    connected_pipes: list[ObjectData]
+    lowest_pipe: ObjectData | None
+    cover_elevation: float
+    lowest_pipe_elevation: float | None
+    height_difference: float | None
+    medium_compatibility: str
+
+
 class PipelineGradientAdjuster:
     """Adjusts pipeline gradients with configurable medium compatibility strategies."""
 
@@ -176,6 +189,119 @@ class PipelineGradientAdjuster:
                 nearest_manhole = manhole
 
         return nearest_manhole
+
+    def _find_all_connected_pipes(self, shaft: ObjectData, pipelines: list[ObjectData]) -> list[ObjectData]:
+        """Find all pipes connected to a shaft within the search radius."""
+        connected_pipes = []
+
+        for pipeline in pipelines:
+            if not pipeline.is_line_based:
+                continue
+
+            # Check medium compatibility
+            if not self.compatibility.are_compatible(shaft.medium, pipeline.medium):
+                continue
+
+            # Check if pipe start or end is within search radius of shaft
+            start_distance = shaft.point.distance_2d(pipeline.point)
+            end_distance = shaft.point.distance_2d(pipeline.end_point) if pipeline.end_point else float("inf")
+
+            if start_distance <= self.params.manhole_search_radius or end_distance <= self.params.manhole_search_radius:
+                connected_pipes.append(pipeline)
+
+        return connected_pipes
+
+    def calculate_cover_to_pipe_heights(self, elements: list[ObjectData]) -> list[CoverToPipeHeight]:
+        """Calculate cover-to-lowest-pipe height differences for all shafts."""
+        medium_groups = self._group_objects_by(elements)
+
+        cover_heights = []
+        for group_id, group_objects in medium_groups.items():
+            log.info(f"Calculating cover heights for compatibility group: {group_id}")
+            group_heights = self._calculate_group_cover_heights(group_objects)
+            cover_heights.extend(group_heights)
+
+        return cover_heights
+
+    def _calculate_group_cover_heights(self, objects: list[ObjectData]) -> list[CoverToPipeHeight]:
+        """Calculate cover heights for objects in the same compatibility group."""
+        pipelines = [obj for obj in objects if obj.is_line_based]
+        manholes = [obj for obj in objects if obj.is_point_based and self._is_manhole(obj)]
+
+        cover_heights = []
+
+        for shaft in manholes:
+            connected_pipes = self._find_all_connected_pipes(shaft, pipelines)
+
+            if not connected_pipes:
+                # No connected pipes found
+                cover_heights.append(
+                    CoverToPipeHeight(
+                        shaft=shaft,
+                        connected_pipes=[],
+                        lowest_pipe=None,
+                        cover_elevation=shaft.point.altitude,
+                        lowest_pipe_elevation=None,
+                        height_difference=None,
+                        medium_compatibility=f"No compatible pipes found for {shaft.medium}",
+                    )
+                )
+                continue
+
+            # Find the lowest pipe elevation
+            lowest_pipe = None
+            lowest_elevation = float("inf")
+
+            for pipe in connected_pipes:
+                # Check both start and end elevations of the pipe
+                start_elev = pipe.point.altitude
+                end_elev = pipe.end_point.altitude if pipe.end_point else start_elev
+
+                # Use the lower of start/end elevations for this pipe
+                pipe_lowest = min(start_elev, end_elev)
+
+                if pipe_lowest < lowest_elevation:
+                    lowest_elevation = pipe_lowest
+                    lowest_pipe = pipe
+
+            # Calculate height difference
+            cover_elevation = shaft.point.altitude
+            height_difference = cover_elevation - lowest_elevation if lowest_pipe else None
+
+            # Create compatibility description
+            if height_difference is None:
+                height_difference = 1.0
+            shaft.dimensions.height = max(1.0, height_difference)
+
+            compatibility_desc = self._describe_shaft_pipe_compatibility(shaft, connected_pipes)
+            cover_heights.append(
+                CoverToPipeHeight(
+                    shaft=shaft,
+                    connected_pipes=connected_pipes,
+                    lowest_pipe=lowest_pipe,
+                    cover_elevation=cover_elevation,
+                    lowest_pipe_elevation=lowest_elevation if lowest_pipe else None,
+                    height_difference=height_difference,
+                    medium_compatibility=compatibility_desc,
+                )
+            )
+
+        return cover_heights
+
+    def _describe_shaft_pipe_compatibility(self, shaft: ObjectData, connected_pipes: list[ObjectData]) -> str:
+        """Create description of shaft-pipe medium compatibility."""
+        if not connected_pipes:
+            return f"No compatible pipes found for shaft {shaft.medium}"
+
+        pipe_mediums = list({pipe.medium for pipe in connected_pipes})
+        descriptions = []
+
+        for pipe_medium in pipe_mediums:
+            compatibility = self.compatibility.get_description(shaft.medium, pipe_medium)
+            pipe_count = sum(1 for pipe in connected_pipes if pipe.medium == pipe_medium)
+            descriptions.append(f"{pipe_count}x {pipe_medium} ({compatibility})")
+
+        return f"Shaft {shaft.medium} → " + ", ".join(descriptions)
 
     def _describe_compatibility(
         self, pipeline: ObjectData, start_manhole: ObjectData | None, end_manhole: ObjectData | None
@@ -315,6 +441,55 @@ class PipelineGradientAdjuster:
             new_points.append(new_point)
 
         pipeline.points = new_points
+
+    def generate_cover_height_report(self, cover_heights: list[CoverToPipeHeight]) -> dict[str, Any]:
+        """Generate a report of cover-to-pipe height calculations."""
+        if not cover_heights:
+            return {
+                "summary": "No cover height calculations performed",
+                "total_shafts": 0,
+                "compatibility_strategy": type(self.compatibility).__name__,
+                "cover_heights": [],
+            }
+
+        # Separate shafts with and without connected pipes
+        shafts_with_pipes = [ch for ch in cover_heights if ch.connected_pipes]
+        shafts_without_pipes = [ch for ch in cover_heights if not ch.connected_pipes]
+
+        # Calculate statistics
+        height_differences = [ch.height_difference for ch in shafts_with_pipes if ch.height_difference is not None]
+        avg_height_diff = sum(height_differences) / len(height_differences) if height_differences else 0
+        min_height_diff = min(height_differences) if height_differences else 0
+        max_height_diff = max(height_differences) if height_differences else 0
+
+        return {
+            "summary": f"Calculated cover heights for {len(cover_heights)} shafts ({len(shafts_with_pipes)} with pipes, {len(shafts_without_pipes)} isolated)",
+            "total_shafts": len(cover_heights),
+            "shafts_with_connected_pipes": len(shafts_with_pipes),
+            "shafts_without_connected_pipes": len(shafts_without_pipes),
+            "compatibility_strategy": type(self.compatibility).__name__,
+            "height_statistics": {
+                "average_cover_to_pipe_height_m": round(avg_height_diff, 3),
+                "minimum_cover_to_pipe_height_m": round(min_height_diff, 3),
+                "maximum_cover_to_pipe_height_m": round(max_height_diff, 3),
+                "total_pipe_connections": sum(len(ch.connected_pipes) for ch in shafts_with_pipes),
+            },
+            "cover_heights": [
+                {
+                    "shaft_medium": ch.shaft.medium,
+                    "shaft_layer": ch.shaft.layer,
+                    "cover_elevation_m": round(ch.cover_elevation, 3),
+                    "connected_pipes_count": len(ch.connected_pipes),
+                    "lowest_pipe_medium": ch.lowest_pipe.medium if ch.lowest_pipe else None,
+                    "lowest_pipe_elevation_m": round(ch.lowest_pipe_elevation, 3)
+                    if ch.lowest_pipe_elevation is not None
+                    else None,
+                    "height_difference_m": round(ch.height_difference, 3) if ch.height_difference is not None else None,
+                    "medium_compatibility": ch.medium_compatibility,
+                }
+                for ch in cover_heights
+            ],
+        }
 
     def generate_report(self, adjustments: list[PipelineAdjustment]) -> dict[str, Any]:
         """Generate a report of pipeline adjustments."""

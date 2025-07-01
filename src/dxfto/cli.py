@@ -114,17 +114,22 @@ def process_dxf(
             click.echo("Updating points elevation from LandXML...")
             processor.update_points_elevation(landxml_reader)
 
+        click.echo("Adjusting pipe gradients based on shaft elevations...")
+        gradient = PipelineGradientAdjuster(
+            params=GradientAdjustmentParams(
+                manhole_search_radius=100, min_gradient_percent=0.1, max_gradient_percent=10
+            ),
+            compatibility=PrefixBasedCompatibility(separator=" "),
+        )
         if adjust_gradient:
-            click.echo("Adjusting pipe gradients based on shaft elevations...")
-            gradient = PipelineGradientAdjuster(
-                params=GradientAdjustmentParams(
-                    manhole_search_radius=100, min_gradient_percent=0.1, max_gradient_percent=10
-                ),
-                compatibility=PrefixBasedCompatibility(separator=" "),
-            )
             adjustment_result = processor.adjustment_pipe_gardiant(gradient)
             if len(adjustment_result) > 0 and verbose:
                 click.echo("Adjusting pipe gradients based on shaft elevations...")
+
+        result_shaft_heights = processor.calculate_cover_to_pipe_height(gradient)
+        if result_shaft_heights:
+            if len(result_shaft_heights) > 0 and verbose:
+                click.echo("Calculated cover to pipe heights on every shaft:")
 
         revit_updater = RevitFamilyNameUpdater()
         processor.update_family_and_types(revit_updater)

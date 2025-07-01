@@ -9,6 +9,7 @@ import logging
 from collections.abc import Iterable
 
 from dxfto.process.gradient.adjuster import (
+    CoverToPipeHeight,
     PipelineAdjustment,
     PipelineGradientAdjuster,
 )
@@ -127,6 +128,28 @@ class DXFProcessor:
         reports = gradient.adjust_gradients_by(elements=elements)
         asjustment_result.extend(reports)
         return asjustment_result
+
+    def calculate_cover_to_pipe_height(self, gradient: PipelineGradientAdjuster) -> list[CoverToPipeHeight]:
+        """Calculate and adjust shaft heights based on the manhole altitudes and deepest point of the pipe.
+
+        Parameters
+        ----------
+        gradient : PipelineGradientAdjuster
+            Gradient adjuster to apply shaft height adjustments
+
+        Returns
+        -------
+        list[CoverToPipeHeight]
+            List of adjustments made to cover heights based on pipe depths
+        """
+        elements = []
+        for medium in self.mediums:
+            for elems, _ in medium.point_data.assigned:
+                elements.extend(elems)
+            for elems, _ in medium.line_data.assigned:
+                elements.extend(elems)
+
+        return gradient.calculate_cover_to_pipe_heights(elements=elements)
 
     def update_points_elevation(self, updater: IElevationUpdater) -> None:
         """Assign extracted texts to mediums.
