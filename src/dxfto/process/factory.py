@@ -186,7 +186,7 @@ class ObjectDataFactory:
                 dimensions=dimensions,
                 layer=_get_layer_name(entity),
                 positions=(position,),
-                points=transformed_points,
+                # points=transformed_points,
                 color=_get_entity_color(entity),
             )
 
@@ -496,9 +496,7 @@ class ObjectDataFactory:
             color=_get_entity_color(entity),
         )
 
-    def _create_bulge_point_based_object(
-        self, entity: DXFEntity, config: MediumConfig
-    ) -> ObjectData:
+    def _create_bulge_point_based_object(self, entity: DXFEntity, config: MediumConfig) -> ObjectData:
         """Create line-based ObjectData from points.
 
         Parameters
@@ -529,9 +527,7 @@ class ObjectDataFactory:
             color=_get_entity_color(entity),
         )
 
-    def _create_round_line_based(
-        self, entity: DXFEntity, points: list[Point3D], config: MediumConfig
-    ) -> ObjectData:
+    def _create_round_line_based(self, entity: DXFEntity, points: list[Point3D], config: MediumConfig) -> ObjectData:
         """Create line-based ObjectData from points.
 
         Parameters
@@ -563,9 +559,7 @@ class ObjectDataFactory:
             color=_get_entity_color(entity),
         )
 
-    def _create_round_point_based(
-        self, entity: DXFEntity, points: list[Point3D], config: MediumConfig
-    ) -> ObjectData:
+    def _create_round_point_based(self, entity: DXFEntity, points: list[Point3D], config: MediumConfig) -> ObjectData:
         """Create line-based ObjectData from points.
 
         Parameters
@@ -619,9 +613,7 @@ class ObjectDataFactory:
             self._block_cache[block_name] = entities
         return self._block_cache[block_name]
 
-    def _analyze_block_shape(
-        self, insert_entity: Insert, block_entities: list[DXFEntity]
-    ) -> tuple | None:
+    def _analyze_block_shape(self, insert_entity: Insert, block_entities: list[DXFEntity]) -> tuple | None:
         """Analyze block geometry to determine shape and dimensions.
 
         Parameters
@@ -728,9 +720,7 @@ class ObjectDataFactory:
 
         return dimensions, []
 
-    def _transform_block_geometry(
-        self, points: list[Point3D], insert_entity: Insert
-    ) -> list[Point3D]:
+    def _transform_block_geometry(self, points: list[Point3D], insert_entity: Insert) -> list[Point3D]:
         """Transform block geometry points to world coordinates.
 
         Parameters

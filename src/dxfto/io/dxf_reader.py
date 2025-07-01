@@ -36,6 +36,29 @@ LAYER_TRANSLATION = {
 }
 
 
+def get_color_filter(entity: DXFEntity, layer: LayerData) -> bool:
+    """Check if entity color matches the layer color."""
+    if layer.color is None:
+        return True
+    if isinstance(layer.color, (tuple | list)):
+        entity_color = getattr(entity, "rgb", RGB(0, 0, 0))
+        layer_color = RGB(*layer.color)
+        return entity_color == layer_color
+    elif isinstance(layer.color, int):
+        return entity.dxf.color == layer.color
+    elif isinstance(layer.color, str):
+        layer_color = layer.color.upper()
+        layer_color = LAYER_TRANSLATION.get(layer_color, layer_color)
+        for aci_color in ACI:
+            if aci_color.name != layer_color:
+                continue
+            return True
+    log.warning(
+        f"No able to find color for {entity} in layer {layer.name} with color {layer.color}"
+    )
+    return False
+
+
 class DXFReader:
     """Clean DXF file reader focused on file I/O and entity querying.
 
@@ -73,36 +96,6 @@ class DXFReader:
         except DXFError as e:
             raise DXFError(f"Cannot read DXF file {self.dxf_path}: {e}") from e
 
-    def query_entities(self, layers: list[LayerData]) -> EntityQuery:
-        """Query entities from specified layers.
-
-        Parameters
-        ----------
-        layers : list[LayerData]
-            List of layer configurations to query
-
-        Returns
-        -------
-        EntityQuery
-            Query result containing entities from specified layers
-
-        Raises
-        ------
-        RuntimeError
-            If DXF file is not loaded
-        """
-        if self._doc is None:
-            raise RuntimeError("DXF file not loaded. Call load_file() first.")
-
-        layer_names = [layer.name for layer in layers]
-        if not layer_names:
-            log.warning("No layers specified for entity query")
-            return self._doc.modelspace().query('*[layer=="__NONEXISTENT__"]')  # Empty result
-
-        query = '*[layer=="' + '" | layer=="'.join(layer_names) + '"]'
-        log.debug(f"Querying entities from layers: {layer_names}")
-        return self._doc.modelspace().query(query)
-
     def query_layer(self, layer: LayerData) -> EntityQuery:
         """Query entities from specified layers.
 
@@ -125,28 +118,13 @@ class DXFReader:
             raise RuntimeError("DXF file not loaded. Call load_file() first.")
 
         def color_filter(entity: DXFEntity) -> bool:
-            """Check if entity color matches the layer color."""
-            if layer.color is None:
-                return True
-            if isinstance(layer.color, (tuple | list)):
-                entity_color = getattr(entity, "rgb", RGB(0, 0, 0))
-                layer_color = RGB(*layer.color)
-                return entity_color == layer_color
-            elif isinstance(layer.color, int):
-                return entity.dxf.color == layer.color
-            elif isinstance(layer.color, str):
-                layer_color = layer.color.upper()
-                layer_color = LAYER_TRANSLATION.get(layer_color, layer_color)
-                for aci_color in ACI:
-                    if aci_color.name != layer_color:
-                        continue
-                    return True
-            log.warning(
-                f"No able to find color for {entity} in layer {layer.name} with color {layer.color}"
-            )
-            return False
+            """Filter function to check entity color against layer color."""
+            return get_color_filter(entity, layer)
 
-        query = f'*[layer=="{layer.name}"]'
+        if layer.block is None:
+            query = f'*[layer=="{layer.name}"]'
+        else:
+            query = f'INSERT[layer=="{layer.name}" & name=="{layer.block}"]'
         log.debug(f"Querying entities from layer: {layer.name} with color {layer.color}")
         return self._doc.modelspace().query(query).filter(color_filter)
 

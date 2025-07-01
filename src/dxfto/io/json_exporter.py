@@ -87,9 +87,7 @@ class JsonExporter:
         elem_export.extend(line_based_data)
         return elem_export
 
-    def _get_element_data(
-        self, element_data: list[tuple[list[ObjectData], MediumConfig]]
-    ) -> list[dict[str, Any]]:
+    def _get_element_data(self, element_data: list[tuple[list[ObjectData], MediumConfig]]) -> list[dict[str, Any]]:
         """Export elements and texts to dictionary format.
 
         Parameters
@@ -106,12 +104,11 @@ class JsonExporter:
 
         for elements, _ in element_data:
             export_data = [self._export_element(elem) for elem in elements]
+            export_data = [data for data in export_data if data is not None]
             elements_export_data.extend(export_data)
         return elements_export_data
 
-    def _get_param(
-        self, name: str, value: Any, value_type: str, unit: str | None = None
-    ) -> dict[str, Any]:
+    def _get_param(self, name: str, value: Any, value_type: str, unit: str | None = None) -> dict[str, Any]:
         param = {
             "name": name,
             "value": value,
@@ -139,7 +136,7 @@ class JsonExporter:
             parameters.append(param.to_dict())
         return parameters
 
-    def _export_element(self, element: ObjectData) -> dict[str, Any]:
+    def _export_element(self, element: ObjectData):
         """Export a pipe to dictionary format.
 
         Parameters
@@ -163,13 +160,14 @@ class JsonExporter:
             element_data["insert_point"] = _export_point(element.point)
         elif element.is_line_based:
             element_data["line_points"] = _export_points(element.points)
+        else:
+            print(f"Unknown element type: {element_data}")
+            return None
 
         element_data["parameters"] = self._get_parameters(element)
         return element_data
 
-    def _export_dimensions(
-        self, dimensions: RectangularDimensions | RoundDimensions
-    ) -> dict[str, Any]:
+    def _export_dimensions(self, dimensions: RectangularDimensions | RoundDimensions) -> dict[str, Any]:
         """Export dimensions to dictionary format.
 
         Parameters

@@ -234,14 +234,21 @@ class ObjectData:
     It can be extended with common properties or methods in the future.
     """
 
-    line_based_types: ClassVar[set[ObjectType]] = {
+    @classmethod
+    def point_types(cls) -> set[ObjectType]:
+        """Get set of point-based object types."""
+        point_based = set()
+        for obj_type in ObjectType:
+            if obj_type in cls.line_types:
+                continue
+            point_based.add(obj_type)
+        return point_based
+
+    line_types: ClassVar[set[ObjectType]] = {
         ObjectType.PIPE_WASTEWATER,
         ObjectType.PIPE_WATER,
         ObjectType.PIPE_GAS,
         ObjectType.CABLE_DUCT,
-    }
-    point_based_types: ClassVar[set[ObjectType]] = {
-        ObjectType.SHAFT,
     }
 
     medium: str
@@ -297,7 +304,10 @@ class ObjectData:
         bool
             True if the object is line-based, False otherwise.
         """
-        return self.end_point is not None
+        is_oject_type_line = self.object_type in self.line_types
+        has_two_positions = len(self.positions) == 2
+        has_end_point = self.end_point is not None
+        return is_oject_type_line and has_two_positions and has_end_point
 
     @property
     def is_point_based(self) -> bool:
@@ -308,18 +318,9 @@ class ObjectData:
         bool
             True if the object is point-based, False otherwise.
         """
-        return self.end_point is None
-
-    @property
-    def should_be_round(self) -> bool:
-        """Check if the object has round dimensions.
-
-        Returns
-        -------
-        bool
-            True if the object has round dimensions, False otherwise.
-        """
-        return self.object_type.name.startswith("PIPE") or self.object_type == ObjectType.SHAFT
+        is_oject_type_point = self.object_type in self.point_types()
+        is_single_position = len(self.positions) == 1
+        return is_oject_type_point and is_single_position
 
     def get_parameters(self) -> list[Parameter]:
         """Get parameters for the object.
