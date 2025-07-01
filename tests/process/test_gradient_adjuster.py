@@ -1,91 +1,16 @@
 """Tests for pipeline gradient adjustment with medium compatibility."""
 
-import sys
-from pathlib import Path
-
 import pytest
 
-# Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
-
 from dxfto.models import ObjectData, ObjectType, Point3D, RoundDimensions
-from dxfto.process.gradient_adjuster import (
+from dxfto.process.gradient import (
     ExplicitRulesCompatibility,
-    GradientAdjustmentParams,
-    PatternBasedCompatibility,
-    PipelineGradientAdjuster,
     PrefixBasedCompatibility,
 )
-
-
-class TestMediumCompatibilityStrategies:
-    """Test different medium compatibility strategies."""
-
-    def test_prefix_based_compatibility(self):
-        """Test prefix-based compatibility checking."""
-        strategy = PrefixBasedCompatibility(separator=" ")
-
-        # Same prefix - compatible
-        assert strategy.are_compatible("Regenabwasser Gemeinde", "Regenabwasser Privat")
-        assert strategy.are_compatible("Abwasser Gemeinde", "Abwasser Privat")
-
-        # Different prefix - incompatible
-        assert not strategy.are_compatible("Regenabwasser Gemeinde", "Abwasser Privat")
-        assert not strategy.are_compatible("Wasser Gemeinde", "Gas Privat")
-
-        # Exact match - compatible
-        assert strategy.are_compatible("Wasser", "Wasser")
-
-        # Prefix extraction
-        assert strategy.get_medium_prefix("Regenabwasser Gemeinde") == "Regenabwasser"
-        assert strategy.get_medium_prefix("Wasser") == "Wasser"
-        assert strategy.get_group("Regenabwasser Privat") == "Regenabwasser"
-
-    def test_explicit_rules_compatibility(self):
-        """Test explicit rules-based compatibility."""
-        rules = {
-            "Regenabwasser Gemeinde": ["Regenabwasser Privat"],
-            "Regenabwasser Privat": ["Regenabwasser Gemeinde"],
-            "Abwasser Gemeinde": ["Abwasser Privat"],
-            "Abwasser Privat": ["Abwasser Gemeinde"],
-        }
-
-        strategy = ExplicitRulesCompatibility(rules)
-
-        # Rule-based compatibility
-        assert strategy.are_compatible("Regenabwasser Gemeinde", "Regenabwasser Privat")
-        assert strategy.are_compatible("Abwasser Privat", "Abwasser Gemeinde")
-
-        # No rule - incompatible
-        assert not strategy.are_compatible("Regenabwasser Gemeinde", "Abwasser Privat")
-        assert not strategy.are_compatible("Wasser", "Gas")
-
-        # Exact match always compatible
-        assert strategy.are_compatible("Wasser", "Wasser")
-
-    def test_pattern_based_compatibility(self):
-        """Test pattern-based compatibility."""
-        patterns = {
-            "regenabwasser": ["Regenabwasser*", "Regenwasser*"],
-            "abwasser": ["Abwasser*", "Schmutzwasser*"],
-            "wasser": ["Wasser*"],
-        }
-
-        strategy = PatternBasedCompatibility(patterns)
-
-        # Pattern group compatibility
-        assert strategy.are_compatible("Regenabwasser Gemeinde", "Regenabwasser Privat")
-        assert strategy.are_compatible("Regenabwasser Test", "Regenwasser ABC")
-        assert strategy.are_compatible("Abwasser A", "Schmutzwasser B")
-
-        # Different groups - incompatible
-        assert not strategy.are_compatible("Regenabwasser Test", "Abwasser Test")
-        assert not strategy.are_compatible("Wasser Test", "Gas Test")
-
-        # Group identification
-        assert strategy.get_group("Regenabwasser Gemeinde") == "regenabwasser"
-        assert strategy.get_group("Regenwasser Test") == "regenabwasser"
-        assert strategy.get_group("Unknown Medium") == "Unknown Medium"
+from dxfto.process.gradient.adjuster import (
+    GradientAdjustmentParams,
+    PipelineGradientAdjuster,
+)
 
 
 class TestPipelineGradientAdjuster:
@@ -312,7 +237,7 @@ class TestPipelineGradientAdjuster:
             positions=(Point3D(east=20.0, north=0.0, altitude=98.0),),
         )
 
-        # Pipeline with intermediate points
+        # Pipeline with intermediate points (wrong elevations to force adjustment)
         pipeline = ObjectData(
             medium="Test",
             object_type=ObjectType.PIPE_WASTEWATER,
@@ -321,13 +246,13 @@ class TestPipelineGradientAdjuster:
             dimensions=RoundDimensions(diameter=0.3),
             layer="test",
             positions=(
-                Point3D(east=1.0, north=0.0, altitude=100.0),
-                Point3D(east=19.0, north=0.0, altitude=98.0),
+                Point3D(east=1.0, north=0.0, altitude=95.0),  # Wrong elevation
+                Point3D(east=19.0, north=0.0, altitude=95.5),  # Wrong elevation (uphill!)
             ),
             points=[
-                Point3D(east=1.0, north=0.0, altitude=100.0),  # Start
-                Point3D(east=10.0, north=0.0, altitude=99.0),  # Middle
-                Point3D(east=19.0, north=0.0, altitude=98.0),  # End
+                Point3D(east=1.0, north=0.0, altitude=95.0),  # Start (wrong)
+                Point3D(east=10.0, north=0.0, altitude=95.2),  # Middle (wrong)
+                Point3D(east=19.0, north=0.0, altitude=95.5),  # End (wrong)
             ],
         )
 

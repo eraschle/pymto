@@ -13,8 +13,7 @@ from .config import ConfigurationHandler
 from .io import JsonExporter, LandXMLReader
 from .process.assigners import SpatialTextAssigner
 from .process.creator import MediumObjectCreator
-from .process.dimension import DimensionUpdater
-from .process.dimension_mapper import DimensionMapper
+from .process.dimension import DimensionMapper, DimensionUpdater
 from .process.revit_updater import RevitFamilyNameUpdater
 from .processor import DXFProcessor, IExporter
 
@@ -123,9 +122,6 @@ def _print_assignment_statistic(processor: DXFProcessor):
             f"{medium.name:<25} {total_elems:>12} {total_texts:>12} {assigned_elems:>15} {assigned_perc:>11.1f}%"
         )
     click.echo("-" * 85)
-
-    click.echo(f"Total Objects: {sum([medium.get_point_total() for medium in processor.mediums])}")
-    click.echo(f"Total Lines: {sum([medium.get_line_total() for medium in processor.mediums])}")
 
 
 def _print_export_statistic(exporter: IExporter):

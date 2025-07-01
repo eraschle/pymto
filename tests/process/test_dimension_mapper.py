@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from dxfto.process.dimension_mapper import DimensionMapper
+from dxfto.process.dimension import DimensionMapper
 
 
 class TestDimensionMapper:

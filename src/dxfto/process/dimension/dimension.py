@@ -5,7 +5,7 @@ supporting both round (circular) and rectangular dimensions with various formats
 and unit specifications.
 """
 
-from ..models import (
+from ...models import (
     AssingmentData,
     MediumConfig,
     ObjectData,
