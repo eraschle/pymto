@@ -419,8 +419,8 @@ class PipelineGradientAdjuster:
         total_distance = 0
         distances = [0.0]
 
-        for i in range(1, len(pipeline.points)):
-            segment_distance = pipeline.points[i - 1].distance_2d(pipeline.points[i])
+        for idx in range(1, len(pipeline.points)):
+            segment_distance = pipeline.points[idx - 1].distance_2d(pipeline.points[idx])
             total_distance += segment_distance
             distances.append(total_distance)
 
@@ -428,13 +428,13 @@ class PipelineGradientAdjuster:
         elevation_diff = end_elevation - start_elevation
 
         new_points = []
-        for i, point in enumerate(pipeline.points):
-            if i == 0:
+        for idx, point in enumerate(pipeline.points):
+            if idx == 0:
                 new_elevation = start_elevation
-            elif i == len(pipeline.points) - 1:
+            elif idx == len(pipeline.points) - 1:
                 new_elevation = end_elevation
             else:
-                distance_ratio = distances[i] / total_distance if total_distance > 0 else 0
+                distance_ratio = distances[idx] / total_distance if total_distance > 0 else 0
                 new_elevation = start_elevation + (elevation_diff * distance_ratio)
 
             new_point = Point3D(point.east, point.north, new_elevation)
