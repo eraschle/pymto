@@ -58,6 +58,7 @@ class ElementData(object):
         # Handle both insert_point and line_points
         self.insert_point = json_data.get("insert_point")
         self.line_points = json_data.get("line_points", [])
+        self._json_data = json_data
 
     def is_point_based(self):
         # type: () -> bool
@@ -76,8 +77,7 @@ class ElementData(object):
 
     def __repr__(self):
         # type: () -> str
-        point_type = "point-based" if self.is_point_based() else "line-based"
-        return "ElementData({}, {})".format(self.object_type, point_type)
+        return self._json_data
 
 
 class RevitImporter(object):
@@ -133,7 +133,9 @@ class RevitImporter(object):
             raise ValueError("Family symbol not found: {}, {}".format(family_name, type_name))
         family_symbol = family_symbol.Duplicate(type_name)
         if not isinstance(family_symbol, FamilySymbol):
-            raise ValueError("Failed to duplicate family symbol: {}, {}".format(family_name, type_name))
+            raise ValueError(
+                "Failed to duplicate family symbol: {}, {}".format(family_name, type_name)
+            )
         if not family_symbol.IsActive:
             family_symbol.Activate()
         return family_symbol
@@ -156,13 +158,19 @@ class RevitImporter(object):
             return self.create_point_based_element(element_data, family_symbol)
         elif element_data.is_line_based():
             return self.create_line_based_element(element_data, family_symbol)
-        raise ValueError("ElementData is neither point-based or line-based, got: {}".format(element_data))
+        raise ValueError(
+            "ElementData is neither point-based or line-based, got: {}".format(
+                element_data._json_data
+            )
+        )
 
     def create_point_based_element(self, element_data: ElementData, family_symbol: FamilySymbol):
         # type: (ElementData, FamilySymbol) -> list[FamilyInstance]
         """Create point-based element (normal FamilyInstance)"""
         if element_data.insert_point is None:
-            raise ValueError("ElementData is not point-based, Did you check is_point_based() first?")
+            raise ValueError(
+                "ElementData is not point-based, Did you check is_point_based() first?"
+            )
 
         position = self.create_xyz_from_point(element_data.insert_point)
         instance = self.document.Create.NewFamilyInstance(  # pyright: ignore[reportAttributeAccessIssue]
@@ -193,8 +201,12 @@ class RevitImporter(object):
         for idx, point in enumerate(all_points):
             if idx == 0:
                 continue
-            instance = AdaptiveComponentInstanceUtils.CreateAdaptiveComponentInstance(self.document, family_symbol)
-            adaptive_points = AdaptiveComponentInstanceUtils.GetInstancePlacementPointElementRefIds(instance)
+            instance = AdaptiveComponentInstanceUtils.CreateAdaptiveComponentInstance(
+                self.document, family_symbol
+            )
+            adaptive_points = AdaptiveComponentInstanceUtils.GetInstancePlacementPointElementRefIds(
+                instance
+            )
 
             start_point = self.create_xyz_from_point(all_points[idx - 1])
             end_point = self.create_xyz_from_point(point)
@@ -277,9 +289,13 @@ class RevitImporter(object):
                     # Create ElementData object from JSON
                     element_data = ElementData(element_json)
 
-                    family_symbol = self.get_family_symbol(element_data.family, element_data.family_type)
+                    family_symbol = self.get_family_symbol(
+                        element_data.family, element_data.family_type
+                    )
                     if family_symbol is None:
-                        print(f"Family symbol not found for {element_data.family} - {element_data.family_type}")
+                        print(
+                            f"Family symbol not found for {element_data.family} - {element_data.family_type}"
+                        )
                         continue
 
                     instances = self.create_element(element_data, family_symbol)
@@ -307,7 +323,9 @@ def main():
         return
 
     # Select JSON file
-    project_zero_path = forms.pick_file(file_ext="json", title="Project Koordinaten Datei auswählen")
+    project_zero_path = forms.pick_file(
+        file_ext="json", title="Project Koordinaten Datei auswählen"
+    )
     if isinstance(project_zero_path, list):
         project_zero_path = project_zero_path[0]
 
