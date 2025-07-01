@@ -6,6 +6,7 @@ format suitable for Revit modeling.
 """
 
 from pathlib import Path
+from pprint import pp
 
 import click
 
@@ -48,12 +49,29 @@ from .processor import DXFProcessor, IExporter
     default=1.0,
     help="Maximum distance for text-to-pipe assignment",
 )
+@click.option(
+    "--adjust-gradient",
+    type=bool,
+    is_flag=True,
+    flag_value=True,
+    help="Process gradient adjustment on pipes. (Default False)",
+)
+@click.option(
+    "--verbose",
+    "-v",
+    type=bool,
+    is_flag=True,
+    flag_value=True,
+    help="Process gradient adjustment on pipes. (Default False)",
+)
 def process_dxf(
     dxf_file: Path,
     config: Path,
     landxml: Path,
     output: Path | None,
     max_text_distance: float,
+    adjust_gradient: bool,
+    verbose: bool,
 ) -> None:
     """Process DXF file and export pipe/shaft data for Revit modeling.
 
@@ -96,15 +114,17 @@ def process_dxf(
             click.echo("Updating points elevation from LandXML...")
             processor.update_points_elevation(landxml_reader)
 
-        gradient = PipelineGradientAdjuster(
-            params=GradientAdjustmentParams(
-                manhole_search_radius=100, min_gradient_percent=0.1, max_gradient_percent=10
-            ),
-            compatibility=PrefixBasedCompatibility(separator=" "),
-        )
-        adjustment_result = processor.adjustment_pipe_gardiant(gradient)
-        if len(adjustment_result) > 0:
+        if adjust_gradient:
             click.echo("Adjusting pipe gradients based on shaft elevations...")
+            gradient = PipelineGradientAdjuster(
+                params=GradientAdjustmentParams(
+                    manhole_search_radius=100, min_gradient_percent=0.1, max_gradient_percent=10
+                ),
+                compatibility=PrefixBasedCompatibility(separator=" "),
+            )
+            adjustment_result = processor.adjustment_pipe_gardiant(gradient)
+            if len(adjustment_result) > 0 and verbose:
+                click.echo("Adjusting pipe gradients based on shaft elevations...")
 
         revit_updater = RevitFamilyNameUpdater()
         processor.update_family_and_types(revit_updater)
@@ -112,6 +132,18 @@ def process_dxf(
         exporter = JsonExporter(output)
         processor.export_data(exporter)
         _print_export_statistic(exporter)
+        if not verbose:
+            return
+        click.echo("Not exported elements:")
+        for medium, elements in exporter.not_exported_elements.items():
+            if len(elements) == 0:
+                continue
+            click.echo(f"Medium: {medium}")
+            click.echo("-" * 85)
+            for element in elements:
+                # params = [pp(param.to_dict()) for param in element.get_parameters()]
+                click.echo(f"{pp(element)}")
+            click.echo("")
 
     except Exception as e:
         raise click.ClickException(f"Processing failed: {e}") from e
