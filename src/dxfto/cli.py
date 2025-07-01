@@ -104,7 +104,7 @@ def process_dxf(
         click.echo("Updating dimensions based on assigned texts...")
         dim_mapper = DimensionMapper()
         dimension_updater = DimensionUpdater(target_unit="m", dimension_mapper=dim_mapper)
-        processor.update_dimensions(dimension_updater)
+        processor.update_dimensions(updater=dimension_updater)
 
         # Process LandXML if provided
         if landxml:
@@ -112,30 +112,34 @@ def process_dxf(
             landxml_reader.load_file()
 
             click.echo("Updating points elevation from LandXML...")
-            processor.update_points_elevation(landxml_reader)
+            processor.update_points_elevation(updater=landxml_reader)
 
         click.echo("Adjusting pipe gradients based on shaft elevations...")
         gradient = PipelineGradientAdjuster(
             params=GradientAdjustmentParams(
-                manhole_search_radius=100, min_gradient_percent=0.1, max_gradient_percent=10
+                manhole_search_radius=2,
+                min_gradient_percent=0.5,
+                max_gradient_percent=10,
             ),
             compatibility=PrefixBasedCompatibility(separator=" "),
         )
         if adjust_gradient:
-            adjustment_result = processor.adjustment_pipe_gardiant(gradient)
+            adjustment_result = processor.adjustment_pipe_gardiant(gradient=gradient)
             if len(adjustment_result) > 0 and verbose:
                 click.echo("Adjusting pipe gradients based on shaft elevations...")
 
-        result_shaft_heights = processor.calculate_cover_to_pipe_height(gradient)
-        if result_shaft_heights:
-            if len(result_shaft_heights) > 0 and verbose:
-                click.echo("Calculated cover to pipe heights on every shaft:")
+        result_shaft_heights = processor.calculate_cover_to_pipe_height(gradient=gradient)
+        if len(result_shaft_heights) > 0 and verbose:
+            click.echo("Calculated cover to pipe heights on every shaft:")
+
+        click.echo("Adjusting and round parameter values...")
+        processor.round_parameter_values(updater=dimension_updater)
 
         revit_updater = RevitFamilyNameUpdater()
-        processor.update_family_and_types(revit_updater)
+        processor.update_family_and_types(updater=revit_updater)
 
         exporter = JsonExporter(output)
-        processor.export_data(exporter)
+        processor.export_data(exporter=exporter)
         _print_export_statistic(exporter)
         if not verbose:
             return

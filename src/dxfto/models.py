@@ -29,12 +29,13 @@ class ObjectType(Enum):
     CABLE_DUCT = "cable_duct"  # Kabekanal
 
 
-@dataclass
 class Parameter:
-    name: str
-    value: Any
-    value_type: str
-    unit: str | None = field(default=None)
+    def __init__(self, name: str, value: Any, value_type: str, unit: str | None = None) -> None:
+        """Initialize a parameter with name, value, type and optional unit."""
+        self.name = name
+        self.value = value
+        self.value_type = value_type
+        self.unit = unit
 
     def to_dict(self) -> dict[str, Any]:
         """Convert parameter to dictionary format."""
@@ -109,12 +110,34 @@ class Point3D:
         return np.sqrt(dx**2 + dy**2)
 
 
+def _get_parameters(instance: object) -> list[Parameter]:
+    """Get parameters from an object.
+
+    Parameters
+    ----------
+    obj : Any
+        Object to extract parameters from
+
+    Returns
+    -------
+    list[Parameter]
+        List of parameters extracted from the object
+    """
+    params = []
+    for _, param in instance.__dict__.items():
+        if not isinstance(param, Parameter):
+            continue
+        params.append(param)
+    return sorted(params, key=lambda p: p.name)
+
+
 class ADimensions:
     def __init__(self, height: float | None = None) -> None:
-        self._height = Parameter("Height", height if height is not None else 0.0, "float", "m")
+        height = height if height is not None else 0.0
+        self._height = Parameter(name="Height", value=height, value_type="float", unit="m")
 
     @property
-    def height(self) -> float | None:
+    def height(self) -> float:
         """Get the height of the rectangular shape."""
         return self._height.value
 
@@ -122,12 +145,12 @@ class ADimensions:
     def height(self, value: float | None) -> None:
         """Set the height of the rectangular shape."""
         if value is None or value < 0:
-            raise ValueError("Height must be a non-negative value.")
+            value = 0.0
         self._height.value = float(value)
 
     def to_parameters(self) -> list[Parameter]:
         """Get parameters as a dictionary."""
-        return [value for _, value in self.__dict__.items() if isinstance(value, Parameter)]
+        return _get_parameters(self)
 
 
 class RectangularDimensions(ADimensions):
@@ -147,9 +170,9 @@ class RectangularDimensions(ADimensions):
 
     def __init__(self, length: float, width: float, angle: float, height: float | None = None) -> None:
         super().__init__(height)
-        self._length = Parameter("Length", length, "float", "m")
-        self._width = Parameter("Width", width, "float", "m")
-        self._angle = Parameter("Angle", angle % 360, "float", "Degree")
+        self._length = Parameter(name="Width", value=length, value_type="float", unit="m")
+        self._width = Parameter(name="Depth", value=width, value_type="float", unit="m")
+        self._angle = Parameter(name="XY rotation (azimuth)", value=angle % 360, value_type="float", unit="Degree")
 
     @property
     def length(self) -> float:
@@ -199,21 +222,20 @@ class RoundDimensions(ADimensions):
     def __init__(self, diameter: float, height: float | None = None) -> None:
         super().__init__(height)
         """Initialize RoundDimensions with diameter and optional height."""
-        self._diameter = diameter
+        self._diameter = Parameter(name="Diameter", value=diameter, value_type="float", unit="m")
 
     @property
     def diameter(self) -> float:
-        return self._diameter
+        return self._diameter.value
 
     @diameter.setter
     def diameter(self, value: float) -> None:
         """Set the diameter of the round shape."""
         if value <= 0:
-            raise ValueError("Diameter must be a positive value.")
-        self._diameter = float(value)
+            value = 0.0
+        self._diameter.value = float(value)
 
 
-@dataclass
 class DxfText:
     """Represents a text element from DXF file.
 
@@ -229,21 +251,26 @@ class DxfText:
         RGB color values
     """
 
-    medium: str
-    content: str
-    position: Point3D
-    layer: str
-    color: tuple[int, int, int]
+    def __init__(self, medium: str, content: str, position: Point3D, layer: str, color: tuple[int, int, int]) -> None:
+        self.medium = medium
+        self._content = Parameter(name="Text", value=content, value_type="string")
+        self.position: Point3D = position
+        self.layer = layer
+        self.color = color
+
+    @property
+    def content(self) -> str:
+        """Get the text content."""
+        return self._content.value
+
+    @content.setter
+    def content(self, value: str) -> None:
+        """Set the text content."""
+        self._content.value = value
 
     def to_parameters(self) -> list[Parameter]:
         """Get parameters as a dictionary."""
-        return [
-            Parameter(
-                name="Text",
-                value=self.content,
-                value_type="string",
-            )
-        ]
+        return [self._content]
 
 
 @dataclass
@@ -302,7 +329,18 @@ class ObjectData:
         return self.positions[0]
 
     @property
-    def end_point(self) -> Point3D | None:
+    def has_end_point(self) -> bool:
+        """Check if the object has an end point.
+
+        Returns
+        -------
+        bool
+            True if the object has an end point, False otherwise.
+        """
+        return len(self.positions) > 1
+
+    @property
+    def end_point(self) -> Point3D:
         """End point of the line-based object.
         Point-based objects return None
 
@@ -312,7 +350,7 @@ class ObjectData:
             Point3D representing the end position of the object, or None.
         """
         if len(self.positions) == 1:
-            return None
+            raise ValueError("Element has no end point. Did you check 'has_end_point'?")
         return self.positions[-1]
 
     @property
@@ -325,9 +363,9 @@ class ObjectData:
             True if the object is line-based, False otherwise.
         """
         is_oject_type_line = self.object_type in self.line_types
-        has_two_positions = len(self.positions) == 2
-        has_end_point = self.end_point is not None
-        return is_oject_type_line and has_two_positions and has_end_point
+        has_two_or_more_positions = len(self.positions) >= 2
+        has_end_point = len(self.positions) >= 2 and self.end_point is not None
+        return is_oject_type_line and has_two_or_more_positions and has_end_point
 
     @property
     def is_point_based(self) -> bool:
@@ -353,10 +391,7 @@ class ObjectData:
         params = []
         if self.assigned_text is not None:
             params.extend(self.assigned_text.to_parameters())
-        if isinstance(self.dimensions, RectangularDimensions):
-            params.extend(self.dimensions.to_parameters())
-        if isinstance(self.dimensions, RoundDimensions):
-            params.extend(self.dimensions.to_parameters())
+        params.extend(self.dimensions.to_parameters())
         params.extend(self.parameters)
         return params
 
