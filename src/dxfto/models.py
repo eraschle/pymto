@@ -134,13 +134,13 @@ class RectangularDimensions:
         """Get parameters as a dictionary."""
         return [
             Parameter(
-                name="Länge",
+                name="Width",
                 value=self.length,
                 value_type="float",
                 unit="m",
             ),
             Parameter(
-                name="Breite",
+                name="Depth",
                 value=self.width,
                 value_type="float",
                 unit="m",
@@ -152,7 +152,7 @@ class RectangularDimensions:
                 unit="Degree",
             ),
             Parameter(
-                name="Höhe",
+                name="Height",
                 value=self.height if self.height is not None else 0.0,
                 value_type="float",
                 unit="m",
@@ -179,13 +179,13 @@ class RoundDimensions:
         """Get parameters as a dictionary."""
         return [
             Parameter(
-                name="Durchmesser",
+                name="Diameter",
                 value=self.diameter,
                 value_type="float",
                 unit="m",
             ),
             Parameter(
-                name="Höhe",
+                name="Height",
                 value=self.height if self.height is not None else 0.0,
                 value_type="float",
                 unit="m",

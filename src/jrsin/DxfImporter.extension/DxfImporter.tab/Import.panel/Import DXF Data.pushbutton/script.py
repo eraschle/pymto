@@ -6,15 +6,14 @@ IronPython 3 compatible
 """
 
 import json
-import re
 
 from Autodesk.Revit.DB import (
     XYZ,
     AdaptiveComponentInstanceUtils,
     BuiltInCategory,
     Document,
+    Element,
     ElementId,
-    FamilyInstance,
     FamilySymbol,
     FilteredElementCollector,
     Parameter,
@@ -58,7 +57,7 @@ class ElementData(object):
         # Handle both insert_point and line_points
         self.insert_point = json_data.get("insert_point")
         self.line_points = json_data.get("line_points", [])
-        self._json_data = json_data
+        self.json_data = json_data
 
     def is_point_based(self):
         # type: () -> bool
@@ -74,10 +73,6 @@ class ElementData(object):
         # type: () -> list
         """Get all points for line-based elements"""
         return self.line_points if self.line_points else []
-
-    def __repr__(self):
-        # type: () -> str
-        return self._json_data
 
 
 class RevitImporter(object):
@@ -113,29 +108,31 @@ class RevitImporter(object):
             return symbol
         return None
 
-    def get_family_symbol(self, family_name: str, type_name: str):
-        # type: (str, str) -> FamilySymbol | None
+    def get_or_create_symbol(self, element_data: ElementData):
+        # type: (dict) -> FamilySymbol | None
         """Get first available Generic Model family symbol"""
         collector = self.get_family_collector()
         family_symbol = None
         for symbol in collector.ToElements():
             if not isinstance(symbol, FamilySymbol):
                 continue
-            if symbol.FamilyName != family_name:
+            if symbol.FamilyName != element_data.family:
                 continue
             family_symbol = symbol
-            if symbol.Name != type_name:
+            if symbol.Name != element_data.family_type:
                 continue
             if not symbol.IsActive:
                 symbol.Activate()
             return symbol
         if family_symbol is None:
+            family_name = element_data.family
+            type_name = element_data.family_type
             raise ValueError("Family symbol not found: {}, {}".format(family_name, type_name))
-        family_symbol = family_symbol.Duplicate(type_name)
+        family_symbol = family_symbol.Duplicate(element_data.family_type)
         if not isinstance(family_symbol, FamilySymbol):
-            raise ValueError(
-                "Failed to duplicate family symbol: {}, {}".format(family_name, type_name)
-            )
+            family_name = element_data.family
+            type_name = element_data.family_type
+            raise ValueError("Failed to duplicate family symbol: {}, {}".format(family_name, type_name))
         if not family_symbol.IsActive:
             family_symbol.Activate()
         return family_symbol
@@ -152,32 +149,25 @@ class RevitImporter(object):
         return XYZ(east, north, alt)
 
     def create_element(self, element_data: ElementData, family_symbol: FamilySymbol):
-        # type: (ElementData, FamilySymbol) -> list[FamilyInstance]
+        # type: (ElementData, FamilySymbol) -> list[Element]
         """Create Revit element from ElementData"""
         if element_data.is_point_based():
             return self.create_point_based_element(element_data, family_symbol)
         elif element_data.is_line_based():
             return self.create_line_based_element(element_data, family_symbol)
-        raise ValueError(
-            "ElementData is neither point-based or line-based, got: {}".format(
-                element_data._json_data
-            )
-        )
+        raise ValueError("Element is neither point or line-based, got: {}".format(element_data.json_data))
 
     def create_point_based_element(self, element_data: ElementData, family_symbol: FamilySymbol):
-        # type: (ElementData, FamilySymbol) -> list[FamilyInstance]
+        # type: (ElementData, FamilySymbol) -> list[Element]
         """Create point-based element (normal FamilyInstance)"""
         if element_data.insert_point is None:
-            raise ValueError(
-                "ElementData is not point-based, Did you check is_point_based() first?"
-            )
+            raise ValueError("ElementData is not point-based, Did you check is_point_based() first?")
 
         position = self.create_xyz_from_point(element_data.insert_point)
         instance = self.document.Create.NewFamilyInstance(  # pyright: ignore[reportAttributeAccessIssue]
             position, family_symbol, StructuralType.NonStructural
         )
 
-        self.set_element_parameters(instance, element_data)
         return [instance]
 
     def _get_reference_point(self, element_id: ElementId):
@@ -189,7 +179,7 @@ class RevitImporter(object):
         return ref_point
 
     def create_line_based_element(self, element_data: ElementData, family_symbol: FamilySymbol):
-        # type: (ElementData, FamilySymbol) -> list[FamilyInstance]
+        # type: (ElementData, FamilySymbol) -> list[Element]
         """Create line-based element (AdaptiveComponent)"""
         instances = []
         all_points = element_data.get_all_points()
@@ -201,12 +191,8 @@ class RevitImporter(object):
         for idx, point in enumerate(all_points):
             if idx == 0:
                 continue
-            instance = AdaptiveComponentInstanceUtils.CreateAdaptiveComponentInstance(
-                self.document, family_symbol
-            )
-            adaptive_points = AdaptiveComponentInstanceUtils.GetInstancePlacementPointElementRefIds(
-                instance
-            )
+            instance = AdaptiveComponentInstanceUtils.CreateAdaptiveComponentInstance(self.document, family_symbol)
+            adaptive_points = AdaptiveComponentInstanceUtils.GetInstancePlacementPointElementRefIds(instance)
 
             start_point = self.create_xyz_from_point(all_points[idx - 1])
             end_point = self.create_xyz_from_point(point)
@@ -222,21 +208,20 @@ class RevitImporter(object):
                 )
                 continue
 
-            self.set_element_parameters(instance, element_data)
             instances.append(instance)
         return instances
 
-    def _get_parameter_value(self, param: Parameter, param_data):
+    def _get_parameter_value(self, parameter: Parameter, parameter_data):
         # type: (Parameter, dict) -> str | int | float | None
         """Set parameter value with unit conversion if needed"""
-        value = param_data["value"]
+        value = parameter_data["value"]
         if value is None:
             return None
 
-        unit_type = param_data.get("unit", None)
-        if param.StorageType == StorageType.ElementId:
+        unit_type = parameter_data.get("unit", None)
+        if parameter.StorageType == StorageType.ElementId:
             raise NotImplementedError("ElementId parameters are not supported in this script")
-        if param.StorageType == StorageType.Double:
+        if parameter.StorageType == StorageType.Double:
             if unit_type is None:
                 return float(value)
             if unit_type.lower() in ["mm", "cm", "m"]:
@@ -245,33 +230,31 @@ class RevitImporter(object):
             if unit_type.lower() in ["degree", "grad"]:
                 return UnitUtils.ConvertToInternalUnits(float(value), UnitTypeId.Degrees)
             raise ValueError(f"Unknown unit type: {unit_type}")
-        if param.StorageType == StorageType.Integer:
-            if param_data.get("value_type", None) == "bool":
+        if parameter.StorageType == StorageType.Integer:
+            if parameter_data.get("value_type", None) == "bool":
                 return 1 if bool(value) else 0
             return int(value)
-        value = str(value)
-
         return str(value)
 
-    def _set_parameter_value(self, param: Parameter, param_data):
+    def _set_parameter_value(self, parameter: Parameter, parameter_data: dict):
         # type: (Parameter, dict) -> None
         """Set parameter value with unit conversion if needed"""
-        value = self._get_parameter_value(param=param, param_data=param_data)
+        value = self._get_parameter_value(parameter=parameter, parameter_data=parameter_data)
         if value is None:
             return
         try:
-            param.Set(value)  # pyright: ignore[reportArgumentType]
+            parameter.Set(value)  # pyright: ignore[reportArgumentType]
         except Exception as ex:
-            print(f"Failed to set parameter {param.Definition.Name}: {ex}")
+            print(f"Failed to set parameter {parameter.Definition.Name}: {ex}")
 
-    def set_element_parameters(self, instance: FamilyInstance, element_data: ElementData):
-        # type: (FamilyInstance, ElementData) -> None
+    def set_element_parameters(self, element: Element, element_data: ElementData):
+        # type: (Element, ElementData) -> None
         """Set parameters on element instance"""
-        for param_data in element_data.parameters:
-            param = instance.LookupParameter(param_data["name"])
-            if param is None or param.IsReadOnly:
+        for parameter_data in element_data.parameters:
+            parameter = element.LookupParameter(parameter_data["name"])
+            if parameter is None or parameter.IsReadOnly:
                 continue
-            self._set_parameter_value(param=param, param_data=param_data)
+            self._set_parameter_value(parameter=parameter, parameter_data=parameter_data)
 
     def import_data(self, json_path):
         # type: (str) -> int
@@ -279,26 +262,22 @@ class RevitImporter(object):
         json_data = self.load_json_data(json_path)
 
         created_count = 0
-
-        # Start transaction
         with Transaction(name="Import Revit Data", doc=self.document):
             # Process each category
             for medium, elements in json_data.items():
                 print(f"Processing medium: {medium} with {len(elements)} elements")
-                for element_json in elements:
+                for element in elements:
                     # Create ElementData object from JSON
-                    element_data = ElementData(element_json)
-
-                    family_symbol = self.get_family_symbol(
-                        element_data.family, element_data.family_type
-                    )
+                    element_data = ElementData(element)
+                    family_symbol = self.get_or_create_symbol(element_data)
                     if family_symbol is None:
-                        print(
-                            f"Family symbol not found for {element_data.family} - {element_data.family_type}"
-                        )
+                        print(f"Family symbol not found for {element_data.family} - {element_data.family_type}")
                         continue
 
+                    self.set_element_parameters(family_symbol, element_data)
                     instances = self.create_element(element_data, family_symbol)
+                    for instance in instances:
+                        self.set_element_parameters(instance, element_data)
                     created_count += len(instances)
 
         return created_count
@@ -323,9 +302,7 @@ def main():
         return
 
     # Select JSON file
-    project_zero_path = forms.pick_file(
-        file_ext="json", title="Project Koordinaten Datei auswählen"
-    )
+    project_zero_path = forms.pick_file(file_ext="json", title="Project Koordinaten Datei auswählen")
     if isinstance(project_zero_path, list):
         project_zero_path = project_zero_path[0]
 
