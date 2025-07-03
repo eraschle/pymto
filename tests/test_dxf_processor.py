@@ -5,10 +5,10 @@ from unittest.mock import Mock
 
 import pytest
 
-from dxfto.config import ConfigurationHandler
-from dxfto.models import Medium
-from dxfto.processor import DXFProcessor
-from dxfto.protocols import (
+from pymto.config import ConfigurationHandler
+from pymto.models import Medium
+from pymto.processor import DXFProcessor
+from pymto.protocols import (
     IAssignmentStrategy,
     IDimensionUpdater,
     IElevationUpdater,

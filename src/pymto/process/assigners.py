@@ -7,7 +7,7 @@ or pipe junctions.
 
 import numpy as np
 
-from dxfto.protocols import IAssignmentStrategy
+from pymto.protocols import IAssignmentStrategy
 
 from ..models import AssingmentGroup, Medium, ObjectData, Point3D
 

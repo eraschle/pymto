@@ -114,21 +114,19 @@ def process_dxf(
             click.echo("Updating points elevation from LandXML...")
             processor.update_points_elevation(updater=landxml_reader)
 
+        params = GradientAdjustmentParams(
+            manhole_search_radius=1,
+            min_gradient_percent=0.8,
+            gradient_break_threshold=5,
+        )
+        compatibility = PrefixBasedCompatibility(separator=" ")
+        gradient = PipelineGradientAdjuster(mediums=processor.mediums, params=params, compatibility=compatibility)
         if adjust_gradient:
-            params = GradientAdjustmentParams(
-                manhole_search_radius=1,
-                min_gradient_percent=0.8,
-                gradient_break_threshold=5,
-            )
-            compatibility = PrefixBasedCompatibility(separator=" ")
-            gradient = PipelineGradientAdjuster(
-                mediums=processor.mediums, params=params, compatibility=compatibility
-            )
             click.echo("Adjusting pipe gradients based on shaft elevations...")
             processor.adjustment_pipe_gardiant(gradient=gradient)
 
-            click.echo("Calculated cover to pipe heights on every shaft:")
-            processor.calculate_cover_to_pipe_height(gradient=gradient)
+        click.echo("Calculated cover to pipe heights on every shaft:")
+        processor.calculate_cover_to_pipe_height(gradient=gradient)
 
         click.echo("Adjusting and round parameter values...")
         processor.round_parameter_values(updater=dimension_updater)

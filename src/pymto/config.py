@@ -36,7 +36,7 @@ class ConfigurationHandler:
         for layer_info in layer_data:
             layers.append(
                 LayerData(
-                    name=layer_info.get("Name", ""),
+                    name=layer_info.get("Name"),
                     color=layer_info.get("Farbe"),
                     block=layer_info.get("Block"),
                 )

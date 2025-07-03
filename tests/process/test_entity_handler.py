@@ -3,8 +3,8 @@
 import math
 from unittest.mock import Mock, patch
 
-from dxfto.models import Point3D
-from dxfto.process import entity_handler as dxf
+from pymto.models import Point3D
+from pymto.process import entity_handler as dxf
 
 
 class TestExtractPointsFromEntity:
@@ -18,7 +18,7 @@ class TestExtractPointsFromEntity:
         line_entity.dxf.end = Mock(x=10.0, y=5.0)
 
         # Mock isinstance to return True for Line
-        with patch("dxfto.process.entity_handler.isinstance") as mock_isinstance:
+        with patch("pymto.process.entity_handler.isinstance") as mock_isinstance:
 
             def isinstance_side_effect(_, cls):
                 from ezdxf.entities.line import Line
@@ -40,7 +40,7 @@ class TestExtractPointsFromEntity:
         circle_entity.dxf.center = Mock(x=5.0, y=5.0)
 
         # Mock isinstance to return True for Circle
-        with patch("dxfto.process.entity_handler.isinstance") as mock_isinstance:
+        with patch("pymto.process.entity_handler.isinstance") as mock_isinstance:
 
             def isinstance_side_effect(_, cls):
                 from ezdxf.entities.circle import Circle

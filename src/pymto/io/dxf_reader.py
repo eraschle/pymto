@@ -53,9 +53,7 @@ def get_color_filter(entity: DXFEntity, layer: LayerData) -> bool:
             if aci_color.name != layer_color:
                 continue
             return True
-    log.warning(
-        f"No able to find color for {entity} in layer {layer.name} with color {layer.color}"
-    )
+    log.warning(f"No able to find color for {entity} in layer {layer.name} with color {layer.color}")
     return False
 
 
@@ -123,9 +121,10 @@ class DXFReader:
 
         if layer.block is None:
             query = f'*[layer=="{layer.name}"]'
+        elif layer.name is None:
+            query = f'*[name=="{layer.block}"]'
         else:
             query = f'INSERT[layer=="{layer.name}" & name=="{layer.block}"]'
-        log.debug(f"Querying entities from layer: {layer.name} with color {layer.color}")
         return self._doc.modelspace().query(query).filter(color_filter)
 
     @property

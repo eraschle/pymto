@@ -1,4 +1,4 @@
-# DXFto - DXF Processing Tool for Revit Export
+# pymto - DXF Processing Tool for Revit Export
 
 [![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
@@ -43,13 +43,13 @@ Ein Python-Tool zur Verarbeitung von DXF-Dateien mit Rohrleitungen und Schächte
 ```bash
 # Repository klonen
 git clone <repository-url>
-cd dxfto
+cd pymto
 
 # Dependencies installieren
 uv sync
 
 # Tool testen
-uv run python -m dxfto.cli --help
+uv run python -m pymto.cli --help
 ```
 
 ### Alternative Installation (pip)
@@ -104,38 +104,38 @@ uv run pre-commit run --all-files
 
 ```bash
 # Einfache DXF-Verarbeitung
-uv run python -m dxfto.cli input.dxf
+uv run python -m pymto.cli input.dxf
 
 # Mit Output-Datei spezifizieren
-uv run python -m dxfto.cli input.dxf --output output.json
+uv run python -m pymto.cli input.dxf --output output.json
 
 # Mit LandXML für Höhendaten
-uv run python -m dxfto.cli input.dxf --landxml terrain.xml
+uv run python -m pymto.cli input.dxf --landxml terrain.xml
 
 # Verbose Output
-uv run python -m dxfto.cli input.dxf --verbose
+uv run python -m pymto.cli input.dxf --verbose
 ```
 
 ### Erweiterte Optionen
 
 ```bash
 # Layer-basierte Gruppierung mit Konfigurationsdatei
-uv run python -m dxfto.cli input.dxf \
+uv run python -m pymto.cli input.dxf \
   --grouping layer \
   --config config.json
 
 # Farbbasierte Gruppierung mit Toleranz
-uv run python -m dxfto.cli input.dxf \
+uv run python -m pymto.cli input.dxf \
   --grouping color \
   --color-tolerance 25.0
 
 # Zonbasierte Textzuordnung
-uv run python -m dxfto.cli input.dxf \
+uv run python -m pymto.cli input.dxf \
   --text-assignment zone \
   --max-text-distance 30.0
 
 # Revit-spezifisches Format
-uv run python -m dxfto.cli input.dxf \
+uv run python -m pymto.cli input.dxf \
   --revit-format \
   --output revit_export.json
 ```
@@ -146,7 +146,7 @@ uv run python -m dxfto.cli input.dxf \
 
 ```bash
 # Beispiel-Konfiguration generieren
-uv run python -m dxfto.cli create-config sample_config.json
+uv run python -m pymto.cli create-config sample_config.json
 ```
 
 #### Konfigurationsformat
@@ -169,18 +169,18 @@ uv run python -m dxfto.cli create-config sample_config.json
 ## Projektstruktur
 
 ```
-dxfto/
-├── src/dxfto/              # Hauptanwendung
+pymto/
+├── src/pymto/              # Hauptanwendung
 │   ├── __init__.py         # Package-Initialisierung
-│   ├── cli.py              # → [CLI Interface](src/dxfto/cli.py)
-│   ├── models.py           # → [Datenmodelle](src/dxfto/models.py)
-│   ├── protocols.py        # → [Interface-Definitionen](src/dxfto/protocols.py)
-│   ├── dxf_reader.py       # → [DXF-Verarbeitung](src/dxfto/dxf_reader.py)
-│   ├── landxml_reader.py   # → [LandXML-Verarbeitung](src/dxfto/landxml_reader.py)
-│   ├── groupers.py         # → [Gruppierungsstrategien](src/dxfto/groupers.py)
-│   ├── text_assigners.py   # → [Textzuordnung](src/dxfto/text_assigners.py)
-│   ├── json_exporter.py    # → [JSON-Export](src/dxfto/json_exporter.py)
-│   └── main.py             # → [Haupteinstiegspunkt](src/dxfto/main.py)
+│   ├── cli.py              # → [CLI Interface](src/pymto/cli.py)
+│   ├── models.py           # → [Datenmodelle](src/pymto/models.py)
+│   ├── protocols.py        # → [Interface-Definitionen](src/pymto/protocols.py)
+│   ├── dxf_reader.py       # → [DXF-Verarbeitung](src/pymto/dxf_reader.py)
+│   ├── landxml_reader.py   # → [LandXML-Verarbeitung](src/pymto/landxml_reader.py)
+│   ├── groupers.py         # → [Gruppierungsstrategien](src/pymto/groupers.py)
+│   ├── text_assigners.py   # → [Textzuordnung](src/pymto/text_assigners.py)
+│   ├── json_exporter.py    # → [JSON-Export](src/pymto/json_exporter.py)
+│   └── main.py             # → [Haupteinstiegspunkt](src/pymto/main.py)
 ├── tests/                  # → [Test-Suite](tests/)
 ├── docs/                   # Dokumentation
 │   └── API.md              # → [API Dokumentation](docs/API.md)
@@ -209,7 +209,7 @@ Das Projekt verwendet moderne Python-Standards:
 uv run pytest
 
 # Mit Coverage
-uv run pytest --cov=src/dxfto
+uv run pytest --cov=src/pymto
 
 # Spezifische Tests
 uv run pytest tests/test_dxf_reader.py -v
@@ -232,11 +232,11 @@ uv run isort .
 
 ### Kernkomponenten
 
-1. **[DXF Reader](src/dxfto/dxf_reader.py)**: Extraktion von Geometrien aus DXF-Dateien
-2. **[LandXML Reader](src/dxfto/landxml_reader.py)**: Höhendaten-Integration
-3. **[Groupers](src/dxfto/groupers.py)**: Layer- und farbbasierte Gruppierung
-4. **[Text Assigners](src/dxfto/text_assigners.py)**: Räumliche Textzuordnung
-5. **[JSON Exporter](src/dxfto/json_exporter.py)**: Export für Revit
+1. **[DXF Reader](src/pymto/dxf_reader.py)**: Extraktion von Geometrien aus DXF-Dateien
+2. **[LandXML Reader](src/pymto/landxml_reader.py)**: Höhendaten-Integration
+3. **[Groupers](src/pymto/groupers.py)**: Layer- und farbbasierte Gruppierung
+4. **[Text Assigners](src/pymto/text_assigners.py)**: Räumliche Textzuordnung
+5. **[JSON Exporter](src/pymto/json_exporter.py)**: Export für Revit
 
 ### Design Patterns
 
@@ -250,7 +250,7 @@ uv run isort .
 
 ```bash
 # Kompletttes Beispiel mit allen Features
-uv run python -m dxfto.cli beispiel.dxf \
+uv run python -m pymto.cli beispiel.dxf \
   --landxml gelaende.xml \
   --config medien_config.json \
   --grouping layer \
@@ -265,9 +265,9 @@ uv run python -m dxfto.cli beispiel.dxf \
 
 ```python
 from pathlib import Path
-from dxfto.dxf_reader import DXFReader
-from dxfto.groupers import LayerBasedGrouper
-from dxfto.json_exporter import RevitJSONExporter
+from pymto.dxf_reader import DXFReader
+from pymto.groupers import LayerBasedGrouper
+from pymto.json_exporter import RevitJSONExporter
 
 # DXF laden
 reader = DXFReader(Path("input.dxf"))
@@ -291,18 +291,18 @@ exporter.export_media(media)
 
 ### Hauptklassen
 
-- **[DXFReader](src/dxfto/dxf_reader.py)**: DXF-Datei Verarbeitung
-- **[LandXMLReader](src/dxfto/landxml_reader.py)**: Terrain-Daten Integration
-- **[LayerBasedGrouper](src/dxfto/groupers.py)**: Layer-basierte Elementgruppierung
-- **[ColorBasedGrouper](src/dxfto/groupers.py)**: Farbbasierte Elementgruppierung
-- **[SpatialTextAssigner](src/dxfto/text_assigners.py)**: Räumliche Textzuordnung
-- **[ZoneBasedTextAssigner](src/dxfto/text_assigners.py)**: Zonenbasierte Textzuordnung
-- **[JSONExporter](src/dxfto/json_exporter.py)**: Standard JSON-Export
-- **[RevitJSONExporter](src/dxfto/json_exporter.py)**: Revit-spezifischer Export
+- **[DXFReader](src/pymto/dxf_reader.py)**: DXF-Datei Verarbeitung
+- **[LandXMLReader](src/pymto/landxml_reader.py)**: Terrain-Daten Integration
+- **[LayerBasedGrouper](src/pymto/groupers.py)**: Layer-basierte Elementgruppierung
+- **[ColorBasedGrouper](src/pymto/groupers.py)**: Farbbasierte Elementgruppierung
+- **[SpatialTextAssigner](src/pymto/text_assigners.py)**: Räumliche Textzuordnung
+- **[ZoneBasedTextAssigner](src/pymto/text_assigners.py)**: Zonenbasierte Textzuordnung
+- **[JSONExporter](src/pymto/json_exporter.py)**: Standard JSON-Export
+- **[RevitJSONExporter](src/pymto/json_exporter.py)**: Revit-spezifischer Export
 
 ### Datenmodelle
 
-Siehe [models.py](src/dxfto/models.py) für vollständige Definitionen:
+Siehe [models.py](src/pymto/models.py) für vollständige Definitionen:
 
 - `Pipe`: Rohrleitung mit Geometrie und Eigenschaften
 - `Shaft`: Schacht mit Position und Dimensionen
@@ -316,7 +316,7 @@ Siehe [models.py](src/dxfto/models.py) für vollständige Definitionen:
 ### Hauptkommando
 
 ```bash
-uv run python -m dxfto.cli [OPTIONS] DXF_FILE
+uv run python -m pymto.cli [OPTIONS] DXF_FILE
 ```
 
 ### Optionen
@@ -337,7 +337,7 @@ uv run python -m dxfto.cli [OPTIONS] DXF_FILE
 
 ```bash
 # Beispiel-Konfiguration erstellen
-uv run python -m dxfto.cli create-config config.json
+uv run python -m pymto.cli create-config config.json
 ```
 
 ## Spezialfälle und erweiterte Funktionen
@@ -356,7 +356,7 @@ Das Tool unterstützt die Verarbeitung von DXF Block-Referenzen (INSERT Entities
 
 ```bash
 # DXF mit Block-Referenzen verarbeiten
-uv run python -m dxfto.cli input_with_blocks.dxf --verbose
+uv run python -m pymto.cli input_with_blocks.dxf --verbose
 ```
 
 Das Tool:
@@ -460,7 +460,7 @@ for segment in element_segments:
 
 ```bash
 # Angepasste Distanzen für verschiedene Element-Typen
-uv run python -m dxfto.cli input.dxf \
+uv run python -m pymto.cli input.dxf \
   --max-text-distance 30.0 \
   --zone-buffer 10.0        # Nur für ZoneBasedTextAssigner
 ```
@@ -471,7 +471,7 @@ uv run python -m dxfto.cli input.dxf \
 
 ```bash
 # Verbose Mode für detaillierte Block-Informationen
-uv run python -m dxfto.cli input.dxf --verbose 2>&1 | grep -i block
+uv run python -m pymto.cli input.dxf --verbose 2>&1 | grep -i block
 ```
 
 #### Logs analysieren
@@ -527,13 +527,13 @@ if 'custom_type' in block_name:
 3. **Keine Elemente extrahiert**
    ```bash
    # Mit verbose Mode Details anzeigen
-   uv run python -m dxfto.cli input.dxf --verbose
+   uv run python -m pymto.cli input.dxf --verbose
    ```
 
 4. **Import-Fehler**
    ```bash
    # Dependencies neu installieren
-   uv sync --reinstall-package dxfto
+   uv sync --reinstall-package pymto
    ```
 
 ## Beitragen

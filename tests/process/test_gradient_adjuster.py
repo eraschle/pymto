@@ -2,12 +2,12 @@
 
 import pytest
 
-from dxfto.models import ObjectData, ObjectType, Point3D, RoundDimensions
-from dxfto.process.gradient import (
+from pymto.models import ObjectData, ObjectType, Point3D, RoundDimensions
+from pymto.process.gradient import (
     ExplicitRulesCompatibility,
     PrefixBasedCompatibility,
 )
-from dxfto.process.gradient.adjuster import (
+from pymto.process.gradient.adjuster import (
     GradientAdjustmentParams,
     PipelineGradientAdjuster,
 )

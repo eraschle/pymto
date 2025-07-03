@@ -9,12 +9,11 @@ from pathlib import Path
 from typing import Any
 
 from ..models import (
+    ADimensions,
     Medium,
     MediumConfig,
     ObjectData,
     Point3D,
-    RectangularDimensions,
-    RoundDimensions,
 )
 
 
@@ -149,16 +148,6 @@ class JsonExporter:
             self._append_not_exported_elements(config, result, elements)
         return elements_export_data
 
-    def _get_param(self, name: str, value: Any, value_type: str, unit: str | None = None) -> dict[str, Any]:
-        param = {
-            "name": name,
-            "value": value,
-            "type": value_type,
-        }
-        if unit is not None:
-            param["unit"] = unit
-        return param
-
     def _get_parameters(self, element: ObjectData) -> list[dict[str, Any]]:
         """Export parameters of an element to dictionary format.
 
@@ -201,14 +190,14 @@ class JsonExporter:
         elif element.is_line_based:
             element_data["line_points"] = _export_points(element.points)
         else:
-            print(f"{element.medium}:\nNeither point-based nor line-based:\n{element}")
+            return None
 
         parameters = element.get_parameters()
         if len(parameters) > 0:
             element_data["parameters"] = self._get_parameters(element)
         return element_data
 
-    def _export_dimensions(self, dimensions: RectangularDimensions | RoundDimensions) -> dict[str, Any]:
+    def _export_dimensions(self, dimensions: ADimensions) -> list[dict[str, Any]]:
         """Export dimensions to dictionary format.
 
         Parameters
@@ -221,19 +210,9 @@ class JsonExporter:
         dict[str, Any]
             Dictionary containing dimension information
         """
-        dimension_data = {}
-        if isinstance(dimensions, RectangularDimensions):
-            dimension_data = {
-                "length": dimensions.length,
-                "width": dimensions.width,
-                "angle": dimensions.angle,
-            }
-        elif isinstance(dimensions, RoundDimensions):
-            dimension_data = {
-                "radius": dimensions.diameter / 2,
-                "diameter": dimensions.diameter,
-            }
-
-        if dimensions.height is not None:
-            dimension_data["height"] = dimensions.height
-        return dimension_data
+        dimension_dict = [param.to_dict() for param in dimensions.to_parameters()]
+        for dim in dimension_dict:
+            if "name" not in dim or dim["name"] != "Height":
+                continue
+            dim["value"] = max(dim["value"], 1.2)
+        return dimension_dict

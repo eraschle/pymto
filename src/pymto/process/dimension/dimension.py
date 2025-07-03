@@ -9,7 +9,6 @@ from ...models import (
     AssingmentData,
     MediumConfig,
     ObjectData,
-    Parameter,
     RectangularDimensions,
     RoundDimensions,
 )

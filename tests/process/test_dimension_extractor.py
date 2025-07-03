@@ -1,6 +1,6 @@
 """Tests for dimension extraction functions."""
 
-from dxfto.process.dimension import (
+from pymto.process.dimension import (
     convert_to_unit,
     extract_rectangular,
     extract_round,

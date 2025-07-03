@@ -10,8 +10,8 @@ import pytest
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from dxfto.io.landxml_reader import LandXMLReader
-from dxfto.models import Point3D
+from pymto.io.landxml_reader import LandXMLReader
+from pymto.models import Point3D
 
 
 class TestLandXMLReader:
@@ -166,22 +166,22 @@ class TestLandXMLReader:
     def test_create_3d_point_coordinate_parsing(self, mock_landxml_path):
         """Test that _create_3d_point correctly parses coordinates."""
         reader = LandXMLReader(mock_landxml_path)
-        
+
         # Test coordinate parsing with space-separated values
         # Format should be: north east altitude
         coords_text = "1183969.6 2811039.9 1436.56"
         point = reader._create_3d_point(coords_text)
-        
+
         assert point is not None
         # First coordinate should be north, second east, third altitude
         assert point.north == 1183969.6
         assert point.east == 2811039.9
         assert point.altitude == 1436.56
-        
+
         # Test with comma-separated values
         coords_text_comma = "1183969.6,2811039.9,1436.56"
         point_comma = reader._create_3d_point(coords_text_comma)
-        
+
         assert point_comma is not None
         assert point_comma.north == 1183969.6
         assert point_comma.east == 2811039.9
@@ -190,7 +190,7 @@ class TestLandXMLReader:
     def test_real_landxml_coordinate_loading(self, tmp_path):
         """Test loading real LandXML data with correct coordinate parsing."""
         # Create a minimal LandXML file with real data format
-        landxml_content = '''<?xml version="1.0" encoding="UTF-8"?>
+        landxml_content = """<?xml version="1.0" encoding="UTF-8"?>
 <LandXML xmlns="http://www.landxml.org/schema/LandXML-1.2">
     <Surfaces>
         <Surface name="Test DGM">
@@ -204,36 +204,36 @@ class TestLandXMLReader:
             </Definition>
         </Surface>
     </Surfaces>
-</LandXML>'''
-        
+</LandXML>"""
+
         # Write test LandXML file
         landxml_path = tmp_path / "test.xml"
         landxml_path.write_text(landxml_content)
-        
+
         # Load and test
         reader = LandXMLReader(landxml_path)
         reader.load_file()
-        
+
         # Verify points were loaded correctly
         assert len(reader.elevation_points) == 4
-        
+
         # Check first point (coordinates should be correctly parsed as north, east, altitude)
         point1 = reader.elevation_points[0]
         assert point1.north == 1184000.0
         assert point1.east == 2811000.0
         assert point1.altitude == 1440.0
-        
+
         # Test elevation interpolation at center of square
-        # Center should be at (east=2811005.0, north=1184005.0) 
+        # Center should be at (east=2811005.0, north=1184005.0)
         result = reader.get_elevation(2811005.0, 1184005.0)
-        
+
         # Center elevation should be average: (1440+1445+1442+1447)/4 = 1443.5
         expected = 1443.5
         assert abs(result - expected) < 0.1
-        
+
         # Test that different coordinates give different elevations
         result1 = reader.get_elevation(2811002.0, 1184002.0)  # Closer to point1
         result2 = reader.get_elevation(2811008.0, 1184008.0)  # Closer to point4
-        
+
         assert result1 != result2  # Should be different
-        assert result1 < result2   # Result1 should be lower (closer to 1440)
+        assert result1 < result2  # Result1 should be lower (closer to 1440)

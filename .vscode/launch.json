@@ -15,7 +15,7 @@
                 "--adjust-gradient"
             ],
             "cwd": "${workspaceFolder}/src",
-            "module": "dxfto.main"
+            "module": "pymto.main"
         }
     ]
 }

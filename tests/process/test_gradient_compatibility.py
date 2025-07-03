@@ -1,6 +1,6 @@
 """Tests for pipeline gradient adjustment with medium compatibility."""
 
-from dxfto.process.gradient import (
+from pymto.process.gradient import (
     ExplicitRulesCompatibility,
     PatternBasedCompatibility,
     PrefixBasedCompatibility,

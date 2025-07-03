@@ -1,6 +1,6 @@
-# API Dokumentation - DXFto
+# API Dokumentation - pymto
 
-Diese Dokumentation beschreibt die öffentlichen APIs und Schnittstellen der DXFto-Bibliothek.
+Diese Dokumentation beschreibt die öffentlichen APIs und Schnittstellen der pymto-Bibliothek.
 
 ## Inhaltsverzeichnis
 
@@ -18,7 +18,7 @@ Diese Dokumentation beschreibt die öffentlichen APIs und Schnittstellen der DXF
 
 ### DXF Reader
 
-**Modul**: [`src/dxfto/dxf_reader.py`](../src/dxfto/dxf_reader.py)
+**Modul**: [`src/pymto/dxf_reader.py`](../src/pymto/dxf_reader.py)
 
 Die `DXFReader`-Klasse verarbeitet DXF-Dateien und extrahiert Rohrleitungen, Schächte und Textelemente.
 
@@ -36,7 +36,7 @@ class DXFReader:
 **Beispiel:**
 ```python
 from pathlib import Path
-from dxfto.dxf_reader import DXFReader
+from pymto.dxf_reader import DXFReader
 
 reader = DXFReader(Path("input.dxf"))
 reader.load_file()
@@ -53,7 +53,7 @@ texts = reader.extract_texts()
 
 ### LandXML Reader
 
-**Modul**: [`src/dxfto/landxml_reader.py`](../src/dxfto/landxml_reader.py)
+**Modul**: [`src/pymto/landxml_reader.py`](../src/pymto/landxml_reader.py)
 
 Die `LandXMLReader`-Klasse verarbeitet LandXML-Dateien für Höhendaten-Integration.
 
@@ -68,7 +68,7 @@ class LandXMLReader:
 
 **Beispiel:**
 ```python
-from dxfto.landxml_reader import LandXMLReader
+from pymto.landxml_reader import LandXMLReader
 
 landxml_reader = LandXMLReader(Path("terrain.xml"))
 landxml_reader.load_file()
@@ -79,7 +79,7 @@ updated_points = landxml_reader.update_points_elevation(pipe.points)
 
 ### Groupers
 
-**Modul**: [`src/dxfto/groupers.py`](../src/dxfto/groupers.py)
+**Modul**: [`src/pymto/groupers.py`](../src/pymto/groupers.py)
 
 Implementiert verschiedene Strategien zur Gruppierung von DXF-Elementen.
 
@@ -113,7 +113,7 @@ class ColorBasedGrouper:
 
 **Beispiel:**
 ```python
-from dxfto.groupers import ColorBasedGrouper, LayerBasedGrouper
+from pymto.groupers import ColorBasedGrouper, LayerBasedGrouper
 
 # Farbbasierte Gruppierung
 color_grouper = ColorBasedGrouper(color_tolerance=25.0)
@@ -127,7 +127,7 @@ media = layer_grouper.group_elements(pipes, shafts, texts)
 
 ### Text Assigners
 
-**Modul**: [`src/dxfto/text_assigners.py`](../src/dxfto/text_assigners.py)
+**Modul**: [`src/pymto/text_assigners.py`](../src/pymto/text_assigners.py)
 
 Implementiert Strategien zur Zuordnung von Textelementen zu Rohrleitungen.
 
@@ -149,7 +149,7 @@ class ZoneBasedTextAssigner:
 
 **Beispiel:**
 ```python
-from dxfto.text_assigners import SpatialTextAssigner, ZoneBasedTextAssigner
+from pymto.text_assigners import SpatialTextAssigner, ZoneBasedTextAssigner
 
 # Räumliche Zuordnung
 spatial_assigner = SpatialTextAssigner(max_distance=40.0)
@@ -162,7 +162,7 @@ assigned_pipes = zone_assigner.assign_texts_to_pipes(pipes, texts)
 
 ### JSON Exporter
 
-**Modul**: [`src/dxfto/json_exporter.py`](../src/dxfto/json_exporter.py)
+**Modul**: [`src/pymto/json_exporter.py`](../src/pymto/json_exporter.py)
 
 Exportiert verarbeitete Daten in JSON-Format für Revit-Kompatibilität.
 
@@ -183,7 +183,7 @@ class RevitJSONExporter(JSONExporter):
 
 **Beispiel:**
 ```python
-from dxfto.json_exporter import JSONExporter, RevitJSONExporter
+from pymto.json_exporter import JSONExporter, RevitJSONExporter
 
 # Standard Export
 exporter = JSONExporter(Path("output.json"))
@@ -216,7 +216,7 @@ revit_exporter.export_media(media)
 
 ## Datenmodelle
 
-**Modul**: [`src/dxfto/models.py`](../src/dxfto/models.py)
+**Modul**: [`src/pymto/models.py`](../src/pymto/models.py)
 
 ### Point3D
 
@@ -301,7 +301,7 @@ class ShapeType(Enum):
 
 ## Protokolle
 
-**Modul**: [`src/dxfto/protocols.py`](../src/dxfto/protocols.py)
+**Modul**: [`src/pymto/protocols.py`](../src/pymto/protocols.py)
 
 ### GroupingStrategy
 
@@ -327,11 +327,11 @@ class TextAssignmentStrategy(Protocol):
 
 ```python
 from pathlib import Path
-from dxfto.dxf_reader import DXFReader
-from dxfto.landxml_reader import LandXMLReader
-from dxfto.groupers import LayerBasedGrouper
-from dxfto.text_assigners import SpatialTextAssigner
-from dxfto.json_exporter import RevitJSONExporter
+from pymto.dxf_reader import DXFReader
+from pymto.landxml_reader import LandXMLReader
+from pymto.groupers import LayerBasedGrouper
+from pymto.text_assigners import SpatialTextAssigner
+from pymto.json_exporter import RevitJSONExporter
 
 # 1. DXF-Datei laden
 dxf_reader = DXFReader(Path("input.dxf"))
@@ -369,8 +369,8 @@ exporter.export_media(media)
 ### Custom Grouping Strategy
 
 ```python
-from dxfto.protocols import GroupingStrategy
-from dxfto.models import Medium, Pipe, Shaft, DXFText
+from pymto.protocols import GroupingStrategy
+from pymto.models import Medium, Pipe, Shaft, DXFText
 
 class CustomGrouper:
     def group_elements(self, pipes: list[Pipe], shafts: list[Shaft], texts: list[DXFText]) -> list[Medium]:

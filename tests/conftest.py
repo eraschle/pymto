@@ -1,4 +1,4 @@
-"""Pytest configuration and fixtures for dxfto tests."""
+"""Pytest configuration and fixtures for pymto tests."""
 
 import sys
 from pathlib import Path
@@ -31,7 +31,7 @@ def test_dxf_file(project_root):
 @pytest.fixture
 def sample_points():
     """Return sample Point3D objects for testing."""
-    from dxfto.models import Point3D
+    from pymto.models import Point3D
 
     return [
         Point3D(east=0.0, north=0.0, altitude=0.0),
@@ -44,7 +44,7 @@ def sample_points():
 @pytest.fixture
 def rectangular_points():
     """Return points forming a perfect rectangle."""
-    from dxfto.models import Point3D
+    from pymto.models import Point3D
 
     return [
         Point3D(east=0.0, north=0.0, altitude=0.0),
@@ -59,7 +59,7 @@ def circular_points():
     """Return points forming a regular octagon (near-circular)."""
     import math
 
-    from dxfto.models import Point3D
+    from pymto.models import Point3D
 
     center = (0.0, 0.0)
     radius = 5.0
@@ -77,7 +77,7 @@ def circular_points():
 @pytest.fixture
 def irregular_points():
     """Return points forming an irregular polygon."""
-    from dxfto.models import Point3D
+    from pymto.models import Point3D
 
     return [
         Point3D(east=0.0, north=0.0, altitude=0.0),

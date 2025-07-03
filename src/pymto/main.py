@@ -1,4 +1,4 @@
-"""Main entry point for the dxfto package.
+"""Main entry point for the pymto package.
 
 This module provides the main entry point for the command-line interface.
 """

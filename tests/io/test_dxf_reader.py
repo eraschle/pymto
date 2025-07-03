@@ -8,8 +8,8 @@ import pytest
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from dxfto.io.dxf_reader import DXFReader
-from dxfto.models import LayerData
+from pymto.io.dxf_reader import DXFReader
+from pymto.models import LayerData
 
 
 class TestDXFReader:

@@ -3,7 +3,7 @@
 import bisect
 from dataclasses import dataclass
 
-from dxfto.models import ObjectType
+from pymto.models import ObjectType
 
 
 @dataclass

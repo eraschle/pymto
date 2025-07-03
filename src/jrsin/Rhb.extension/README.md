@@ -4,7 +4,7 @@ Eine pyRevit Extension zum Importieren von DXF-Daten aus JSON-Dateien in Autodes
 
 ## Übersicht
 
-Diese Extension ermöglicht den Import von DXF-Geometriedaten, die zuvor von der `dxfto` Anwendung in JSON-Format exportiert wurden, direkt in Revit als native Revit-Elemente.
+Diese Extension ermöglicht den Import von DXF-Geometriedaten, die zuvor von der `pymto` Anwendung in JSON-Format exportiert wurden, direkt in Revit als native Revit-Elemente.
 
 ## Features
 
@@ -31,7 +31,7 @@ Nach der Installation erscheint ein neuer "DXF Importer" Tab in der Revit Ribbon
 
 ### 2. JSON-Datei vorbereiten
 
-Verwenden Sie die `dxfto` Anwendung, um DXF-Dateien in das erforderliche JSON-Format zu konvertieren.
+Verwenden Sie die `pymto` Anwendung, um DXF-Dateien in das erforderliche JSON-Format zu konvertieren.
 
 ### 3. Import durchführen
 
@@ -137,8 +137,8 @@ Die Extension nutzt pyRevit's Output Window für detaillierte Fortschritts- und 
 
 ## Lizenz
 
-Dieses Projekt ist Teil des dxfto-Packages und folgt dessen Lizenzbestimmungen.
+Dieses Projekt ist Teil des pymto-Packages und folgt dessen Lizenzbestimmungen.
 
 ## Support
 
-Für Fragen und Support besuchen Sie das [dxfto Repository](https://github.com/your-repo/dxfto).
+Für Fragen und Support besuchen Sie das [pymto Repository](https://github.com/your-repo/pymto).

@@ -6,7 +6,7 @@ Die neue ObjectData Factory vereinfacht und verbessert die Erstellung von Object
 
 ## Neue Module
 
-### 1. `dxfto/process/entity_handler.py`
+### 1. `pymto/process/entity_handler.py`
 - **Zweck**: Funktionen zur Analyse und Klassifizierung von DXF-Entitäten
 - **Hauptfunktionen**:
   - `is_element_entity()`: Bestimmt, ob eine Entität als Element oder Linie verarbeitet werden soll
@@ -16,7 +16,7 @@ Die neue ObjectData Factory vereinfacht und verbessert die Erstellung von Object
   - `has_diagonal_cross()`: Erkennt diagonale Kreuzlinien in Verteilern
   - Verschiedene Berechnungsfunktionen für Dimensionen und Mittelpunkte
 
-### 2. `dxfto/process/objectdata_factory.py`
+### 2. `pymto/process/objectdata_factory.py`
 - **Zweck**: Factory-Pattern für ObjectData-Erstellung
 - **Hauptklasse**: `ObjectDataFactory`
 - **Unterstützte Entitätstypen**:
@@ -27,7 +27,7 @@ Die neue ObjectData Factory vereinfacht und verbessert die Erstellung von Object
 
 ## Auswirkungen auf bestehenden Code
 
-### 1. `dxfto/io/dxf_reader.py`
+### 1. `pymto/io/dxf_reader.py`
 
 #### Aktueller Zustand
 - Enthält bereits ähnliche Funktionalität, aber weniger strukturiert
@@ -43,29 +43,29 @@ class DXFReader:
         self.dxf_path = dxf_path
         self._doc: Drawing | None = None
         self._factory: ObjectDataFactory | None = None  # NEU
-    
+
     def load_file(self) -> None:
         # Bestehende Logik
         if not self.dxf_path.exists():
             raise FileNotFoundError(f"DXF file not found: {self.dxf_path}")
-        
+
         try:
             self._doc = ezdxf.readfile(str(self.dxf_path))
             self._factory = ObjectDataFactory(self._doc)  # NEU
         except DXFError as e:
             raise DXFError(f"Cannot read DXF file {self.dxf_path}: {e}") from e
-    
+
     def _extract_elements(self, config: AssignmentConfig) -> list[ObjectData]:
         """Vereinfachte Implementierung mit Factory."""
         if self._factory is None:
             raise RuntimeError("DXF file not loaded. Call load_file() first.")
-        
+
         elements = []
         for entity in self._query_modelspace(config.geometry):
             # Verwende Factory für Klassifizierung
             if not self._factory.should_process_as_element(entity):
                 continue
-            
+
             # Verwende Factory für ObjectData-Erstellung
             element = self._factory.create_from_entity(entity)
             if element is None:
@@ -108,7 +108,7 @@ Diese Methoden können entfernt werden, da sie von der Factory übernommen werde
 - **Annähernd runde Formen**: Polygone mit vielen Seiten werden als rund behandelt
 - **Unregelmäßige Formen**: Begrenzungsrahmen-Dimensionen
 
-### 3. `dxfto/models.py`
+### 3. `pymto/models.py`
 
 #### Mögliche Erweiterungen
 ```python

@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from dxfto.models import (
+from pymto.models import (
     AssingmentData,
     DxfColor,
     DxfText,

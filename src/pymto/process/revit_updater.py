@@ -1,7 +1,7 @@
 import re
 
-from dxfto.models import AssingmentData, ObjectData, RoundDimensions
-from dxfto.protocols import IRevitFamilyNameUpdater
+from pymto.models import AssingmentData, ObjectData, RoundDimensions
+from pymto.protocols import IRevitFamilyNameUpdater
 
 
 class RevitFamilyNameUpdater(IRevitFamilyNameUpdater):

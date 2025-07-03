@@ -114,6 +114,14 @@ class Parameter:
             param_dict["unit"] = self.unit
         return param_dict
 
+    def __str__(self) -> str:
+        if self.unit is None:
+            return f"Parameter(name={self.name}, value={self.value})"
+        return f"Parameter(name={self.name}, value={self.value}, unit={self.unit})"
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
 
 @dataclass(frozen=True)
 class DxfColor:
@@ -218,6 +226,9 @@ class ADimensions:
         """Get parameters as a dictionary."""
         return _get_parameters(self)
 
+    def __repr__(self) -> str:
+        return self.__str__()
+
 
 class RectangularDimensions(ADimensions):
     """Dimensions for rectangular shapes.
@@ -273,6 +284,9 @@ class RectangularDimensions(ADimensions):
     def angle(self, value: float) -> None:
         self._angle.value = float(value) % 360  # Normalize angle to [0, 360)
 
+    def __str__(self) -> str:
+        return f"RectangularDimensions(length={self.length}, width={self.width}, height={self.height})"
+
 
 class RoundDimensions(ADimensions):
     """Dimensions for round shapes.
@@ -300,6 +314,9 @@ class RoundDimensions(ADimensions):
         if value <= 0:
             value = 0.0
         self._diameter.value = float(value)
+
+    def __str__(self) -> str:
+        return f"RoundDimensions(diameter={self.diameter}, height={self.height})"
 
 
 class DxfText:
@@ -370,7 +387,7 @@ class ObjectData:
     family_type: str
     dimensions: RectangularDimensions | RoundDimensions
     layer: str
-    fdk_id: Parameter
+    object_id: Parameter
     assigned_text: DxfText | None = None
     color: tuple[int, int, int] = field(default_factory=tuple, repr=True, compare=True)
 
@@ -484,7 +501,7 @@ class ObjectData:
         list[Parameter]
             List of parameters associated with the object.
         """
-        params = [self.fdk_id]
+        params = [self.object_id]
         if self.assigned_text is not None:
             params.extend(self.assigned_text.to_parameters())
         params.extend(self.dimensions.to_parameters())
@@ -494,7 +511,7 @@ class ObjectData:
 
 @dataclass(slots=True)
 class LayerData:
-    name: str = field(repr=True, compare=True)
+    name: str | None = field(repr=True, compare=True)
     color: str | int | tuple[int, int, int] | None = field(repr=True, compare=True)
     block: str | None = field(default=None, repr=True, compare=True)
 

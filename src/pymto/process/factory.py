@@ -98,6 +98,14 @@ def _get_entity_color(entity: DXFEntity) -> tuple[int, int, int]:
         return (0, 0, 0)
 
 
+def _get_object_id_from(config: MediumConfig) -> Parameter:
+    value = config.object_id
+    if len(value) == 0:
+        log.warning("Object-ID is empty, defaulting to 'UNKNOWN'")
+        value = "UNKNOWN"
+    return Parameter(name="FDK_ID", value=value)
+
+
 class ObjectDataFactory:
     """Factory for creating ObjectData from DXF entities."""
 
@@ -189,7 +197,7 @@ class ObjectDataFactory:
                 positions=(position,),
                 # points=transformed_points,
                 color=_get_entity_color(entity),
-                fdk_id=Parameter(name="FDK-ID", value=config.object_id),
+                object_id=_get_object_id_from(config),
             )
 
         except Exception as e:
@@ -231,7 +239,7 @@ class ObjectDataFactory:
                 layer=_get_layer_name(entity),
                 positions=(position,),
                 color=_get_entity_color(entity),
-                fdk_id=Parameter(name="FDK-ID", value=config.object_id),
+                object_id=_get_object_id_from(config),
             )
 
         except Exception as e:
@@ -344,7 +352,7 @@ class ObjectDataFactory:
             positions=(position,),
             # points=points,
             color=_get_entity_color(entity),
-            fdk_id=Parameter(name="FDK-ID", value=config.object_id),
+            object_id=_get_object_id_from(config),
         )
 
     def _create_rect_line_based_object(
@@ -382,7 +390,7 @@ class ObjectDataFactory:
             positions=(points[0], points[-1]),
             points=points,
             color=_get_entity_color(entity),
-            fdk_id=Parameter(name="FDK-ID", value=config.object_id),
+            object_id=_get_object_id_from(config),
         )
 
     def _create_round_line_based_from_polyine(
@@ -416,7 +424,7 @@ class ObjectDataFactory:
             positions=(points[0], points[-1]),
             points=points,
             color=_get_entity_color(entity),
-            fdk_id=Parameter(name="FDK-ID", value=config.object_id),
+            object_id=_get_object_id_from(config),
         )
 
     def _create_round_point_based_from_polyline(
@@ -452,7 +460,7 @@ class ObjectDataFactory:
             positions=(position,),
             # points=points,
             color=_get_entity_color(entity),
-            fdk_id=Parameter(name="FDK-ID", value=config.object_id),
+            object_id=_get_object_id_from(config),
         )
 
     def _create_multi_sided_object(
@@ -494,7 +502,7 @@ class ObjectDataFactory:
             positions=(position,),
             # points=points,
             color=_get_entity_color(entity),
-            fdk_id=Parameter(name="FDK-ID", value=config.object_id),
+            object_id=_get_object_id_from(config),
         )
 
     def _create_bulge_point_based_object(self, entity: DXFEntity, config: MediumConfig) -> ObjectData:
@@ -526,7 +534,7 @@ class ObjectDataFactory:
             layer=_get_layer_name(entity),
             positions=(center,),
             color=_get_entity_color(entity),
-            fdk_id=Parameter(name="FDK-ID", value=config.object_id),
+            object_id=_get_object_id_from(config),
         )
 
     def _create_round_line_based(self, entity: DXFEntity, points: list[Point3D], config: MediumConfig) -> ObjectData:
@@ -559,7 +567,7 @@ class ObjectDataFactory:
             points=points,
             positions=(points[0], points[-1]),
             color=_get_entity_color(entity),
-            fdk_id=Parameter(name="FDK-ID", value=config.object_id),
+            object_id=_get_object_id_from(config),
         )
 
     def _create_round_point_based(self, entity: DXFEntity, points: list[Point3D], config: MediumConfig) -> ObjectData:
@@ -594,7 +602,7 @@ class ObjectDataFactory:
             points=points,
             positions=(points[0], points[-1]),
             color=_get_entity_color(entity),
-            fdk_id=Parameter(name="FDK-ID", value=config.object_id),
+            object_id=_get_object_id_from(config),
         )
 
     def _get_block_entities(self, insert_entity: Insert) -> list[DXFEntity]:
