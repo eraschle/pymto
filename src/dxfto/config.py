@@ -81,6 +81,11 @@ class ConfigurationHandler:
         return ObjectType.UNKNOWN
 
     def _create_medium_config(self, medium_name: str, config: dict) -> MediumConfig:
+        object_id = config.get("FDK_ID", "UNKNOWN")
+        if len(object_id) == 0:
+            log.warning(f"FDK_ID is empty for medium {medium_name}, defaulting to 'UNKNOWN'")
+            object_id = "UNKNOWN"
+
         return MediumConfig(
             medium=medium_name,
             geometry=self._create_layer_data(config.get("Geometrie", [])),
@@ -90,7 +95,7 @@ class ConfigurationHandler:
             object_type=self._create_default_shape(config.get("Category", "NONE")),
             default_unit=self._create_default_unit(config.get("Unit", "mm")),
             elevation_offset=config.get("ElevationOffset", 0.0),
-            object_id=config.get("FDK_ID", ""),
+            object_id=object_id,
         )
 
     def _create_medium_configs(self, medium: str, configs: list[dict]) -> list[MediumConfig]:

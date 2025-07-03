@@ -194,7 +194,6 @@ class JsonExporter:
             "object_type": element.object_type.name.upper(),
             "family": element.family,
             "family_type": element.family_type,
-            # "layer_name": element.layer,
             "dimensions": self._export_dimensions(element.dimensions),
         }
         if element.is_point_based:
@@ -202,9 +201,11 @@ class JsonExporter:
         elif element.is_line_based:
             element_data["line_points"] = _export_points(element.points)
         else:
-            return None
+            print(f"{element.medium}:\nNeither point-based nor line-based:\n{element}")
 
-        element_data["parameters"] = self._get_parameters(element)
+        parameters = element.get_parameters()
+        if len(parameters) > 0:
+            element_data["parameters"] = self._get_parameters(element)
         return element_data
 
     def _export_dimensions(self, dimensions: RectangularDimensions | RoundDimensions) -> dict[str, Any]:

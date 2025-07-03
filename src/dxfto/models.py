@@ -29,10 +29,76 @@ class ObjectType(Enum):
     CABLE_DUCT = "cable_duct"  # Kabekanal
 
 
+def is_int(val: Any) -> bool:
+    """Check if val is a float."""
+    if isinstance(val, int):
+        return True
+    if not isinstance(val, str):
+        val = str(val)
+    try:
+        int(val)
+        return True
+    except ValueError:
+        return False
+
+
+def is_float(val: Any) -> bool:
+    """Check if val is a float."""
+    if isinstance(val, float):
+        return True
+    if not isinstance(val, str):
+        val = str(val)
+    try:
+        float(val)
+        return True
+    except ValueError:
+        return False
+
+
+def is_boolean(val: Any) -> bool:
+    """Check if val is a float."""
+    if isinstance(val, bool):
+        return True
+    if is_int(val):
+        return int(val) in (0, 1)
+    if is_float(val):
+        return float(val) in (0, 1)
+    if not isinstance(val, str):
+        val = str(val).lower()
+    return val in ("true", "false", "1", "0", "yes", "no", "ja", "nein")
+
+
+def to_bool(val: Any) -> bool:
+    """Convert value to boolean."""
+    if isinstance(val, bool):
+        return val
+    if is_int(val):
+        return int(val) != 0
+    if is_float(val):
+        return float(val) != 0.0
+    if not isinstance(val, str):
+        val = str(val).lower()
+    return val in ("true", "1", "yes", "ja")
+
+
+def _get_value_type(value: Any, value_type: str | None) -> tuple[Any, str]:
+    """Determine the type of value."""
+    if value_type is not None:
+        return value, value_type.upper()
+    if is_boolean(value) and len(str(value)) > 0:
+        return to_bool(value), "BOOL"
+    if is_int(value):
+        return int(value), "INT"
+    if is_float(value):
+        return float(value), "FLOAT"
+    return str(value).strip(), "STRING"
+
+
 class Parameter:
-    def __init__(self, name: str, value: Any, value_type: str, unit: str | None = None) -> None:
+    def __init__(self, name: str, value: Any, value_type: str | None = None, unit: str | None = None) -> None:
         """Initialize a parameter with name, value, type and optional unit."""
         self.name = name
+        value, value_type = _get_value_type(value, value_type)
         self.value = value
         self.value_type = value_type
         self.unit = unit
@@ -42,7 +108,7 @@ class Parameter:
         param_dict = {
             "name": self.name,
             "value": self.value,
-            "value_type": self.value_type,
+            "value_type": self.value_type.upper(),
         }
         if self.unit is not None:
             param_dict["unit"] = self.unit
@@ -304,6 +370,7 @@ class ObjectData:
     family_type: str
     dimensions: RectangularDimensions | RoundDimensions
     layer: str
+    fdk_id: Parameter
     assigned_text: DxfText | None = None
     color: tuple[int, int, int] = field(default_factory=tuple, repr=True, compare=True)
 
@@ -380,6 +447,35 @@ class ObjectData:
         is_single_position = len(self.positions) == 1
         return is_oject_type_point and is_single_position
 
+    def add_parameter(self, name: str, value: Any, *, value_type: str | None = None, unit: str | None = None) -> None:
+        """Add a parameter to the object.
+
+        Parameters
+        ----------
+        parameter
+            Parameter to add.
+        """
+        if value_type is None:
+            if is_boolean(value):
+                value_type = "bool"
+                value = to_bool(value)
+            elif is_int(value):
+                value_type = "int"
+                value = int(value)
+            elif is_float(value):
+                value_type = "float"
+                value = float(value)
+            else:
+                value_type = "string"
+                value = str(value)
+        parameter = Parameter(
+            name=name,
+            value=value,
+            value_type=value_type,
+            unit=unit,
+        )
+        self.parameters.append(parameter)
+
     def get_parameters(self) -> list[Parameter]:
         """Get parameters for the object.
 
@@ -388,12 +484,12 @@ class ObjectData:
         list[Parameter]
             List of parameters associated with the object.
         """
-        params = []
+        params = [self.fdk_id]
         if self.assigned_text is not None:
             params.extend(self.assigned_text.to_parameters())
         params.extend(self.dimensions.to_parameters())
         params.extend(self.parameters)
-        return params
+        return sorted(params, key=lambda param: param.name)
 
 
 @dataclass(slots=True)

@@ -120,7 +120,9 @@ class PipelineGradientAdjuster:
             ObjectType.WATER_SPECIAL,
         }
 
-    def _adjust_single_pipeline(self, pipeline: ObjectData, manholes: list[ObjectData]) -> PipelineAdjustment | None:
+    def _adjust_single_pipeline(
+        self, pipeline: ObjectData, manholes: list[ObjectData]
+    ) -> PipelineAdjustment | None:
         """Adjust elevation for a single pipeline based on compatible manholes."""
         if not pipeline.is_line_based:
             return None
@@ -145,7 +147,9 @@ class PipelineGradientAdjuster:
 
         # Handle gradient breaks for complex pipelines
         if pipeline.points and len(pipeline.points) > 2:
-            return self._adjust_pipeline_with_gradient_breaks(pipeline, start_shaft, end_shaft, manholes)
+            return self._adjust_pipeline_with_gradient_breaks(
+                pipeline, start_shaft, end_shaft, manholes
+            )
 
         # Simple 2-point pipeline adjustment
         new_start_elev, new_end_elev, gradient_perc, reason = self._calculate_elevations(
@@ -264,7 +268,10 @@ class PipelineGradientAdjuster:
             next_point = points[idx + 1]
 
             # Check if current point is higher than both neighbors (bump)
-            if curr_point.altitude > prev_point.altitude and curr_point.altitude > next_point.altitude:
+            if (
+                curr_point.altitude > prev_point.altitude
+                and curr_point.altitude > next_point.altitude
+            ):
                 terrain_bumps.append(idx)
 
         return terrain_bumps
@@ -334,7 +341,9 @@ class PipelineGradientAdjuster:
                     # Calculate distance and original gradient
                     distance = prev_orig_point.distance_2d(curr_orig_point)
                     if distance > 0:
-                        original_gradient = ((curr_orig_point.altitude - prev_orig_point.altitude) / distance) * 100
+                        original_gradient = (
+                            (curr_orig_point.altitude - prev_orig_point.altitude) / distance
+                        ) * 100
 
                         # Apply minimum gradient constraint but preserve terrain following
                         if original_gradient > 0:  # Uphill in DGM
@@ -383,7 +392,9 @@ class PipelineGradientAdjuster:
 
         return nearest_manhole
 
-    def _find_all_connected_pipes(self, shaft: ObjectData, pipelines: list[ObjectData]) -> list[ObjectData]:
+    def _find_all_connected_pipes(
+        self, shaft: ObjectData, pipelines: list[ObjectData]
+    ) -> list[ObjectData]:
         """Find all pipes connected to a shaft within the search radius."""
         connected_pipes = []
 
@@ -396,16 +407,25 @@ class PipelineGradientAdjuster:
                 continue
 
             # Check if pipe start or end is within search radius of shaft
-            start_distance = min(shaft.point.distance_2d(pipeline.point), shaft.point.distance_2d(pipeline.end_point))
-            end_distance = min(shaft.point.distance_2d(pipeline.end_point), shaft.point.distance_2d(pipeline.point))
+            start_distance = min(
+                shaft.point.distance_2d(pipeline.point), shaft.point.distance_2d(pipeline.end_point)
+            )
+            end_distance = min(
+                shaft.point.distance_2d(pipeline.end_point), shaft.point.distance_2d(pipeline.point)
+            )
 
-            if all(distance > self.params.manhole_search_radius for distance in (start_distance, end_distance)):
+            if all(
+                distance > self.params.manhole_search_radius
+                for distance in (start_distance, end_distance)
+            ):
                 continue
             connected_pipes.append(pipeline)
 
         return connected_pipes
 
-    def calculate_cover_to_pipe_heights(self, elements: list[ObjectData]) -> list[CoverToPipeHeight]:
+    def calculate_cover_to_pipe_heights(
+        self, elements: list[ObjectData]
+    ) -> list[CoverToPipeHeight]:
         """Calculate cover-to-lowest-pipe height differences for all shafts."""
         medium_groups = self._group_objects_by(elements)
 
@@ -482,7 +502,9 @@ class PipelineGradientAdjuster:
 
         return cover_heights
 
-    def _describe_shaft_pipe_compatibility(self, shaft: ObjectData, connected_pipes: list[ObjectData]) -> str:
+    def _describe_shaft_pipe_compatibility(
+        self, shaft: ObjectData, connected_pipes: list[ObjectData]
+    ) -> str:
         """Create description of shaft-pipe medium compatibility."""
         if not connected_pipes:
             return f"No compatible pipes found for shaft {shaft.medium}"
@@ -504,7 +526,9 @@ class PipelineGradientAdjuster:
         descriptions = []
 
         if start_manhole:
-            compatibility = self.compatibility.get_description(pipeline.medium, start_manhole.medium)
+            compatibility = self.compatibility.get_description(
+                pipeline.medium, start_manhole.medium
+            )
             descriptions.append(f"Start: {compatibility}")
 
         if end_manhole:
@@ -516,8 +540,25 @@ class PipelineGradientAdjuster:
 
         return "; ".join(descriptions)
 
+    def _get_object_config(self, element: ObjectData) -> MediumConfig | None:
+        """Get the master medium configuration for an element."""
+        for medium in self.mediums:
+            if medium.name != element.medium:
+                continue
+            return medium.config.config_by(element.object_type)
+        return None
+
+    def _get_elevation_offset(self, element: ObjectData) -> float:
+        """Get elevation offset for an element based on its medium."""
+        master_config = self._get_object_config(element)
+        return master_config.elevation_offset if master_config else 0.0
+
     def _calculate_elevations(
-        self, start_point: Point3D, end_point: Point3D, start_manhole: ObjectData | None, end_manhole: ObjectData | None
+        self,
+        start_point: Point3D,
+        end_point: Point3D,
+        start_manhole: ObjectData | None,
+        end_manhole: ObjectData | None,
     ) -> tuple[float, float, float, str]:
         """Calculate new pipeline elevations based on connected manholes."""
         distance_2d = start_point.distance_2d(end_point)
@@ -633,7 +674,9 @@ class PipelineGradientAdjuster:
 
         pipeline.points = new_points
 
-    def generate_cover_height_report(self, cover_heights: list[CoverToPipeHeight]) -> dict[str, Any]:
+    def generate_cover_height_report(
+        self, cover_heights: list[CoverToPipeHeight]
+    ) -> dict[str, Any]:
         """Generate a report of cover-to-pipe height calculations."""
         if not cover_heights:
             return {
@@ -648,8 +691,12 @@ class PipelineGradientAdjuster:
         shafts_without_pipes = [ch for ch in cover_heights if not ch.connected_pipes]
 
         # Calculate statistics
-        height_differences = [ch.height_difference for ch in shafts_with_pipes if ch.height_difference is not None]
-        avg_height_diff = sum(height_differences) / len(height_differences) if height_differences else 0
+        height_differences = [
+            ch.height_difference for ch in shafts_with_pipes if ch.height_difference is not None
+        ]
+        avg_height_diff = (
+            sum(height_differences) / len(height_differences) if height_differences else 0
+        )
         min_height_diff = min(height_differences) if height_differences else 0
         max_height_diff = max(height_differences) if height_differences else 0
 
@@ -675,7 +722,9 @@ class PipelineGradientAdjuster:
                     "lowest_pipe_elevation_m": round(ch.lowest_pipe_elevation, 3)
                     if ch.lowest_pipe_elevation is not None
                     else None,
-                    "height_difference_m": round(ch.height_difference, 3) if ch.height_difference is not None else None,
+                    "height_difference_m": round(ch.height_difference, 3)
+                    if ch.height_difference is not None
+                    else None,
                     "medium_compatibility": ch.medium_compatibility,
                 }
                 for ch in cover_heights
