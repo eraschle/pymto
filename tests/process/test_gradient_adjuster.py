@@ -2,7 +2,7 @@
 
 import pytest
 
-from pymto.models import ObjectData, ObjectType, Point3D, RoundDimensions
+from pymto.models import ObjectData, ObjectType, Parameter, Point3D, RoundDimensions
 from pymto.process.gradient import (
     ExplicitRulesCompatibility,
     PrefixBasedCompatibility,
@@ -28,6 +28,7 @@ class TestPipelineGradientAdjuster:
             dimensions=RoundDimensions(diameter=1.0),
             layer="test",
             positions=(Point3D(east=0.0, north=0.0, altitude=100.0),),
+            object_id=Parameter(name="object_id", value="manhole_id"),
         )
 
         manhole2 = ObjectData(
@@ -38,6 +39,7 @@ class TestPipelineGradientAdjuster:
             dimensions=RoundDimensions(diameter=1.0),
             layer="test",
             positions=(Point3D(east=100.0, north=0.0, altitude=98.0),),
+            object_id=Parameter(name="object_id", value="manhole_id"),
         )
 
         # Create pipeline (initially uphill - should be corrected)
@@ -52,6 +54,7 @@ class TestPipelineGradientAdjuster:
                 Point3D(east=1.0, north=0.0, altitude=99.5),  # Near manhole1
                 Point3D(east=99.0, north=0.0, altitude=99.8),  # Near manhole2 (uphill!)
             ),
+            object_id=Parameter(name="object_id", value="pipe_id"),
         )
 
         return [manhole1, manhole2, pipeline]
@@ -59,10 +62,10 @@ class TestPipelineGradientAdjuster:
     def test_gradient_adjustment_with_prefix_strategy(self, sample_objects):
         """Test gradient adjustment using prefix-based compatibility."""
         adjuster = PipelineGradientAdjuster(
+            mediums=[],
             params=GradientAdjustmentParams(
                 manhole_search_radius=5.0,
-                min_gradient_percent=0.5,
-                gradient_break_threshold_percent=2.0,
+                min_gradient_percent=2.0,
             ),
             compatibility=PrefixBasedCompatibility(),
         )
@@ -81,7 +84,10 @@ class TestPipelineGradientAdjuster:
         assert adjustment.adjusted_end == 98.0  # From manhole2
 
         # Check adjustment reason
-        assert "shaft" in adjustment.adjustment_reason.lower() or "manhole" in adjustment.adjustment_reason.lower()
+        assert (
+            "shaft" in adjustment.adjustment_reason.lower()
+            or "manhole" in adjustment.adjustment_reason.lower()
+        )
 
     def test_no_compatible_manholes(self):
         """Test behavior when no compatible manholes are found."""
@@ -94,6 +100,7 @@ class TestPipelineGradientAdjuster:
             dimensions=RoundDimensions(diameter=1.0),
             layer="test",
             positions=(Point3D(east=0.0, north=0.0, altitude=100.0),),
+            object_id=Parameter(name="object_id", value="manhole_id"),
         )
 
         pipeline = ObjectData(
@@ -107,9 +114,10 @@ class TestPipelineGradientAdjuster:
                 Point3D(east=1.0, north=0.0, altitude=99.0),
                 Point3D(east=10.0, north=0.0, altitude=99.5),  # Uphill
             ),
+            object_id=Parameter(name="object_id", value="pipe_id"),
         )
 
-        adjuster = PipelineGradientAdjuster()
+        adjuster = PipelineGradientAdjuster(mediums=[])
         adjustments = adjuster.adjust_gradients_by([manhole, pipeline])
 
         # Should still make adjustment to fix uphill gradient
@@ -130,6 +138,7 @@ class TestPipelineGradientAdjuster:
             dimensions=RoundDimensions(diameter=1.0),
             layer="test",
             positions=(Point3D(east=0.0, north=0.0, altitude=100.0),),
+            object_id=Parameter(name="object_id", value="manhole1_id"),
         )
 
         manhole2 = ObjectData(
@@ -140,6 +149,7 @@ class TestPipelineGradientAdjuster:
             dimensions=RoundDimensions(diameter=1.0),
             layer="test",
             positions=(Point3D(east=100.0, north=0.0, altitude=99.9),),  # Only 0.1m drop over 100m
+            object_id=Parameter(name="object_id", value="manhole2_id"),
         )
 
         pipeline = ObjectData(
@@ -149,10 +159,16 @@ class TestPipelineGradientAdjuster:
             family_type="Test",
             dimensions=RoundDimensions(diameter=0.3),
             layer="test",
-            positions=(Point3D(east=1.0, north=0.0, altitude=100.0), Point3D(east=99.0, north=0.0, altitude=99.9)),
+            positions=(
+                Point3D(east=1.0, north=0.0, altitude=100.0),
+                Point3D(east=99.0, north=0.0, altitude=99.9),
+            ),
+            object_id=Parameter(name="object_id", value="pipeline_id"),
         )
 
-        adjuster = PipelineGradientAdjuster(params=GradientAdjustmentParams(min_gradient_percent=0.5))
+        adjuster = PipelineGradientAdjuster(
+            mediums=[], params=GradientAdjustmentParams(min_gradient_percent=0.5)
+        )
         adjustments = adjuster.adjust_gradients_by([manhole1, manhole2, pipeline])
 
         assert len(adjustments) == 1
@@ -167,7 +183,7 @@ class TestPipelineGradientAdjuster:
         rules = {"Medium A": ["Medium B"], "Medium B": ["Medium A"]}
 
         strategy = ExplicitRulesCompatibility(rules)
-        adjuster = PipelineGradientAdjuster(compatibility=strategy)
+        adjuster = PipelineGradientAdjuster(mediums=[], compatibility=strategy)
 
         manhole1 = ObjectData(
             medium="Medium A",
@@ -177,6 +193,7 @@ class TestPipelineGradientAdjuster:
             dimensions=RoundDimensions(diameter=1.0),
             layer="test",
             positions=(Point3D(east=0.0, north=0.0, altitude=100.0),),
+            object_id=Parameter(name="object_id", value="manhole1_id"),
         )
 
         manhole2 = ObjectData(
@@ -187,6 +204,7 @@ class TestPipelineGradientAdjuster:
             dimensions=RoundDimensions(diameter=1.0),
             layer="test",
             positions=(Point3D(east=10.0, north=0.0, altitude=98.0),),
+            object_id=Parameter(name="object_id", value="manhole2_id"),
         )
 
         pipeline = ObjectData(
@@ -196,7 +214,11 @@ class TestPipelineGradientAdjuster:
             family_type="Test",
             dimensions=RoundDimensions(diameter=0.3),
             layer="test",
-            positions=(Point3D(east=1.0, north=0.0, altitude=99.0), Point3D(east=9.0, north=0.0, altitude=99.0)),
+            positions=(
+                Point3D(east=1.0, north=0.0, altitude=99.0),
+                Point3D(east=9.0, north=0.0, altitude=99.0),
+            ),
+            object_id=Parameter(name="object_id", value="pipeline_id"),
         )
 
         adjustments = adjuster.adjust_gradients_by([manhole1, manhole2, pipeline])
@@ -205,7 +227,10 @@ class TestPipelineGradientAdjuster:
         adjustment = adjustments[0]
 
         # Check that adjustment was made based on explicit rules
-        assert "shaft" in adjustment.adjustment_reason.lower() or "manhole" in adjustment.adjustment_reason.lower()
+        assert (
+            "shaft" in adjustment.adjustment_reason.lower()
+            or "manhole" in adjustment.adjustment_reason.lower()
+        )
 
     def test_intermediate_points_interpolation(self):
         """Test that intermediate points are properly interpolated."""
@@ -217,6 +242,7 @@ class TestPipelineGradientAdjuster:
             dimensions=RoundDimensions(diameter=1.0),
             layer="test",
             positions=(Point3D(east=0.0, north=0.0, altitude=100.0),),
+            object_id=Parameter(name="object_id", value="manhole1_id"),
         )
 
         manhole2 = ObjectData(
@@ -227,6 +253,7 @@ class TestPipelineGradientAdjuster:
             dimensions=RoundDimensions(diameter=1.0),
             layer="test",
             positions=(Point3D(east=20.0, north=0.0, altitude=98.0),),
+            object_id=Parameter(name="object_id", value="manhole2_id"),
         )
 
         # Pipeline with intermediate points (wrong elevations to force adjustment)
@@ -246,9 +273,10 @@ class TestPipelineGradientAdjuster:
                 Point3D(east=10.0, north=0.0, altitude=95.2),  # Middle (wrong)
                 Point3D(east=19.0, north=0.0, altitude=95.5),  # End (wrong)
             ],
+            object_id=Parameter(name="object_id", value="pipeline_id"),
         )
 
-        adjuster = PipelineGradientAdjuster()
+        adjuster = PipelineGradientAdjuster(mediums=[])
         adjustments = adjuster.adjust_gradients_by([manhole1, manhole2, pipeline])
 
         assert len(adjustments) == 1
@@ -264,7 +292,7 @@ class TestPipelineGradientAdjuster:
 
     def test_adjustment_report_generation(self, sample_objects):
         """Test generation of adjustment reports."""
-        adjuster = PipelineGradientAdjuster()
+        adjuster = PipelineGradientAdjuster(mediums=[])
         adjustments = adjuster.adjust_gradients_by(sample_objects)
         report = adjuster.generate_report(adjustments)
 
@@ -283,7 +311,7 @@ class TestPipelineGradientAdjuster:
 
     def test_empty_adjustments_report(self):
         """Test report generation with no adjustments."""
-        adjuster = PipelineGradientAdjuster()
+        adjuster = PipelineGradientAdjuster(mediums=[])
         report = adjuster.generate_report([])
 
         assert report["total_adjustments"] == 0

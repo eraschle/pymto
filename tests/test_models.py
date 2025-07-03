@@ -13,6 +13,7 @@ from pymto.models import (
     MediumMasterConfig,
     ObjectData,
     ObjectType,
+    Parameter,
     Point3D,
     RectangularDimensions,
     RoundDimensions,
@@ -127,6 +128,7 @@ class TestObjectData:
             layer="CIRCLE_LAYER",
             positions=(position,),
             color=(0, 255, 0),
+            object_id=Parameter(name="Object ID", value="12345"),
         )
 
         assert obj.dimensions == dims
@@ -156,6 +158,7 @@ class TestObjectData:
             layer="RECT_LAYER",
             points=points,
             color=(0, 0, 255),
+            object_id=Parameter(name="Object ID", value="12345"),
         )
 
         assert obj.dimensions == dims
@@ -184,6 +187,7 @@ class TestObjectData:
             dimensions=dims,
             layer="SHAFT_LAYER",
             assigned_text=assigned_text,
+            object_id=Parameter(name="Object ID", value="12345"),
         )
 
         assert obj.assigned_text == assigned_text
@@ -259,6 +263,7 @@ class TestAssignmentConfig:
             elevation_offset=0.0,
             default_unit="mm",
             object_type=ObjectType.UNKNOWN,
+            object_id="12345",
         )
         assert config.geometry == geometry_layers
         assert config.text == text_layers
@@ -284,6 +289,7 @@ class TestAssingmentData:
             dimensions=dims,
             layer="TEST",
             positions=(position,),
+            object_id=Parameter(name="Object ID", value="12345"),
         )
 
         config = MediumConfig(
@@ -295,6 +301,7 @@ class TestAssingmentData:
             elevation_offset=0.0,
             default_unit="mm",
             object_type=ObjectType.UNKNOWN,
+            object_id="12345",
         )
 
         assignment = AssingmentData()
@@ -315,6 +322,7 @@ class TestAssingmentData:
             elevation_offset=0.0,
             default_unit="mm",
             object_type=ObjectType.UNKNOWN,
+            object_id="12345",
         )
 
         assignment = AssingmentData()
@@ -342,6 +350,7 @@ class TestMedium:
             elevation_offset=0.0,
             family="Test Family",
             family_type="Test Family Type",
+            object_id="12345",
         )
         lines_config = MediumConfig(
             medium="Test Medium",
@@ -352,6 +361,7 @@ class TestMedium:
             elevation_offset=0.0,
             family="Test Family",
             family_type="Test Family Type",
+            object_id="12345",
         )
         master = MediumMasterConfig(
             medium="Abwasserleitung",

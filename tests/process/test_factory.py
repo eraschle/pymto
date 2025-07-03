@@ -4,7 +4,7 @@
 from unittest.mock import Mock, patch
 
 import pytest
-from pymto.models import LayerData, MediumConfig, ObjectType
+from pymto.models import LayerData, MediumConfig, ObjectType, Parameter
 from pymto.process.factory import ObjectDataFactory
 from ezdxf.entities.insert import Insert
 
@@ -35,6 +35,7 @@ def shaft_config():
         family="ShaftFamily",
         family_type="ShaftType",
         elevation_offset=0.0,
+        object_id="shaft_id",
     )
 
 
@@ -50,6 +51,7 @@ def pipe_config():
         family="PipeFamily",
         family_type="PipeType",
         elevation_offset=0.0,
+        object_id="pipe_id",
     )
 
 
@@ -74,7 +76,9 @@ class TestObjectDataFactory:
 
     def _create_circle_entity(self, center=(0, 0, 0), radius=1.0, layer="0", color=1):
         """Create mock circle entity."""
-        return self._create_mock_entity("CIRCLE", center=center, radius=radius, layer=layer, color=color)
+        return self._create_mock_entity(
+            "CIRCLE", center=center, radius=radius, layer=layer, color=color
+        )
 
     def _create_insert_entity(self, insert=(0, 0, 0), name="TEST_BLOCK", layer="0"):
         """Create mock insert entity."""
@@ -156,7 +160,9 @@ class TestFactoryRouting:
 
     def _create_circle_entity(self, center=(0, 0, 0), radius=1.0, layer="0", color=1):
         """Create mock circle entity."""
-        return self._create_mock_entity("CIRCLE", center=center, radius=radius, layer=layer, color=color)
+        return self._create_mock_entity(
+            "CIRCLE", center=center, radius=radius, layer=layer, color=color
+        )
 
     def _create_insert_entity(self, insert=(0, 0, 0), name="TEST_BLOCK", layer="0"):
         """Create mock insert entity."""
@@ -198,6 +204,7 @@ class TestCircleProcessing:
                 positions=(Point3D(east=10000, north=20000, altitude=5000),),
                 points=[],
                 color=(255, 0, 0),
+                object_id=Parameter(name="object_id", value=shaft_config.object_id),
             )
             mock_create.return_value = mock_obj
 
@@ -237,6 +244,7 @@ class TestInsertProcessing:
                 positions=(Point3D(east=15000, north=25000, altitude=0),),
                 points=[],
                 color=(255, 0, 0),
+                object_id=Parameter(name="object_id", value=shaft_config.object_id),
             )
             mock_create.return_value = mock_obj
 
@@ -277,6 +285,7 @@ class TestLineProcessing:
                     Point3D(east=50000, north=0, altitude=0),
                 ],
                 color=(0, 255, 0),
+                object_id=Parameter(name="object_id", value=pipe_config.object_id),
             )
             mock_create.return_value = mock_obj
 
@@ -307,6 +316,7 @@ class TestConfigurationHandling:
                 elevation_offset=0.0,
                 default_unit="mm",
                 object_type=ObjectType.SHAFT,
+                object_id="shaft_id",
             ),
             MediumConfig(
                 medium="test",
@@ -317,6 +327,7 @@ class TestConfigurationHandling:
                 elevation_offset=0.0,
                 default_unit="mm",
                 object_type=ObjectType.PIPE_WATER,
+                object_id="pipe_water_id",
             ),
             MediumConfig(
                 medium="test",
@@ -327,6 +338,7 @@ class TestConfigurationHandling:
                 elevation_offset=0.0,
                 default_unit="mm",
                 object_type=ObjectType.PIPE_WASTEWATER,
+                object_id="pipe_wastewater_id",
             ),
         ]
 
@@ -351,6 +363,7 @@ class TestConfigurationHandling:
                 elevation_offset=0.0,
                 default_unit=unit,
                 object_type=ObjectType.SHAFT,
+                object_id="shaft_id",
             )
 
             with patch.object(factory, "_create_from_circle") as mock_create:

@@ -44,6 +44,7 @@ class TestIntegration:
             elevation_offset=0.0,
             default_unit="mm",
             object_type=ObjectType.PIPE_WATER,
+            object_id="TestObject",
         )
 
     @pytest.fixture
