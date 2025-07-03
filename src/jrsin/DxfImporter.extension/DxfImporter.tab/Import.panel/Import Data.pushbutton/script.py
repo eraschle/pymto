@@ -21,12 +21,12 @@ from Autodesk.Revit.DB import (
     StorageType,
     UnitTypeId,
     UnitUtils,
+    Transaction,
 )
 from Autodesk.Revit.DB.Structure import (
     StructuralType,
 )
 from pyrevit import forms
-from pyrevit.revit import Transaction
 
 
 def get_length_value(value, unit=None):
@@ -236,7 +236,7 @@ class RevitImporter(object):
             return int(value)
         return str(value)
 
-    def _set_parameter_value(self, parameter: Parameter, parameter_data: dict):
+    def _set_parameter_value(self, parameter: Parameter, parameter_data):
         # type: (Parameter, dict) -> None
         """Set parameter value with unit conversion if needed"""
         value = self._get_parameter_value(parameter=parameter, parameter_data=parameter_data)
@@ -265,7 +265,9 @@ class RevitImporter(object):
         for medium, elements in json_data.items():
             # Process each category
             print(f"Processing medium: {medium} with {len(elements)} elements")
-            with Transaction(name=f"Process {medium}", doc=self.document):
+            tx = Transaction(self.document, f"Import {medium}")
+            tx.Start()
+            try:
                 for element in elements:
                     # Create ElementData object from JSON
                     element_data = ElementData(element)
@@ -279,6 +281,10 @@ class RevitImporter(object):
                     for instance in instances:
                         self.set_element_parameters(instance, element_data)
                     created_count += len(instances)
+                tx.Commit()
+            except Exception as ex:
+                print(f"Error processing medium {medium}: {ex}")
+                tx.RollBack()
 
         return created_count
 
