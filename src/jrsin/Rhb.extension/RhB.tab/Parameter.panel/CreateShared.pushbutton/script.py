@@ -1,4 +1,31 @@
 # -*- coding: utf-8 -*-
+
+__title__ = "Create Shared"
+__author__ = "Erich Raschle"
+__doc__ = """Version = 1.0
+Date    = 03.07.2025
+__________________________________________________________________
+Description:
+Erstellt eine Shared Parameter Datei und fügt die
+Parameter aus der CSV-Datei als Shared Parameter
+in die Shared Parameter Datei ein.
+
+Die CSV-Datei muss im folgenden Format vorliegen:
+Name;Datentyp;HideWhenNoValue;UserModifiable
+__________________________________________________________________
+How-to:
+Selektieren Sie die CSV-Datei mit den Parametern Definitionen.
+Durch OK wird der Vorgang gestartet.
+__________________________________________________________________
+Prerequisite:
+- Keine
+__________________________________________________________________
+Last update:
+- [03.07.2025] Initial version
+__________________________________________________________________
+"""
+
+import traceback
 import os
 
 from Autodesk.Revit.DB import (
@@ -13,23 +40,19 @@ from Autodesk.Revit.DB import (
     ForgeTypeId,
     GroupTypeId,
     SpecTypeId,
-    Transaction,
 )
 from pyrevit import forms
+from pyrevit.revit.db.transaction import Transaction
 
 
 def _read_csv(file_path):
-    """
-    Reads a CSV file and returns a list of dictionaries.
-    Each dictionary represents a row in the CSV file.
-    """
     with open(file_path, mode="r", encoding="utf-8") as csvfile:
         data = csvfile.read().strip().splitlines()
         headers = [str(hdr).strip() for hdr in data[0].split(";")]
         rows = []
         for row in data[1:]:
             values = row.split(";")
-            rows.append(dict(zip(headers, values, strict=True)))
+            rows.append(dict(zip(headers, values)))
     return rows
 
 
@@ -50,14 +73,14 @@ def _get_data_type(data_type) -> ForgeTypeId:
     raise ValueError(f"Unsupported data type: {data_type}")
 
 
-def _create_external_definition_options(definition_rows) -> list[ExternalDefinitionCreationOptions]:
+def _create_external_definition_options(definition_rows):
     definitions = []
     for line in definition_rows:
         name = line["Name"]
         data_type = _get_data_type(line["Datentyp"])
         options = ExternalDefinitionCreationOptions(name=name.strip(), dataType=data_type)
-        options.HideWhenNoValue = bool(line.get("HideWhenNoValue", "False"))
-        options.UserModifiable = bool(line.get("UserModifiable", "True"))
+        options.HideWhenNoValue = line.get("HideWhenNoValue", False)
+        options.UserModifiable = line.get("UserModifiable", True)
         definitions.append(options)
     return definitions
 
@@ -91,7 +114,7 @@ def _get_or_create_group(definition_file: DefinitionFile, group_name: str = "Def
         if group.Name != group_name:
             continue
         return group
-    return definition_file.Groups.Create("Default")
+    return definition_file.Groups.Create(group_name)
 
 
 def _get_or_create_shared_parameter(
@@ -143,28 +166,26 @@ def create_parameter_definitions(document: Document, definitions_file: str):
     category_set = _create_category_set(document, categories)
     category_names = [cat.Name for cat in category_set.GetEnumerator() if cat is not None]
     print(f"Create Project Parameters for Categories: {', '.join(category_names)}")
-    app = document.Application  # pyright: ignore[reportFunctionMemberAccess]
-    tx = Transaction(document, "Create Project Parameters")
-    tx.Start()
-    try:
-        binding_map = document.ParameterBindings
-        for definition in definitions:
-            if binding_map.Contains(definition):
-                print(f"Parameter already exists: {definition.Name} [{definition.GetDataType()}]")
-                continue
-            binding = app.Create.NewInstanceBinding(category_set)  # pyright: ignore[reportFunctionMemberAccess]
-            binding_map.Insert(definition, binding, GroupTypeId.Data)
-            print(f"Created parameter: {definition.Name} [{definition.GetDataType()}]")
-        tx.Commit()
-        return definitions
-    except Exception as e:
-        tx.RollBack()
-        forms.alert(f"Error creating project parameters: {e}")
-        return []
+    app = document.Application  # pyright: ignore
+    created_parameters = []
+    with Transaction(doc=document, name="Create Project Parameters"):
+        try:
+            binding_map = document.ParameterBindings
+            for definition in definitions:
+                if binding_map.Contains(definition):
+                    print(f"Parameter exists: {definition.Name}")
+                    continue
+                binding = app.Create.NewInstanceBinding(category_set)  # pyright: ignore
+                binding_map.Insert(definition, binding, GroupTypeId.Data)
+                created_parameters.append(definition.Name)
+                print(f"Created parameter: {definition.Name}")
+        except Exception:
+            print(f"Error: creating {definition.Name}: {traceback.format_exc()}")
+            raise
+    return created_parameters
 
 
 def main():
-    # type: () -> None
     """Main function"""
     doc = __revit__.ActiveUIDocument.Document
 
@@ -172,8 +193,7 @@ def main():
         forms.alert("No active Revit document found")
         return
 
-    # Select JSON file
-    parameter_definition = forms.pick_file(file_ext="csv", title="Parameter Definitionen Datei auswählen")
+    parameter_definition = forms.pick_file(file_ext="csv", title="Select CSV file with parameter definitions")
     if isinstance(parameter_definition, list):
         parameter_definition = parameter_definition[0]
     if parameter_definition is None:
@@ -181,8 +201,8 @@ def main():
         return
 
     created_parameters = create_parameter_definitions(doc, parameter_definition)
-    if not created_parameters:
-        forms.alert("Keine Parameter erstellt. Überprüfen Sie das CSV-Dateiformat.")
+    if len(created_parameters) == 0:
+        forms.alert("No parameters were created. Please check the CSV file and try again.")
     else:
         forms.alert(f"{len(created_parameters)} Parameter erfolgreich erstellt.")
 

@@ -26,12 +26,15 @@ Diese Extension ermöglicht den Import von DXF-Geometriedaten, die zuvor von der
 ## Nutzung
 
 ### 1. Extension aktivieren
+
 Nach der Installation erscheint ein neuer "DXF Importer" Tab in der Revit Ribbon.
 
 ### 2. JSON-Datei vorbereiten
+
 Verwenden Sie die `dxfto` Anwendung, um DXF-Dateien in das erforderliche JSON-Format zu konvertieren.
 
 ### 3. Import durchführen
+
 1. Klicken Sie auf "Import DXF Data" im DXF Importer Tab
 2. Wählen Sie die JSON-Datei aus
 3. Konfigurieren Sie die Import-Einstellungen:
@@ -73,13 +76,13 @@ family_mapping = {
         "category": "OST_GenericModel",
     },
     "WATER_PIPE": {
-        "family_name": "Generic Model", 
+        "family_name": "Generic Model",
         "type_name": "Water Pipe",
         "category": "OST_GenericModel",
     },
     "SHAFT": {
         "family_name": "Generic Model",
-        "type_name": "Shaft", 
+        "type_name": "Shaft",
         "category": "OST_GenericModel",
     },
 }
@@ -90,7 +93,7 @@ family_mapping = {
 Die Extension erstellt automatisch folgende Shared Parameters:
 
 - **DXF_ObjectType**: Original DXF Objekttyp
-- **DXF_LayerName**: Original DXF Layer-Name  
+- **DXF_LayerName**: Original DXF Layer-Name
 - **DXF_PointCount**: Anzahl der Punkte in der ursprünglichen Geometrie
 - **DXF_Diameter/Radius/Width/Height**: Elementdimensionen
 - **DXF_CenterX/Y/Z**: Zentrumskoordinaten

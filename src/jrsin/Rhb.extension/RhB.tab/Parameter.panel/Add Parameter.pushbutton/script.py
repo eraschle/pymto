@@ -1,8 +1,23 @@
 # -*- coding: utf-8 -*-
-"""
-Import DXF Data - pyRevit Button Script
-Simple extension to read revit_data.json and create elements in Revit
-IronPython 3 compatible
+__title__ = "Set Parameter Data"
+__author__ = "Erich Raschle"
+__doc__ = """Version = 1.0
+Date    = 03.07.2025
+__________________________________________________________________
+Description:
+Fügt die Shared Parameter aus der Shared Parameter Datei
+als Projektparameter in das aktuelle Revit-Projekt ein.
+__________________________________________________________________
+How-to:
+Selektieren Sie die CSV-Datei mit den Parametern Definitionen.
+Durch OK wird der Vorgang gestartet.
+__________________________________________________________________
+Prerequisite:
+- Keine
+__________________________________________________________________
+Last update:
+- [03.07.2025] Initial version
+__________________________________________________________________
 """
 
 from Autodesk.Revit.DB import (
@@ -24,7 +39,7 @@ def _read_csv(file_path):
         rows = []
         for row in data[1:]:
             values = row.split(";")
-            rows.append(dict(zip(headers, values, strict=True)))
+            rows.append(dict(zip(headers, values)))  # noqa [B905}
     return rows
 
 
@@ -54,8 +69,7 @@ def _elements_grouped_by(document: Document, group_param: str, categories=None):
     fdk_groups = {}
     for instance in _get_family_instances(document, categories):
         fdk_id = _get_parameter_value(instance, group_param)
-        if fdk_id is None:
-            print(f"Instance {instance.Id} has no FDK_ID parameter")
+        if fdk_id is None or len(fdk_id.strip()) == 0:
             continue
         if fdk_id not in fdk_groups:
             fdk_groups[fdk_id] = []
@@ -87,19 +101,17 @@ def _set_parameter_value(element: Element, param_dict):
 
 
 def import_data(document: Document, data_file: str, fdk_param: str) -> int:
-    fdk_groups = _elements_grouped_by(document, fdk_param, categories=None)
+    fdk_groups = _elements_grouped_by(document, group_param="FDK_ID", categories=None)
     parameter_data = _read_csv(data_file)
     updated_elements = 0
     for param_row in parameter_data:
         fdk_id = param_row.get(fdk_param, None)
         if fdk_id is None:
-            print(f"Parameter row {param_row} has no FDK_ID")
             continue
         if fdk_id not in fdk_groups:
-            print(f"No instances found for FDK_ID {fdk_id}")
+            print(f"FDK_ID {fdk_id}: No elements found in document")
             continue
-        param_row.pop("FDK_ID", None)
-        with Transaction(document, "Set Parameters for FDK_ID {}".format(fdk_id)):
+        with Transaction(doc=document, name=f"Set Parameters for FDK_ID {fdk_id}"):
             for instance in fdk_groups[fdk_id]:
                 _set_parameter_value(instance, param_row)
                 updated_elements += 1
@@ -107,8 +119,6 @@ def import_data(document: Document, data_file: str, fdk_param: str) -> int:
 
 
 def main():
-    # type: () -> None
-    """Main function"""
     doc = __revit__.ActiveUIDocument.Document
     if doc is None:
         forms.alert("No active Revit document found")
@@ -136,7 +146,7 @@ def main():
     else:
         forms.alert(
             title="Import Result",
-            msg="Import completed! Created {} elements".format(updated_elements),
+            msg=f"Import completed! Updated {updated_elements} elements",
         )
 
 

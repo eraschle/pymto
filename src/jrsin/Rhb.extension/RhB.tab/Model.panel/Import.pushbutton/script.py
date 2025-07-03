@@ -2,7 +2,6 @@
 """
 Import DXF Data - pyRevit Button Script
 Simple extension to read revit_data.json and create elements in Revit
-IronPython 3 compatible
 """
 
 import json
@@ -15,13 +14,14 @@ from Autodesk.Revit.DB import (
     Element,
     ElementId,
     FamilySymbol,
+    FamilyInstance,
     FilteredElementCollector,
     Parameter,
     ReferencePoint,
     StorageType,
+    Transaction,
     UnitTypeId,
     UnitUtils,
-    Transaction,
 )
 from Autodesk.Revit.DB.Structure import (
     StructuralType,

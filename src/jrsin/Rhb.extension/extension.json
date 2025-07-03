@@ -1,0 +1,19 @@
+{
+    "builtin": "False",
+    "default_enabled": "True",
+    "type": "extension",
+    "rocket_mode_compatible": "True",
+    "name": "RhB",
+    "description": "Extension for RhB Projects",
+    "version": "1.0.0",
+    "author": "Erich Raschle",
+    "author_profile": "",
+    "url": "",
+    "website": "",
+    "image": "",
+    "templates": {
+        "author": "",
+        "docpath": ""
+    },
+    "dependencies": [ ]
+}
