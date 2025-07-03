@@ -116,7 +116,7 @@ def process_dxf(
 
         params = GradientAdjustmentParams(
             manhole_search_radius=1,
-            min_gradient_percent=0.8,
+            min_gradient_percent=1.0,
             gradient_break_threshold=5,
         )
         compatibility = PrefixBasedCompatibility(separator=" ")
@@ -158,9 +158,7 @@ def _print_assignment_statistic(processor: DXFProcessor):
     click.echo("\n" + "=" * 85)
     click.echo("TEXT ASSIGNMENT STATISTICS")
     click.echo("=" * 85)
-    click.echo(
-        f"{'Medium':<25} {'Total Elem.':>12} {'Total Text':>12} {'Elem. w/ Text':>15} {'% Assigned':>12}"
-    )
+    click.echo(f"{'Medium':<25} {'Total Elem.':>12} {'Total Text':>12} {'Elem. w/ Text':>15} {'% Assigned':>12}")
     click.echo("-" * 85)
 
     for medium in processor.mediums:
@@ -182,9 +180,7 @@ def _print_export_statistic(exporter: IExporter):
     click.echo("\n" + "=" * 85)
     click.echo("EXPORT STATISTICS")
     click.echo("=" * 85)
-    click.echo(
-        f"{'Medium':<25} {'Total Elem.':>12} {'Exported':>12} {'Not Exported':>15} {'% Percentage':>11}"
-    )
+    click.echo(f"{'Medium':<25} {'Total Elem.':>12} {'Exported':>12} {'Not Exported':>15} {'% Percentage':>11}")
     click.echo("-" * 85)
 
     for medium, statistics in exporter.get_exported_statistics().items():
@@ -192,9 +188,7 @@ def _print_export_statistic(exporter: IExporter):
         not_exported = statistics["not_exported"]
         total = statistics["total"]
         export_perc = (exported / total * 100) if total > 0 else 0
-        click.echo(
-            f"{medium:<25} {total:>12} {exported:>12} {not_exported:>15} {export_perc:>11.1f}%"
-        )
+        click.echo(f"{medium:<25} {total:>12} {exported:>12} {not_exported:>15} {export_perc:>11.1f}%")
 
     click.echo("-" * 85)
 
