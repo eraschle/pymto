@@ -90,6 +90,7 @@ class ConfigurationHandler:
             object_type=self._create_default_shape(config.get("Category", "NONE")),
             default_unit=self._create_default_unit(config.get("Unit", "mm")),
             elevation_offset=config.get("ElevationOffset", 0.0),
+            object_id=config.get("FDK_ID", ""),
         )
 
     def _create_medium_configs(self, medium: str, configs: list[dict]) -> list[MediumConfig]:

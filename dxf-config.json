@@ -59,21 +59,6 @@
             },
             {
                 "Unit": "cm",
-                "Category": "gate_value",
-                "Family": "Wasser - Schacht",
-                "FamilyType": "Armatur Gemeinde",
-                "FDK_ID": "RhB_WL_019",
-                "Geometrie": [
-                    {
-                        "Name": "Armatur",
-                        "Farbe": 160,
-                        "Block": "Armatur_2"
-                    }
-                ],
-                "Text": []
-            },
-            {
-                "Unit": "cm",
                 "Category": "hydrant",
                 "Family": "Wasser - Schacht",
                 "FamilyType": "Hydrant Gemeinde",
@@ -146,21 +131,6 @@
                         "Name": "wkn_privat_bauwerk_text"
                     }
                 ]
-            },
-            {
-                "Unit": "cm",
-                "Category": "gate_value",
-                "Family": "Wasser - Schacht",
-                "FamilyType": "Schieber Privat",
-                "FDK_ID": "RhB_XX_004",
-                "Geometrie": [
-                    {
-                        "Name": "Armatur",
-                        "Farbe": 160,
-                        "Block": "Armatur_2"
-                    }
-                ],
-                "Text": []
             }
         ]
     },

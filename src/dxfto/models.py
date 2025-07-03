@@ -273,7 +273,7 @@ class DxfText:
         return [self._content]
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class ObjectData:
     """Base class for all DXF objects.
 
@@ -413,6 +413,7 @@ class MediumConfig:
     elevation_offset: float
     default_unit: str
     object_type: ObjectType
+    object_id: str
 
 
 @dataclass(frozen=True)
@@ -434,6 +435,25 @@ class MediumMasterConfig:
     medium: str
     point_based: list[MediumConfig] = field(default_factory=list, repr=True, compare=True)
     line_based: list[MediumConfig] = field(default_factory=list, repr=True, compare=True)
+
+    def config_by(self, object_type: ObjectType) -> MediumConfig | None:
+        """Get configuration for a specific object type.
+
+        Parameters
+        ----------
+        object_type : ObjectType
+            The type of the object to get the configuration for
+
+        Returns
+        -------
+        MediumConfig | None
+            Configuration for the specified object type, or None if not found
+        """
+        for config in self.point_based + self.line_based:
+            if config.object_type != object_type:
+                continue
+            return config
+        return None
 
 
 AssingmentGroup = tuple[list[ObjectData], list[DxfText]]

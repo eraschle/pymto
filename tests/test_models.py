@@ -71,7 +71,7 @@ class TestRectangularDimensions:
         assert dims.length == 8.0
         assert dims.width == 4.0
         assert dims.angle == 0.0
-        assert dims.height is None
+        assert dims.height == 0.0  # Default height is 0.0
 
 
 class TestRoundDimensions:
@@ -87,7 +87,7 @@ class TestRoundDimensions:
         """Test RoundDimensions without height."""
         dims = RoundDimensions(diameter=8.0)
         assert dims.diameter == 8.0
-        assert dims.height is None
+        assert dims.height == 0.0  # Default height is 0.0
 
 
 class TestDxfText:

@@ -262,10 +262,10 @@ class RevitImporter(object):
         json_data = self.load_json_data(json_path)
 
         created_count = 0
-        with Transaction(name="Import Revit Data", doc=self.document):
+        for medium, elements in json_data.items():
             # Process each category
-            for medium, elements in json_data.items():
-                print(f"Processing medium: {medium} with {len(elements)} elements")
+            print(f"Processing medium: {medium} with {len(elements)} elements")
+            with Transaction(name=f"Process {medium}", doc=self.document):
                 for element in elements:
                     # Create ElementData object from JSON
                     element_data = ElementData(element)

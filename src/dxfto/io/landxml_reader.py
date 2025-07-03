@@ -132,7 +132,7 @@ class LandXMLReader:
 
         for point in points:
             z_elevation = self.get_elevation(point.east, point.north)
-            z_elevation -= config.elevation_offset
+            z_elevation = z_elevation - config.elevation_offset
             updated_point = Point3D(east=point.east, north=point.north, altitude=z_elevation)
             updated_points.append(updated_point)
 

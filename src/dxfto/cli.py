@@ -114,23 +114,21 @@ def process_dxf(
             click.echo("Updating points elevation from LandXML...")
             processor.update_points_elevation(updater=landxml_reader)
 
-        click.echo("Adjusting pipe gradients based on shaft elevations...")
-        gradient = PipelineGradientAdjuster(
-            params=GradientAdjustmentParams(
-                manhole_search_radius=2,
-                min_gradient_percent=0.5,
-                max_gradient_percent=10,
-            ),
-            compatibility=PrefixBasedCompatibility(separator=" "),
-        )
         if adjust_gradient:
-            adjustment_result = processor.adjustment_pipe_gardiant(gradient=gradient)
-            if len(adjustment_result) > 0 and verbose:
-                click.echo("Adjusting pipe gradients based on shaft elevations...")
+            params = GradientAdjustmentParams(
+                manhole_search_radius=1,
+                min_gradient_percent=0.8,
+                gradient_break_threshold=5,
+            )
+            compatibility = PrefixBasedCompatibility(separator=" ")
+            gradient = PipelineGradientAdjuster(
+                mediums=processor.mediums, params=params, compatibility=compatibility
+            )
+            click.echo("Adjusting pipe gradients based on shaft elevations...")
+            processor.adjustment_pipe_gardiant(gradient=gradient)
 
-        result_shaft_heights = processor.calculate_cover_to_pipe_height(gradient=gradient)
-        if len(result_shaft_heights) > 0 and verbose:
             click.echo("Calculated cover to pipe heights on every shaft:")
+            processor.calculate_cover_to_pipe_height(gradient=gradient)
 
         click.echo("Adjusting and round parameter values...")
         processor.round_parameter_values(updater=dimension_updater)
@@ -162,7 +160,9 @@ def _print_assignment_statistic(processor: DXFProcessor):
     click.echo("\n" + "=" * 85)
     click.echo("TEXT ASSIGNMENT STATISTICS")
     click.echo("=" * 85)
-    click.echo(f"{'Medium':<25} {'Total Elem.':>12} {'Total Text':>12} {'Elem. w/ Text':>15} {'% Assigned':>12}")
+    click.echo(
+        f"{'Medium':<25} {'Total Elem.':>12} {'Total Text':>12} {'Elem. w/ Text':>15} {'% Assigned':>12}"
+    )
     click.echo("-" * 85)
 
     for medium in processor.mediums:
@@ -184,7 +184,9 @@ def _print_export_statistic(exporter: IExporter):
     click.echo("\n" + "=" * 85)
     click.echo("EXPORT STATISTICS")
     click.echo("=" * 85)
-    click.echo(f"{'Medium':<25} {'Total Elem.':>12} {'Exported':>12} {'Not Exported':>15} {'% Percentage':>11}")
+    click.echo(
+        f"{'Medium':<25} {'Total Elem.':>12} {'Exported':>12} {'Not Exported':>15} {'% Percentage':>11}"
+    )
     click.echo("-" * 85)
 
     for medium, statistics in exporter.get_exported_statistics().items():
@@ -192,7 +194,9 @@ def _print_export_statistic(exporter: IExporter):
         not_exported = statistics["not_exported"]
         total = statistics["total"]
         export_perc = (exported / total * 100) if total > 0 else 0
-        click.echo(f"{medium:<25} {total:>12} {exported:>12} {not_exported:>15} {export_perc:>11.1f}%")
+        click.echo(
+            f"{medium:<25} {total:>12} {exported:>12} {not_exported:>15} {export_perc:>11.1f}%"
+        )
 
     click.echo("-" * 85)
 
