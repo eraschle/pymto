@@ -7,6 +7,7 @@ Die neue ObjectData Factory vereinfacht und verbessert die Erstellung von Object
 ## Neue Module
 
 ### 1. `pymto/process/entity_handler.py`
+
 - **Zweck**: Funktionen zur Analyse und Klassifizierung von DXF-Entitäten
 - **Hauptfunktionen**:
   - `is_element_entity()`: Bestimmt, ob eine Entität als Element oder Linie verarbeitet werden soll
@@ -17,6 +18,7 @@ Die neue ObjectData Factory vereinfacht und verbessert die Erstellung von Object
   - Verschiedene Berechnungsfunktionen für Dimensionen und Mittelpunkte
 
 ### 2. `pymto/process/objectdata_factory.py`
+
 - **Zweck**: Factory-Pattern für ObjectData-Erstellung
 - **Hauptklasse**: `ObjectDataFactory`
 - **Unterstützte Entitätstypen**:
@@ -30,6 +32,7 @@ Die neue ObjectData Factory vereinfacht und verbessert die Erstellung von Object
 ### 1. `pymto/io/dxf_reader.py`
 
 #### Aktueller Zustand
+
 - Enthält bereits ähnliche Funktionalität, aber weniger strukturiert
 - Gemischte Verantwortlichkeiten in einer Klasse
 - Teilweise inkonsistente Geometrieerkennung
@@ -76,7 +79,9 @@ class DXFReader:
 ```
 
 #### Zu entfernende Methoden
+
 Diese Methoden können entfernt werden, da sie von der Factory übernommen werden:
+
 - `_should_process_as_element()`
 - `_create_element_from_entity()`
 - `_create_object_from_insert()`
@@ -94,16 +99,19 @@ Diese Methoden können entfernt werden, da sie von der Factory übernommen werde
 ### 2. Verbesserte Unterstützung für verschiedene Schachttypen
 
 #### Runde Schächte
+
 - **Einfache Kreise**: Automatische Durchmessererkennung
 - **Blöcke mit Kreisen**: Erkennung des größten Kreises als Außendurchmesser
 - **Doppelkreis-Schächte**: Äußerer Kreis wird als maßgebend betrachtet
 
 #### Rechteckige Verteiler
+
 - **4-Eck-Geometrie**: Präzise Längen-/Breitenberechnung
 - **Mit Diagonalkreuz**: Erkennung von Kreuzlinien (implementiert aber nicht vollständig genutzt)
 - **Begrenzungsrahmen**: Fallback für komplexe Formen
 
 #### Mehrseitige Elemente
+
 - **Polygone >4 Ecken**: Automatische Erkennung
 - **Annähernd runde Formen**: Polygone mit vielen Seiten werden als rund behandelt
 - **Unregelmäßige Formen**: Begrenzungsrahmen-Dimensionen
@@ -111,6 +119,7 @@ Diese Methoden können entfernt werden, da sie von der Factory übernommen werde
 ### 3. `pymto/models.py`
 
 #### Mögliche Erweiterungen
+
 ```python
 @dataclass
 class ShapeAnalysis:
@@ -129,7 +138,9 @@ class ObjectData:
 ### 4. Performance-Verbesserungen
 
 #### Block-Caching
+
 Die Factory implementiert Caching für Blockdefinitionen:
+
 ```python
 class ObjectDataFactory:
     def __init__(self, dxf_document: Drawing):
@@ -138,7 +149,9 @@ class ObjectDataFactory:
 ```
 
 #### Parallele Verarbeitung (zukünftig)
+
 Die modulare Struktur ermöglicht einfache Parallelisierung:
+
 ```python
 from concurrent.futures import ThreadPoolExecutor
 
@@ -151,16 +164,19 @@ def process_entities_parallel(entities: List[DXFEntity], factory: ObjectDataFact
 ## Migration Strategy
 
 ### Phase 1: Integration der Factory
+
 1. Neue Module `entity_handler.py` und `objectdata_factory.py` hinzufügen
 2. `DXFReader` um Factory-Unterstützung erweitern
 3. Tests für neue Funktionalität
 
 ### Phase 2: Code-Bereinigung
+
 1. Alte Methoden in `DXFReader` entfernen
 2. Duplicate Code eliminieren
 3. Bestehende Tests anpassen
 
 ### Phase 3: Erweiterte Features
+
 1. Vollständige Unterstützung für Diagonalkreuz-Erkennung
 2. Erweiterte Transformationen für Blöcke (Skalierung, Rotation)
 3. Zusätzliche Geometrietypen
@@ -168,21 +184,25 @@ def process_entities_parallel(entities: List[DXFEntity], factory: ObjectDataFact
 ## Vorteile der neuen Architektur
 
 ### 1. Separation of Concerns
+
 - **Entity Handler**: Reine Geometrieanalyse
 - **Factory**: ObjectData-Erstellung
 - **DXF Reader**: Koordination und Dateiverarbeitung
 
 ### 2. Erweiterbarkeit
+
 - Neue Entitätstypen können einfach hinzugefügt werden
 - Modulare Funktionen ermöglichen granulare Tests
 - Factory-Pattern erlaubt verschiedene Erstellungsstrategien
 
 ### 3. Wartbarkeit
+
 - Klare Verantwortlichkeiten
 - Weniger Code-Duplizierung
 - Bessere Testbarkeit
 
 ### 4. Robustheit
+
 - Umfassende Fehlerbehandlung
 - Fallback-Mechanismen für unbekannte Geometrien
 - Logging für Debugging
@@ -190,21 +210,24 @@ def process_entities_parallel(entities: List[DXFEntity], factory: ObjectDataFact
 ## Potenzielle Risiken
 
 ### 1. Breaking Changes
+
 - Bestehende Tests müssen angepasst werden
 - API-Änderungen in `DXFReader`
 
 ### 2. Performance
+
 - Zusätzliche Indirektion durch Factory
 - Möglicher Memory-Overhead durch Caching
 
 ### 3. Komplexität
+
 - Mehr Module zu verwalten
 - Abhängigkeiten zwischen Modulen
 
 ## Empfohlene nächste Schritte
 
-1. **Tests erweitern**: Umfassende Tests für alle Geometrietypen
-2. **Integration testen**: Mit realen DXF-Dateien testen
-3. **Performance messen**: Benchmarks vor und nach Migration
-4. **Dokumentation**: API-Dokumentation für neue Module
-5. **Graduelle Migration**: Schrittweise Umstellung ohne Breaking Changes
+[ ] **Tests erweitern**: Umfassende Tests für alle Geometrietypen
+[ ] **Integration testen**: Mit realen DXF-Dateien testen
+[ ] **Performance messen**: Benchmarks vor und nach Migration
+[ ] **Dokumentation**: API-Dokumentation für neue Module
+[ ] **Graduelle Migration**: Schrittweise Umstellung ohne Breaking Changes

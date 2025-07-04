@@ -1,4 +1,4 @@
-# API Dokumentation - pymto
+# API Dokumentation
 
 Diese Dokumentation beschreibt die öffentlichen APIs und Schnittstellen der pymto-Bibliothek.
 
@@ -34,6 +34,7 @@ class DXFReader:
 ```
 
 **Beispiel:**
+
 ```python
 from pathlib import Path
 from pymto.dxf_reader import DXFReader
@@ -47,6 +48,7 @@ texts = reader.extract_texts()
 ```
 
 **Exceptions:**
+
 - `FileNotFoundError`: DXF-Datei nicht gefunden
 - `ezdxf.DXFError`: DXF-Datei kann nicht gelesen werden
 - `RuntimeError`: Datei nicht geladen (load_file() nicht aufgerufen)
@@ -67,6 +69,7 @@ class LandXMLReader:
 ```
 
 **Beispiel:**
+
 ```python
 from pymto.landxml_reader import LandXMLReader
 
@@ -93,6 +96,7 @@ class LayerBasedGrouper:
 ```
 
 **Konfigurationsformat:**
+
 ```json
 {
   "Medium_Name": {
@@ -112,6 +116,7 @@ class ColorBasedGrouper:
 ```
 
 **Beispiel:**
+
 ```python
 from pymto.groupers import ColorBasedGrouper, LayerBasedGrouper
 
@@ -148,6 +153,7 @@ class ZoneBasedTextAssigner:
 ```
 
 **Beispiel:**
+
 ```python
 from pymto.text_assigners import SpatialTextAssigner, ZoneBasedTextAssigner
 
@@ -182,6 +188,7 @@ class RevitJSONExporter(JSONExporter):
 ```
 
 **Beispiel:**
+
 ```python
 from pymto.json_exporter import JSONExporter, RevitJSONExporter
 
@@ -195,6 +202,7 @@ revit_exporter.export_media(media)
 ```
 
 **Revit JSON-Format:**
+
 ```json
 {
   "version": "1.0",

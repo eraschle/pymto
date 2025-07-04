@@ -1,6 +1,6 @@
 # pymto - DXF Processing Tool for Revit Export
 
-[![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 
 Ein Python-Tool zur Verarbeitung von DXF-Dateien mit Rohrleitungen und Schächten für den Export nach Revit. Das Tool extrahiert Geometrieinformationen, gruppiert Elemente nach Medien und exportiert die Daten in ein Revit-kompatibles JSON-Format.
@@ -14,6 +14,9 @@ Ein Python-Tool zur Verarbeitung von DXF-Dateien mit Rohrleitungen und Schächte
   - [Grundlegende Verwendung](#grundlegende-verwendung)
   - [Erweiterte Optionen](#erweiterte-optionen)
   - [Konfigurationsdateien](#konfigurationsdateien)
+- [Verarbeitungsschritte](#verarbeitungsschritte)
+  - [Datenfluss-Diagramm](#datenfluss-diagramm)
+  - [Architektur-Diagramm](#architektur-diagramm)
 - [Projektstruktur](#projektstruktur)
 - [Entwicklung](#entwicklung)
 - [Architektur](#architektur)
@@ -35,7 +38,7 @@ Ein Python-Tool zur Verarbeitung von DXF-Dateien mit Rohrleitungen und Schächte
 
 ### Voraussetzungen
 
-- Python 3.13 oder höher
+- Python 3.10 oder höher
 - [uv](https://docs.astral.sh/uv/) Package Manager
 
 ### Installation mit uv
@@ -45,7 +48,7 @@ Ein Python-Tool zur Verarbeitung von DXF-Dateien mit Rohrleitungen und Schächte
 git clone <repository-url>
 cd pymto
 
-# Dependencies installieren
+# Virtual Environment erstellen und Dependencies installieren
 uv sync
 
 # Tool testen
@@ -62,7 +65,7 @@ source venv/bin/activate  # Linux/macOS
 venv\Scripts\activate  # Windows
 
 # Dependencies installieren
-pip install -r requirements.txt
+pip install -e .
 ```
 
 ## Entwicklersetup
@@ -103,41 +106,32 @@ uv run pre-commit run --all-files
 ### Grundlegende Verwendung
 
 ```bash
-# Einfache DXF-Verarbeitung
-uv run python -m pymto.cli input.dxf
+# Grundlegende DXF-Verarbeitung mit allen erforderlichen Parametern
+uv run python -m pymto.cli process-dxf input.dxf config.json terrain.xml
 
 # Mit Output-Datei spezifizieren
-uv run python -m pymto.cli input.dxf --output output.json
+uv run python -m pymto.cli process-dxf input.dxf config.json terrain.xml --output output.json
 
-# Mit LandXML für Höhendaten
-uv run python -m pymto.cli input.dxf --landxml terrain.xml
+# Mit Gradient-Anpassung
+uv run python -m pymto.cli process-dxf input.dxf config.json terrain.xml --adjust-gradient
 
 # Verbose Output
-uv run python -m pymto.cli input.dxf --verbose
+uv run python -m pymto.cli process-dxf input.dxf config.json terrain.xml --verbose
 ```
 
-### Erweiterte Optionen
+### Erweiterte Process Optionen
 
 ```bash
-# Layer-basierte Gruppierung mit Konfigurationsdatei
-uv run python -m pymto.cli input.dxf \
-  --grouping layer \
-  --config config.json
-
-# Farbbasierte Gruppierung mit Toleranz
-uv run python -m pymto.cli input.dxf \
-  --grouping color \
-  --color-tolerance 25.0
-
-# Zonbasierte Textzuordnung
-uv run python -m pymto.cli input.dxf \
-  --text-assignment zone \
+# Mit angepasster Textdistanz
+uv run python -m pymto.cli process-dxf input.dxf config.json terrain.xml \
   --max-text-distance 30.0
 
-# Revit-spezifisches Format
-uv run python -m pymto.cli input.dxf \
-  --revit-format \
-  --output revit_export.json
+# Vollständiges Beispiel mit allen Optionen
+uv run python -m pymto.cli process-dxf input.dxf config.json terrain.xml \
+  --output output.json \
+  --max-text-distance 30.0 \
+  --adjust-gradient \
+  --verbose
 ```
 
 ### Konfigurationsdateien
@@ -147,48 +141,404 @@ uv run python -m pymto.cli input.dxf \
 ```bash
 # Beispiel-Konfiguration generieren
 uv run python -m pymto.cli create-config sample_config.json
+
+# Mit DXF-Datei für automatische Layererkennung
+uv run python -m pymto.cli create-config sample_config.json --dxf-file input.dxf
 ```
 
-#### Konfigurationsformat
+#### Konfigurationsformat (Aktuell)
 
 ```json
 {
   "Abwasserleitung": {
-    "Leitung": {"Layer": "PIPE_SEWER", "Farbe": [255, 0, 0]},
-    "Schacht": {"Layer": "SHAFT_SEWER", "Farbe": [200, 0, 0]},
-    "Text": {"Layer": "TEXT_SEWER", "Farbe": [255, 100, 100]}
-  },
-  "Wasserleitung": {
-    "Leitung": {"Layer": "PIPE_WATER", "Farbe": [0, 0, 255]},
-    "Schacht": {"Layer": "SHAFT_WATER", "Farbe": [0, 0, 200]},
-    "Text": {"Layer": "TEXT_WATER", "Farbe": [100, 100, 255]}
+    "Leitung": [{
+      "Unit": "mm",
+      "Category": "water",
+      "Family": "Pipe-Family",
+      "FamilyType": "Pipe-Type",
+      "Geometrie": [{
+        "Name": "PIPE_SEWER",
+        "Farbe": [255, 0, 0]
+      }],
+      "Text": [{
+        "Name": "TEXT_PIPE_DIMENSION"
+      }]
+    }],
+    "Element": [{
+      "Unit": "mm",
+      "Category": "water",
+      "Family": "Shaft-Family",
+      "FamilyType": "Shaft-Type",
+      "Geometrie": [{
+        "Name": "SHAFT_SEWER",
+        "Farbe": [200, 0, 0]
+      }],
+      "Text": [{
+        "Name": "TEXT_SEWER",
+        "Farbe": [255, 100, 100]
+      }]
+    }]
   }
 }
 ```
 
+### Detaillierte Konfigurationsstruktur
+
+Die Konfigurationsdatei definiert, wie DXF-Entities zu Medien gruppiert und verarbeitet werden. Jedes Medium kann sowohl **Element** (punkt-basierte Objekte wie Schächte) als auch **Leitung** (linien-basierte Objekte wie Rohrleitungen) enthalten.
+
+#### Grundstruktur
+
+```json
+{
+  "MediumName": {
+    "Element": [MediumConfig],
+    "Leitung": [MediumConfig]
+  }
+}
+```
+
+#### MediumConfig Felder
+
+Jede Konfiguration (`MediumConfig`) definiert eine Gruppe von verwandten DXF-Objekten:
+
+| Feld              | Typ      | Erforderlich | Beschreibung                   | Verwendung                                                                                                   |
+|-------------------|----------|--------------|--------------------------------|--------------------------------------------------------------------------------------------------------------|
+| `Unit`            | `string` | Ja           | Maßeinheit für Dimensionen     | Unterstützt: `"mm"`, `"cm"`, `"m"`<br/>Standard: `"mm"`                                                      |
+| `Category`        | `string` | Ja           | Objektkategorie für Revit      | Werte: `"water"`, `"waste_water"`, `"gas"`, `"telecom"`, etc.<br/>Siehe [ObjectType Enum](#objecttype-werte) |
+| `Family`          | `string` | Ja           | Revit Family Name              | Wird für Revit-Export verwendet                                                                              |
+| `FamilyType`      | `string` | Ja           | Revit Family Type Name         | Wird für Revit-Export verwendet                                                                              |
+| `FDK_ID`          | `string` | Nein         | Eindeutige Objekt-ID           | Standard: `"UNKNOWN"`                                                                                        |
+| `ElevationOffset` | `number` | Nein         | Höhenoffset in Metern          | Standard: `0.0`                                                                                              |
+| `DefaultWidth`    | `number` | Nein         | Standard-Breite in Metern      | Für rechteckige Objekte                                                                                      |
+| `DefaultDepth`    | `number` | Nein         | Standard-Tiefe in Metern       | Für rechteckige Objekte                                                                                      |
+| `DefaultHeight`   | `number` | Nein         | Standard-Höhe in Metern        | Für alle Objekte                                                                                             |
+| `DefaultDiameter` | `number` | Nein         | Standard-Durchmesser in Metern | Für runde Objekte                                                                                            |
+| `Geometrie`       | `array`  | Ja           | Liste der Geometrie-Layer      | Siehe [LayerData Struktur](#layerdata-struktur)                                                              |
+| `Text`            | `array`  | Ja           | Liste der Text-Layer           | Siehe [LayerData Struktur](#layerdata-struktur)                                                              |
+
+#### LayerData Struktur
+
+Definiert, welche DXF-Layer und Farben zu einer Konfiguration gehören:
+
+| Feld    | Typ                   | Erforderlich | Beschreibung        | Beispiele                                   |
+|---------|-----------------------|--------------|---------------------|---------------------------------------------|
+| `Name`  | `string`              | Nein*        | DXF Layer-Name      | `"PIPE_WATER"`, `"SHAFT_SEWER"`             |
+| `Farbe` | `string/array/number` | Nein         | Farbe für Filterung | Siehe [Farbdefinitionen](#farbdefinitionen) |
+| `Block` | `string`              | Nein*        | DXF Block-Name      | `"SCHACHT_RUND"`, `"MANHOLE_600"`           |
+
+*Mindestens `Name` oder `Block` muss angegeben werden.
+
+#### Farbdefinitionen
+
+Farben können auf verschiedene Weise definiert werden:
+
+```json
+{
+  "Farbe": [255, 0, 0]        // RGB-Array (rot)
+  "Farbe": 1                  // ACI-Farbnummer (rot)
+  "Farbe": "ROT"              // Deutsche Farbname
+  "Farbe": "RED"              // Englische Farbname
+  "Farbe": "Farbe 15"         // AutoCAD Farbbezeichnung
+}
+```
+
+**Unterstützte Farbnamen:**
+
+- Deutsch: `ROT`, `BLAU`, `GRÜN`, `GELB`, `CYAN`, `MAGENTA`, `WEISS`, `SCHWARZ`, `GRAU`, `HELLGRAU`
+- Englisch: `RED`, `BLUE`, `GREEN`, `YELLOW`, `CYAN`, `MAGENTA`, `WHITE`, `BLACK`, `GRAY`, `LIGHTGRAY`
+
+#### ObjectType Werte
+
+Verfügbare Kategorien für das `Category` Feld:
+
+| Wert                    | Beschreibung            | Verwendung                      |
+|-------------------------|-------------------------|---------------------------------|
+| `"water"`               | Wasserleitung           | Rohrleitungen und Armaturen     |
+| `"waste_water"`         | Abwasserleitung         | Kanalisations-Infrastruktur     |
+| `"shaft"`               | Schacht                 | Einstiegs- und Kontrollschächte |
+| `"gas"`                 | Gasleitung              | Gas-Infrastruktur               |
+| `"telecom"`             | Telekommunikation       | Kabel und Verteilerkästen       |
+| `"cable_duct"`          | Kabelkanal              | Elektro-Infrastruktur           |
+| `"lighting"`            | Beleuchtung             | Straßenbeleuchtung              |
+| `"hydrant"`             | Hydrant                 | Feuerwehr-Infrastruktur         |
+| `"gate_value"`          | Schieber                | Absperrarmaturen                |
+| `"water_special"`       | Wasser Spezialbauwerk   | Sonderbauten Wasser             |
+| `"waste_water_special"` | Abwasser Spezialbauwerk | Sonderbauten Abwasser           |
+| `"distribution_board"`  | Verteilerkasten         | Elektroverteilung               |
+
+#### Vollständiges Konfigurationsbeispiel
+
+```json
+{
+  "Abwasserleitung": {
+    "Leitung": [{
+      "Unit": "mm",
+      "Category": "waste_water",
+      "Family": "Pipe-Abwasser-Family",
+      "FamilyType": "Standard-Rohr",
+      "FDK_ID": "AW_PIPE_001",
+      "ElevationOffset": -0.5,
+      "DefaultDiameter": 0.3,
+      "Geometrie": [{
+        "Name": "PIPE_SEWER",
+        "Farbe": [139, 69, 19]
+      }, {
+        "Name": "PIPE_SEWER_MAIN",
+        "Farbe": "BRAUN"
+      }],
+      "Text": [{
+        "Name": "TEXT_PIPE_DIMENSION",
+        "Farbe": [255, 255, 255]
+      }]
+    }],
+    "Element": [{
+      "Unit": "mm",
+      "Category": "shaft",
+      "Family": "Shaft-Abwasser-Family",
+      "FamilyType": "Normschacht",
+      "FDK_ID": "AW_SHAFT_001",
+      "DefaultWidth": 1.0,
+      "DefaultDepth": 1.0,
+      "DefaultHeight": 2.0,
+      "Geometrie": [{
+        "Name": "SHAFT_SEWER",
+        "Farbe": [200, 0, 0]
+      }, {
+        "Block": "SCHACHT_RECHTECKIG",
+        "Farbe": 1
+      }],
+      "Text": [{
+        "Name": "TEXT_SHAFT_ID"
+      }]
+    }]
+  },
+  "Wasserleitung": {
+    "Leitung": [{
+      "Unit": "mm",
+      "Category": "water",
+      "Family": "Pipe-Wasser-Family",
+      "FamilyType": "Trinkwasser-Rohr",
+      "FDK_ID": "W_PIPE_001",
+      "DefaultDiameter": 0.15,
+      "Geometrie": [{
+        "Name": "PIPE_WATER",
+        "Farbe": [0, 0, 255]
+      }],
+      "Text": [{
+        "Name": "TEXT_WATER_PRESSURE"
+      }]
+    }],
+    "Element": [{
+      "Unit": "mm",
+      "Category": "hydrant",
+      "Family": "Hydrant-Family",
+      "FamilyType": "Oberflur-Hydrant",
+      "FDK_ID": "W_HYDRANT_001",
+      "DefaultDiameter": 0.8,
+      "DefaultHeight": 1.2,
+      "Geometrie": [{
+        "Block": "HYDRANT_BLOCK",
+        "Farbe": [0, 100, 255]
+      }],
+      "Text": [{
+        "Name": "TEXT_HYDRANT_INFO"
+      }]
+    }]
+  }
+}
+```
+
+#### Verwendung in der Verarbeitung
+
+1. **Layer-Matching**: DXF-Entities werden basierend auf `Name`, `Farbe` und `Block` gefiltert
+2. **Objekt-Erstellung**: `Category` bestimmt den Objekttyp für Revit
+3. **Dimensionierung**: `Default*` Werte werden als Fallback verwendet
+4. **Parameter-Extraktion**: Texte werden räumlich zugeordnet und als Dimensionen extrahiert
+5. **Revit-Export**: `Family` und `FamilyType` werden für Revit-Objekte verwendet
+6. **Einheiten-Konvertierung**: `Unit` bestimmt Eingabeeinheit, Export erfolgt in Metern
+
+#### Tipps zur Konfiguration
+
+- **Layer-Namen**: Verwenden Sie konsistente Namenskonventionen
+- **Farbkodierung**: Nutzen Sie eindeutige Farben pro Medium
+- **Block-Referenzen**: Ideal für standardisierte Objekte wie Schächte
+- **Default-Werte**: Wichtig für Objekte ohne Textinformationen
+- **FDK_IDs**: Ermöglichen eindeutige Identifikation in Revit
+
+## Verarbeitungsschritte
+
+Das Tool verarbeitet DXF-Dateien in mehreren aufeinander folgenden Schritten:
+
+### 1. Datei-Eingabe und Konfiguration
+
+- **DXF-Datei**: Geometrische Daten (Rohrleitungen, Schächte, Texte)
+- **Konfigurationsdatei**: Zuordnungsregeln für Medien und Layer
+- **LandXML-Datei**: Höhendaten vom Geländemodell
+
+### 2. Datenextraktion
+
+- **DXF-Reader**: Lädt DXF-Datei und extrahiert Entities
+- **Entity-Klassifizierung**: Unterscheidung zwischen Elementen (Schächte) und Linien (Rohrleitungen)
+- **Geometrie-Extraktion**: Positions- und Dimensionsdaten
+
+### 3. Medien-Zuordnung
+
+- **Konfiguration-Abhängige Gruppierung**: Zuordnung basierend auf Layer/Farben
+- **Medium-Erstellung**: Gruppierung verwandter Elemente (z.B. Abwasserleitung)
+
+### 4. Text-Zuordnung
+
+- **Räumliche Analyse**: Zuordnung von Texten zu nahegelegenen Objekten
+- **Dimensions-Änderung**: Extraktion von Rohrdurchmessern aus Texten
+
+### 5. Höhendaten-Integration
+
+- **LandXML-Parser**: Einlesen von Geländehöhen
+- **Höhen-Aktualisierung**: Zuweisung von Z-Koordinaten zu Objekten
+
+### 6. Gradienten-Analyse (optional)
+
+- **Shapely-basierte Geometrieanalyse**: Verbindungsanalyse zwischen Objekten
+- **Gradient-Normalisierung**: Anpassung der Rohrgefälle
+
+### 7. Revit-Vorbereitung
+
+- **Parameterwerte-Rundung**: Anpassung auf Revit-Standards
+- **Family-Name-Zuordnung**: Revit-spezifische Benennung
+
+### 8. JSON-Export
+
+- **Strukturierte Ausgabe**: Revit-kompatibles JSON-Format
+- **Exportstatistiken**: Zusammenfassung der verarbeiteten Daten
+
+### Datenfluss-Diagramm
+
+```mermaid
+graph TD
+    A[DXF-Datei] --> B[DXF-Reader]
+    C[Konfigurationsdatei] --> D[ConfigurationHandler]
+    E[LandXML-Datei] --> F[LandXML-Reader]
+
+    B --> G[DXF-Processor]
+    D --> G
+    F --> G
+
+    G --> H[Entity-Extraktion]
+    H --> I[Medium-Zuordnung]
+    I --> J[Text-Zuordnung]
+    J --> K[Höhendaten-Integration]
+    K --> L[Gradienten-Analyse]
+    L --> M[Revit-Vorbereitung]
+    M --> N[JSON-Export]
+
+    N --> O[Revit-Import]
+
+    O --> P[PyRevit Addin]
+    P --> Q[Create Shared Parameters]
+    P --> R[Create Revit Elements]
+    P --> S[Set Parameter Values]
+
+    style A fill:#e1f5fe, color:#000
+    style C fill:#e8f5e8, color:#000
+    style E fill:#fff3e0, color:#000
+    style O fill:#f3e5f5, color:#000
+    style P fill:#e3f2fd, color:#000
+    style Q fill:#e8f5e8, color:#000
+    style R fill:#fff3e0, color:#000
+    style S fill:#fce4ec, color:#000
+```
+
+### Architektur-Diagramm
+
+```mermaid
+graph TD
+    subgraph "CLI Layer"
+        CLI[CLI Interface]
+    end
+
+    subgraph "Processing Layer"
+        PROC[DXF-Processor]
+    end
+    CONFIG[ConfigurationHandler]
+
+    subgraph "I/O Layer"
+        DXF[DXF-Reader]
+        LANDXML[LandXML-Reader]
+        JSON[JSON-Exporter]
+    end
+
+    subgraph "Processing Services"
+        CREATOR[MediumObjectCreator]
+        ASSIGNER[SpatialTextAssigner]
+        DIMUPD[DimensionUpdater]
+        SHAPELY[ConnectionAnalyzer]
+        REVIT[RevitFamilyNameUpdater]
+    end
+
+    subgraph "Models"
+        MEDIUM[Medium]
+        OBJDATA[ObjectData]
+        POINT[Point3D]
+    end
+
+    CLI --> PROC
+    PROC --> CONFIG
+    PROC --> DXF
+    PROC --> LANDXML
+    PROC --> JSON
+
+    PROC --> CREATOR
+    PROC --> ASSIGNER
+    PROC --> DIMUPD
+    PROC --> SHAPELY
+    PROC --> REVIT
+
+    CREATOR --> MEDIUM
+    CREATOR --> OBJDATA
+    OBJDATA --> POINT
+
+    style CLI fill:#e1f5fe, color:#000
+    style PROC fill:#e8f5e8, color:#000
+    style CONFIG fill:#e8f5e8, color:#000
+    style DXF fill:#fff3e0, color:#000
+    style LANDXML fill:#fff3e0, color:#000
+    style JSON fill:#fff3e0, color:#000
+```
+
 ## Projektstruktur
 
-```
+```text
 pymto/
-├── src/pymto/              # Hauptanwendung
-│   ├── __init__.py         # Package-Initialisierung
-│   ├── cli.py              # → [CLI Interface](src/pymto/cli.py)
-│   ├── models.py           # → [Datenmodelle](src/pymto/models.py)
-│   ├── protocols.py        # → [Interface-Definitionen](src/pymto/protocols.py)
-│   ├── dxf_reader.py       # → [DXF-Verarbeitung](src/pymto/dxf_reader.py)
-│   ├── landxml_reader.py   # → [LandXML-Verarbeitung](src/pymto/landxml_reader.py)
-│   ├── groupers.py         # → [Gruppierungsstrategien](src/pymto/groupers.py)
-│   ├── text_assigners.py   # → [Textzuordnung](src/pymto/text_assigners.py)
-│   ├── json_exporter.py    # → [JSON-Export](src/pymto/json_exporter.py)
-│   └── main.py             # → [Haupteinstiegspunkt](src/pymto/main.py)
-├── tests/                  # → [Test-Suite](tests/)
-├── docs/                   # Dokumentation
-│   └── API.md              # → [API Dokumentation](docs/API.md)
-├── specs/                  # Projektspezifikationen
-│   └── task.md             # → [Anforderungen](specs/task.md)
-├── pyproject.toml          # → [Projekt-Konfiguration](pyproject.toml)
-├── CLAUDE.md               # → [Entwickler-Anweisungen](CLAUDE.md)
-└── README.md               # Diese Datei
+├── src/pymto/                # Hauptanwendung
+│   ├── __init__.py           # Package-Initialisierung
+│   ├── cli.py                # → [CLI Interface](src/pymto/cli.py)
+│   ├── main.py               # → [Haupteinstiegspunkt](src/pymto/main.py)
+│   ├── models.py             # → [Datenmodelle](src/pymto/models.py)
+│   ├── protocols.py          # → [Interface-Definitionen](src/pymto/protocols.py)
+│   ├── processor.py          # → [DXF-Processor](src/pymto/processor.py)
+│   ├── config.py             # → [Konfiguration](src/pymto/config.py)
+│   ├── io/                   # I/O Module
+│   │   ├── dxf_reader.py     # → [DXF-Reader](src/pymto/io/dxf_reader.py)
+│   │   ├── landxml_reader.py # → [LandXML-Reader](src/pymto/io/landxml_reader.py)
+│   │   └── json_exporter.py  # → [JSON-Exporter](src/pymto/io/json_exporter.py)
+│   ├── process/              # Verarbeitungsmodule
+│   │   ├── assigners.py      # → [Text-Zuordnung](src/pymto/process/assigners.py)
+│   │   ├── creator.py        # → [Objekt-Erstellung](src/pymto/process/creator.py)
+│   │   ├── factory.py        # → [Objekt-Factory](src/pymto/process/factory.py)
+│   │   ├── revit_updater.py  # → [Revit-Updates](src/pymto/process/revit_updater.py)
+│   │   └── dimension/        # Dimensionsverarbeitung
+│   │       ├── dimension.py
+│   │       ├── dimension_extractor.py
+│   │       └── dimension_mapper.py
+│   └── analyze/              # Analyse-Module
+│       ├── connection_analyzer.py
+│       ├── connection_analyzer_shapely.py
+│       └── compatibilty.py
+├── tests/                    # → [Test-Suite](tests/)
+├── docs/                     # Dokumentation
+│   └── API.md                # → [API Dokumentation](docs/API.md)
+├── pyproject.toml            # → [Projekt-Konfiguration](pyproject.toml)
+└── README.md                 # Diese Datei
 ```
 
 ## Entwicklung
@@ -197,7 +547,7 @@ pymto/
 
 Das Projekt verwendet moderne Python-Standards:
 
-- **Type Hints**: Python 3.13 Union-Syntax (`str | None`)
+- **Type Hints**: Python 3.10+ Union-Syntax (`str | None`)
 - **Dataclasses**: Für strukturierte Datenmodelle
 - **Protocols**: Für Interface-Definitionen
 - **SOLID-Prinzipien**: Modulare, austauschbare Architektur
@@ -232,17 +582,18 @@ uv run isort .
 
 ### Kernkomponenten
 
-1. **[DXF Reader](src/pymto/dxf_reader.py)**: Extraktion von Geometrien aus DXF-Dateien
-2. **[LandXML Reader](src/pymto/landxml_reader.py)**: Höhendaten-Integration
-3. **[Groupers](src/pymto/groupers.py)**: Layer- und farbbasierte Gruppierung
-4. **[Text Assigners](src/pymto/text_assigners.py)**: Räumliche Textzuordnung
-5. **[JSON Exporter](src/pymto/json_exporter.py)**: Export für Revit
+1. **[DXF Reader](src/pymto/io/dxf_reader.py)**: Extraktion von Geometrien aus DXF-Dateien
+2. **[LandXML Reader](src/pymto/io/landxml_reader.py)**: Höhendaten-Integration
+3. **[DXF Processor](src/pymto/processor.py)**: Zentrale Orchestrierung der Verarbeitung
+4. **[Text Assigners](src/pymto/process/assigners.py)**: Räumliche Textzuordnung
+5. **[JSON Exporter](src/pymto/io/json_exporter.py)**: Export für Revit
 
 ### Design Patterns
 
-- **Strategy Pattern**: Austauschbare Gruppierungs- und Zuordnungsstrategien
+- **Strategy Pattern**: Austauschbare Zuordnungs- und Verarbeitungsstrategien
 - **Protocol Pattern**: Interface-Definitionen für Flexibilität
 - **Factory Pattern**: Objekterstellung basierend auf Konfiguration
+- **Orchestrator Pattern**: Zentrale Steuerung durch DXF-Processor
 
 ## Beispiele
 
@@ -250,14 +601,10 @@ uv run isort .
 
 ```bash
 # Kompletttes Beispiel mit allen Features
-uv run python -m pymto.cli beispiel.dxf \
-  --landxml gelaende.xml \
-  --config medien_config.json \
-  --grouping layer \
-  --text-assignment zone \
-  --max-text-distance 40.0 \
-  --revit-format \
+uv run python -m pymto.cli process-dxf beispiel.dxf medien_config.json gelaende.xml \
   --output projekt_export.json \
+  --max-text-distance 40.0 \
+  --adjust-gradient \
   --verbose
 ```
 
@@ -265,49 +612,59 @@ uv run python -m pymto.cli beispiel.dxf \
 
 ```python
 from pathlib import Path
-from pymto.dxf_reader import DXFReader
-from pymto.groupers import LayerBasedGrouper
-from pymto.json_exporter import RevitJSONExporter
+from pymto.config import ConfigurationHandler
+from pymto.processor import DXFProcessor
+from pymto.process.creator import MediumObjectCreator
+from pymto.process.assigners import SpatialTextAssigner
+from pymto.io import JsonExporter, LandXMLReader
 
-# DXF laden
-reader = DXFReader(Path("input.dxf"))
-reader.load_file()
+# Konfiguration laden
+config = ConfigurationHandler(Path("config.json"))
+config.load_config()
 
-pipes = reader.extract_pipes()
-shafts = reader.extract_shafts()
-texts = reader.extract_texts()
+# Processor erstellen
+processor = DXFProcessor(config)
 
-# Gruppieren
-grouper = LayerBasedGrouper(Path("config.json"))
-grouper.load_config()
-media = grouper.group_elements(pipes, shafts, texts)
+# Daten extrahieren
+extractor = MediumObjectCreator(dxf_path=Path("input.dxf"))
+processor.extract_mediums(extractor=extractor)
+
+# Texte zuordnen
+text_assigner = SpatialTextAssigner(max_distance=5.0)
+processor.assign_texts_to_mediums(text_assigner)
+
+# Höhendaten integrieren
+landxml_reader = LandXMLReader(Path("terrain.xml"))
+landxml_reader.load_file()
+processor.update_points_elevation(updater=landxml_reader)
 
 # Exportieren
-exporter = RevitJSONExporter(Path("output.json"))
-exporter.export_media(media)
+exporter = JsonExporter(Path("output.json"))
+processor.export_data(exporter=exporter)
 ```
 
 ## API Dokumentation
 
 ### Hauptklassen
 
-- **[DXFReader](src/pymto/dxf_reader.py)**: DXF-Datei Verarbeitung
-- **[LandXMLReader](src/pymto/landxml_reader.py)**: Terrain-Daten Integration
-- **[LayerBasedGrouper](src/pymto/groupers.py)**: Layer-basierte Elementgruppierung
-- **[ColorBasedGrouper](src/pymto/groupers.py)**: Farbbasierte Elementgruppierung
-- **[SpatialTextAssigner](src/pymto/text_assigners.py)**: Räumliche Textzuordnung
-- **[ZoneBasedTextAssigner](src/pymto/text_assigners.py)**: Zonenbasierte Textzuordnung
-- **[JSONExporter](src/pymto/json_exporter.py)**: Standard JSON-Export
-- **[RevitJSONExporter](src/pymto/json_exporter.py)**: Revit-spezifischer Export
+- **[DXFReader](src/pymto/io/dxf_reader.py)**: DXF-Datei Verarbeitung
+- **[LandXMLReader](src/pymto/io/landxml_reader.py)**: Terrain-Daten Integration
+- **[DXFProcessor](src/pymto/processor.py)**: Zentrale Verarbeitungssteuerung
+- **[ConfigurationHandler](src/pymto/config.py)**: Konfigurationsmanagement
+- **[MediumObjectCreator](src/pymto/process/creator.py)**: Objekt-Erstellung
+- **[SpatialTextAssigner](src/pymto/process/assigners.py)**: Räumliche Textzuordnung
+- **[JsonExporter](src/pymto/io/json_exporter.py)**: JSON-Export
+- **[ConnectionAnalyzerShapely](src/pymto/analyze/connection_analyzer_shapely.py)**: Geometrieanalyse
 
 ### Datenmodelle
 
 Siehe [models.py](src/pymto/models.py) für vollständige Definitionen:
 
-- `Pipe`: Rohrleitung mit Geometrie und Eigenschaften
-- `Shaft`: Schacht mit Position und Dimensionen
-- `DXFText`: Textelement mit Position und Inhalt
+- `ObjectData`: Basis-Objekt mit Geometrie und Eigenschaften
+- `Point3D`: 3D-Koordinaten mit X, Y, Z
 - `Medium`: Gruppierung von zusammengehörigen Elementen
+- `LayerData`: Layer-Konfiguration mit Name, Farbe, Block
+- `Parameter`: Flexible Parameter für Objekt-Eigenschaften
 
 **Detaillierte API-Dokumentation**: [docs/API.md](docs/API.md)
 
@@ -316,22 +673,25 @@ Siehe [models.py](src/pymto/models.py) für vollständige Definitionen:
 ### Hauptkommando
 
 ```bash
-uv run python -m pymto.cli [OPTIONS] DXF_FILE
+uv run python -m pymto.cli process-dxf DXF_FILE CONFIG_FILE LANDXML_FILE [OPTIONS]
 ```
+
+### Erforderliche Argumente
+
+| Argument       | Beschreibung                            |
+|----------------|-----------------------------------------|
+| `DXF_FILE`     | Pfad zur DXF-Datei                      |
+| `CONFIG_FILE`  | Pfad zur JSON-Konfigurationsdatei       |
+| `LANDXML_FILE` | Pfad zur LandXML-Datei für Höhenangaben |
 
 ### Optionen
 
-| Option | Beschreibung | Standard |
-|--------|--------------|----------|
-| `--landxml, -l` | LandXML-Datei für Höhenangaben | - |
-| `--output, -o` | Output JSON-Datei | `{input}.json` |
-| `--config, -c` | Konfigurationsdatei für Layer-Gruppierung | - |
-| `--grouping` | Gruppierungsstrategie (`layer`/`color`) | `color` |
-| `--text-assignment` | Textzuordnung (`spatial`/`zone`) | `spatial` |
-| `--max-text-distance` | Max. Distanz für Textzuordnung | `50.0` |
-| `--color-tolerance` | Farbtoleranz für Farbgruppierung | `30.0` |
-| `--revit-format` | Revit-spezifisches JSON-Format | `False` |
-| `--verbose, -v` | Detaillierte Ausgabe | `False` |
+| Option                | Beschreibung                   | Standard       |
+|-----------------------|--------------------------------|----------------|
+| `--output, -o`        | Output JSON-Datei              | `{input}.json` |
+| `--max-text-distance` | Max. Distanz für Textzuordnung | `5.0`          |
+| `--adjust-gradient`   | Gradient-Anpassung aktivieren  | `False`        |
+| `--verbose, -v`       | Detaillierte Ausgabe           | `False`        |
 
 ### Weitere Kommandos
 
@@ -360,6 +720,7 @@ uv run python -m pymto.cli input_with_blocks.dxf --verbose
 ```
 
 Das Tool:
+
 1. **Erkennt INSERT Entities** automatisch als Elemente (nicht als Linien)
 2. **Extrahiert Block-Geometrie** aus den Block-Definitionen
 3. **Wendet Transformationen an** (Position, Maßstab, Rotation)
@@ -370,7 +731,7 @@ Das Tool:
 
 Für optimale Erkennung sollten Block-Namen beschreibende Begriffe enthalten:
 
-```
+```markdown
 # Runde Schächte
 SCHACHT_RUND_600    → RoundDimensions(diameter=600.0)
 ROUND_MANHOLE       → RoundDimensions(diameter=600.0)
@@ -413,17 +774,18 @@ LINE Entity              → Linien-Element
 
 Das Tool unterscheidet automatisch zwischen:
 
-| Entity Typ | Bedingung | Klassifizierung | Verarbeitung |
-|------------|-----------|-----------------|-------------|
-| INSERT | Immer | Element | Point-basiert |
-| CIRCLE | Immer | Element | Point-basiert |
-| POLYLINE | ≥4 Punkte | Element | Point-basiert |
-| POLYLINE | <4 Punkte | Linie | Line-basiert |
-| LINE | Immer | Linie | Line-basiert |
+| Entity Typ | Bedingung | Klassifizierung | Verarbeitung  |
+|------------|-----------|-----------------|---------------|
+| INSERT     | Immer     | Element         | Point-basiert |
+| CIRCLE     | Immer     | Element         | Point-basiert |
+| POLYLINE   | ≥4 Punkte | Element         | Point-basiert |
+| POLYLINE   | <4 Punkte | Linie           | Line-basiert  |
+| LINE       | Immer     | Linie           | Line-basiert  |
 
 ### Textzuordnung für verschiedene Element-Typen
 
 #### Point-basierte Elemente (Schächte)
+
 ```python
 # Zuordnung basiert auf Distanz zu Element-Position
 distance = text_position.distance_2d(element.positions[0])
@@ -432,6 +794,7 @@ if distance <= max_distance:
 ```
 
 #### Line-basierte Elemente (Rohrleitungen)
+
 ```python
 # Zuordnung basiert auf Distanz zu Liniensegmenten
 for segment in element_segments:
@@ -513,24 +876,28 @@ if 'custom_type' in block_name:
 ### Häufige Probleme
 
 1. **DXF-Datei kann nicht gelesen werden**
+
    ```bash
    # Prüfen ob Datei existiert und gültig ist
    uv run python -c "import ezdxf; ezdxf.readfile('input.dxf')"
    ```
 
 2. **LandXML-Verarbeitung fehlgeschlagen**
+
    ```bash
    # XML-Struktur prüfen
    xmllint --format terrain.xml | head -20
    ```
 
 3. **Keine Elemente extrahiert**
+
    ```bash
    # Mit verbose Mode Details anzeigen
    uv run python -m pymto.cli input.dxf --verbose
    ```
 
 4. **Import-Fehler**
+
    ```bash
    # Dependencies neu installieren
    uv sync --reinstall-package pymto
@@ -567,21 +934,18 @@ uv run pre-commit run --all-files
 
 - **Issues**: [Repository Issues](../../issues)
 - **Dokumentation**: Diese README und [API-Dokumentation](docs/API.md)
-- **Spezifikationen**: [Task Specifications](specs/task.md)
-- **Entwickler-Setup**: [CLAUDE.md](CLAUDE.md)
 
 ## Changelog
 
 ### Version 1.0.0
+
 - Initiale Implementierung
 - DXF-Reader mit ezdxf
 - LandXML-Integration
-- Layer- und farbbasierte Gruppierung
+- Layer- und farbseparierte Gruppierung
 - Räumliche Textzuordnung
 - JSON-Export für Revit
 - CLI-Interface mit Click
 - Umfassende Test-Suite
 
 ---
-
-*Entwickelt mit Python 3.13 und uv Package Manager*
