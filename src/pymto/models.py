@@ -27,6 +27,9 @@ class ObjectType(Enum):
     HYDRANT = "hydrant"  # Hydrant
     PIPE_GAS = "gas"
     CABLE_DUCT = "cable_duct"  # Kabekanal
+    DISTRIBUTION_BOARD = "distribution_board"  # Verteilerkasten
+    PUBLIC_LIGHTING = "public_lighting"  # Oeffentliche Beleuchtung
+    PIPE_TELECOM = "telecom"  # Swisscom Telecom
 
 
 def is_int(val: Any) -> bool:
@@ -259,8 +262,11 @@ class RectangularDimensions(ADimensions):
     @length.setter
     def length(self, value: float) -> None:
         """Set the length of the rectangular shape."""
-        if value <= 0:
-            raise ValueError("Length must be a positive value.")
+        if value < 0:
+            raise ValueError(f"Length must be a positive value. Got: {value}")
+        if value == 0 and self._length.value > 0:
+            log.debug(f"Not overriding length to 0.0, keeping previous value {self.length}.")
+            return
         self._length.value = float(value)
 
     @property
@@ -271,8 +277,11 @@ class RectangularDimensions(ADimensions):
     @width.setter
     def width(self, value: float) -> None:
         """Set the width of the rectangular shape."""
-        if value <= 0:
-            raise ValueError("Width must be a positive value.")
+        if value < 0:
+            raise ValueError(f"Width must be a positive value. Got: {value}")
+        if value == 0 and self._width.value > 0:
+            log.debug(f"Not overriding width to 0.0, keeping previous value {self.width}.")
+            return
         self._width.value = float(value)
 
     @property
@@ -379,6 +388,7 @@ class ObjectData:
         ObjectType.PIPE_WATER,
         ObjectType.PIPE_GAS,
         ObjectType.CABLE_DUCT,
+        ObjectType.PIPE_TELECOM,
     }
 
     medium: str
@@ -392,6 +402,25 @@ class ObjectData:
     color: tuple[int, int, int] = field(default_factory=tuple, repr=True, compare=True)
     points: list[Point3D] = field(default_factory=list, repr=False, compare=False)
     parameters: list[Parameter] = field(default_factory=list, repr=False, compare=False, init=False)
+
+    @property
+    def has_valid_dimensions(self) -> bool:
+        """Check if dimensions are valid."""
+        if isinstance(self.dimensions, RectangularDimensions):
+            return self.dimensions.length > 0 and self.dimensions.width > 0
+        if isinstance(self.dimensions, RoundDimensions):
+            return self.dimensions.diameter > 0
+        return False
+
+    def set_default_values(self, config: "MediumConfig") -> None:
+        """Check if dimensions are valid."""
+        if isinstance(self.dimensions, RectangularDimensions):
+            self.dimensions.length = config.default_width or 0.0
+            self.dimensions.width = config.default_depth or 0.0
+            log.debug(f"Setting default: {self.object_type}: {self.dimensions.length} x {self.dimensions.width}")
+        if isinstance(self.dimensions, RoundDimensions):
+            self.dimensions.diameter = config.default_diameter or 0.0
+            log.debug(f"Setting default: {self.object_type}: {self.dimensions.diameter} diameter")
 
     @property
     def point(self) -> Point3D:
@@ -515,10 +544,14 @@ class MediumConfig:
     text: list[LayerData]
     family: str
     family_type: str
-    elevation_offset: float
     default_unit: str
     object_type: ObjectType
     object_id: str
+    elevation_offset: float = 0.0
+    default_width: float | None = None
+    default_depth: float | None = None
+    default_height: float | None = None
+    default_diameter: float | None = None
 
 
 @dataclass(frozen=True)

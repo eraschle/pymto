@@ -1,7 +1,7 @@
 import re
 
-from pymto.models import AssingmentData, ObjectData, RoundDimensions
-from pymto.protocols import IRevitFamilyNameUpdater
+from ..models import AssingmentData, ObjectData, RectangularDimensions, RoundDimensions
+from ..protocols import IRevitFamilyNameUpdater
 
 
 class RevitFamilyNameUpdater(IRevitFamilyNameUpdater):
@@ -15,6 +15,7 @@ class RevitFamilyNameUpdater(IRevitFamilyNameUpdater):
         for element in elements:
             self._update_family_dimensions(element)
             self._update_family_type_dimensions(element)
+            self._create_parameters_for(element)
 
     def _update_family_dimensions(self, element: ObjectData) -> None:
         placeholder = self.get_placeholder(element.family)
@@ -48,3 +49,10 @@ class RevitFamilyNameUpdater(IRevitFamilyNameUpdater):
 
     def get_placeholder(self, name: str) -> re.Match[str] | None:
         return self.placeholder_pattern.search(name)
+
+    def _create_parameters_for(self, element: ObjectData):
+        """Create parameters for the element based on its dimensions."""
+        if isinstance(element.dimensions, RoundDimensions):
+            element.add_parameter(name="Rectangular", value=False)
+        if isinstance(element.dimensions, RectangularDimensions):
+            element.add_parameter(name="Rectangular", value=True)

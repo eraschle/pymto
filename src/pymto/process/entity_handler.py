@@ -7,15 +7,17 @@ shape characteristics (round, rectangular, multi-sided) and processing type.
 import logging
 import math
 
+import numpy as np
 from ezdxf import math as ezmath
+from ezdxf.entities.arc import Arc
 from ezdxf.entities.circle import Circle
 from ezdxf.entities.dxfentity import DXFEntity
 from ezdxf.entities.line import Line
 from ezdxf.entities.lwpolyline import LWPolyline
 from ezdxf.entities.polyline import Polyline
-from ezdxf.math import Vec2
+from ezdxf.math import Vec2, Vec3
 
-from ..models import ObjectType, Point3D
+from ..models import MediumConfig, ObjectType, Point3D
 
 log = logging.getLogger(__name__)
 
@@ -48,33 +50,69 @@ def extract_points_from(entity: DXFEntity) -> list[Point3D]:
     elif isinstance(entity, LWPolyline):
         for point in entity.get_points("xy"):
             point_values.append(Point3D(east=point[0], north=point[1], altitude=0.0))
+    elif isinstance(entity, Arc):
+        src_length = get_arc_length(entity)
+        return split_arc_to_points(entity, num_points=int(src_length / 0.2))
     elif isinstance(entity, Circle):
-        # For circles, return center point
         center = entity.dxf.center
         point_values = [Point3D(east=center.x, north=center.y, altitude=0.0)]
 
     return point_values
 
 
-def get_default_line_diameter(object_type: ObjectType) -> float:
-    diameter = 0.0
+def get_arc_length(arc: Arc) -> float:
+    radius = arc.dxf.radius
+    start_angle = math.radians(arc.dxf.start_angle)
+    end_angle = math.radians(arc.dxf.end_angle)
+    if end_angle < start_angle:
+        end_angle += 2 * math.pi
+    return radius * (end_angle - start_angle)
+
+
+def split_arc_to_points(arc: Arc, num_points: int | None = None, spacing: float | None = None) -> list[Point3D]:
+    """Split an ARC into points"""
+    center = Vec3(arc.dxf.center)
+    radius = arc.dxf.radius
+    start_angle = math.radians(arc.dxf.start_angle)
+    end_angle = math.radians(arc.dxf.end_angle)
+
+    # Handle angle wraparound
+    if end_angle < start_angle:
+        end_angle += 2 * math.pi
+
+    if num_points:
+        angles = np.linspace(start_angle, end_angle, num_points)
+    elif spacing:
+        arc_length = get_arc_length(arc)
+        num_points = int(arc_length / spacing) + 1
+        angles = np.linspace(start_angle, end_angle, num_points)
+    else:
+        angles = []
+
+    points = []
+    for angle in angles:
+        x = center.x + radius * math.cos(angle)
+        y = center.y + radius * math.sin(angle)
+        z = center.z
+        points.append(Point3D(east=x, north=y, altitude=z))
+    return points
+
+
+def get_default_line_diameter(object_type: ObjectType, config: MediumConfig) -> float:
+    diameter = config.default_diameter or 0.0
     if object_type == ObjectType.PIPE_WATER:
-        diameter = 50.0
+        diameter = 0.05
     elif object_type == ObjectType.PIPE_GAS:
-        diameter = 50.0
+        diameter = 0.05
     elif object_type == ObjectType.PIPE_WASTEWATER:
-        diameter = 150.0
-    if diameter > 0.0:
-        diameter /= 1000
+        diameter = 0.15
     return diameter
 
 
-def get_default_point_diameter(object_type: ObjectType) -> float:
-    diameter = 0.0
-    if object_type == ObjectType.SHAFT:
-        diameter = 1000.0
-    if diameter > 0.0:
-        diameter /= 1000
+def get_default_point_diameter(object_type: ObjectType, config: MediumConfig) -> float:
+    diameter = config.default_diameter or 0.0
+    if diameter == 0 and object_type == ObjectType.SHAFT:
+        diameter = 1.0
     return diameter
 
 

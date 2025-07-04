@@ -1,9 +1,7 @@
 """Simplified connection analysis for gradient normalization based on shafts along pipes."""
 
 import logging
-import time
 from collections.abc import Iterable
-from functools import wraps
 from typing import Any
 
 from shapely.geometry import LineString, Point
@@ -34,7 +32,7 @@ class ConnectionAnalyzerShapely:
         compatibility : IMediumCompatibilityStrategy
             Strategy for checking medium compatibility
         elevation_threshold : float
-            Minimum elevation change in meters to detect gradient breaks
+            Minimum gradient in percent to detect gradient breaks
         """
         self.tolerance = tolerance
         self.compatibility = compatibility
@@ -304,19 +302,33 @@ class ConnectionAnalyzerShapely:
         Returns
         -------
         bool
-            True if gradient break detected (elevation change > threshold)
+            True if gradient break detected (gradient > threshold %)
         """
+        if self.elevation_threshold == 0:
+            return False
+
         if len(points) < 2:
             return False
 
-        for i in range(len(points) - 1):
-            elevation_diff = abs(points[i + 1].altitude - points[i].altitude)
-            if elevation_diff > self.elevation_threshold:
-                log.debug(
-                    f"Gradient break detected: {elevation_diff:.2f}m elevation change "
-                    f"exceeds threshold {self.elevation_threshold:.2f}m"
-                )
-                return True
+        for idx in range(len(points) - 1):
+            current_point = points[idx]
+            next_point = points[idx + 1]
+
+            # Calculate 2D distance between points
+            distance = current_point.distance_2d(next_point)
+
+            if distance > 0:
+                # Calculate gradient between points
+                elevation_diff = next_point.altitude - current_point.altitude
+                gradient_m_per_m = elevation_diff / distance
+                gradient_percent = abs(gradient_m_per_m * 100)  # Convert to percentage
+
+                if gradient_percent > self.elevation_threshold:
+                    log.debug(
+                        f"Gradient break detected: {gradient_percent:.2f}% gradient "
+                        f"exceeds threshold {self.elevation_threshold:.2f}%"
+                    )
+                    return True
         return False
 
     def _should_preserve_segment_gradient(self, segment: dict) -> bool:
@@ -332,6 +344,9 @@ class ConnectionAnalyzerShapely:
         bool
             True if segment gradient should be preserved (not normalized)
         """
+        if self.elevation_threshold == 0:
+            return False  # No threshold means no breaks to preserve
+
         segment_points = segment["points"]
 
         # Preserve gradient if segment contains gradient breaks
@@ -344,12 +359,20 @@ class ConnectionAnalyzerShapely:
         end_shaft = segment.get("end_shaft")
 
         if start_shaft and end_shaft:
+            # Calculate gradient between shafts
             shaft_height_diff = abs(start_shaft.point.altitude - end_shaft.point.altitude)
-            if shaft_height_diff > self.elevation_threshold:
-                log.debug(
-                    f"Preserving segment gradient due to significant shaft height difference: {shaft_height_diff:.2f}m"
-                )
-                return True
+            shaft_distance = start_shaft.point.distance_2d(end_shaft.point)
+
+            if shaft_distance > 0:
+                shaft_gradient_m_per_m = shaft_height_diff / shaft_distance
+                shaft_gradient_percent = shaft_gradient_m_per_m * 100  # Convert to percentage
+
+                if shaft_gradient_percent > self.elevation_threshold:
+                    log.debug(
+                        f"Preserving segment gradient due to significant shaft gradient: {shaft_gradient_percent:.2f}% "
+                        f"exceeds threshold {self.elevation_threshold:.2f}%"
+                    )
+                    return True
 
         return False
 
@@ -372,7 +395,7 @@ class ConnectionAnalyzerShapely:
         for segment in segments:
             start_shaft = segment["start_shaft"]
             end_shaft = segment["end_shaft"]
-            segment_points = list(segment["points"])  # Create explicit copy to avoid modifying original
+            segment_points = list(segment["points"])
             segment_length = segment["length"]
 
             if segment_length == 0:
@@ -538,7 +561,7 @@ class ConnectionAnalyzerShapely:
             "pipes_without_shafts": total_pipes - pipes_with_shafts,
             "total_segments": total_segments,
             "tolerance_meters": self.tolerance,
-            "elevation_threshold_meters": self.elevation_threshold,
+            "elevation_threshold_percent": self.elevation_threshold,
             "compatibility_strategy": type(self.compatibility).__name__,
             "processing_method": "shaft_based_segments",
         }

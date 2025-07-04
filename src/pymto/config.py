@@ -94,8 +94,12 @@ class ConfigurationHandler:
             family_type=config.get("FamilyType", "NO FAMILY TYPE"),
             object_type=self._create_default_shape(config.get("Category", "NONE")),
             default_unit=self._create_default_unit(config.get("Unit", "mm")),
-            elevation_offset=config.get("ElevationOffset", 0.0),
             object_id=object_id,
+            default_width=config.get("DefaultWidth", None),
+            default_depth=config.get("DefaultDepth", None),
+            default_height=config.get("DefaultHeight", None),
+            default_diameter=config.get("DefaultDiameter", None),
+            elevation_offset=config.get("ElevationOffset", 0.0),
         )
 
     def _create_medium_configs(self, medium: str, configs: list[dict]) -> list[MediumConfig]:

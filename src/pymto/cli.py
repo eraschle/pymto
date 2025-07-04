@@ -121,7 +121,7 @@ def process_dxf(
             shapely_analyzer = ConnectionAnalyzerShapely(
                 tolerance=0.1,
                 compatibility=compatibility,
-                elevation_threshold=0.5,  # 0.5m elevation threshold
+                elevation_threshold=0.0,  # 5.0% gradient threshold
             )
             shapely_analyzer.load_multiple_mediums(processor.mediums)
             shapely_analyzer.analyze_and_normalize_pipe_gradients()
@@ -148,7 +148,7 @@ def process_dxf(
         exporter = JsonExporter(output)
         processor.export_data(exporter=exporter)
         _print_export_statistic(exporter)
-        if not verbose:
+        if not verbose or not exporter.has_not_exported_elements():
             return
         click.echo("Not exported elements:")
         for medium, elements in exporter.not_exported_elements.items():
@@ -182,11 +182,13 @@ def _print_assignment_statistic(processor: DXFProcessor):
         total_elems = elem_stats["elements"] + line_stats["elements"]
         total_texts = elem_stats["texts"] + line_stats["texts"]
         assigned_elems = elem_stats["assigned"] + line_stats["assigned"]
-        assigned_perc = (assigned_elems / total_texts * 100) if total_elems > 0 else 0
+        if total_texts == 0:
+            assigned_perc = "~"
+        else:
+            assigned_perc = (assigned_elems / total_texts * 100) if total_elems > 0 else 0
+            assigned_perc = f"{assigned_perc:.1f}%"
 
-        click.echo(
-            f"{medium.name:<25} {total_elems:>12} {total_texts:>12} {assigned_elems:>15} {assigned_perc:>11.1f}%"
-        )
+        click.echo(f"{medium.name:<25} {total_elems:>12} {total_texts:>12} {assigned_elems:>15} {assigned_perc:>11}")
     click.echo("-" * 85)
 
 
@@ -201,8 +203,12 @@ def _print_export_statistic(exporter: IExporter):
         exported = statistics["exported"]
         not_exported = statistics["not_exported"]
         total = statistics["total"]
-        export_perc = (exported / total * 100) if total > 0 else 0
-        click.echo(f"{medium:<25} {total:>12} {exported:>12} {not_exported:>15} {export_perc:>11.1f}%")
+        if total == 0:
+            export_perc = "~"
+        else:
+            export_perc = (exported / total * 100) if total > 0 else 0
+            export_perc = f"{export_perc:.1f}%"
+        click.echo(f"{medium:<25} {total:>12} {exported:>12} {not_exported:>15} {export_perc:>11}")
 
     click.echo("-" * 85)
 

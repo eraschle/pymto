@@ -55,6 +55,18 @@ class JsonExporter:
         self.exported_elements: dict[str, list[ObjectData]] = {}
         self.not_exported_elements: dict[str, list[ObjectData]] = {}
 
+    def has_not_exported_elements(self) -> bool:
+        """Check if there are any elements that were not exported.
+
+        Returns
+        -------
+        bool
+            True if there are not exported elements, False otherwise
+        """
+        if len(self.not_exported_elements) == 0:
+            return False
+        return any(len(elems) > 0 for elems in self.not_exported_elements.values())
+
     def export_data(self, mediums: list[Medium]) -> None:
         export_data = {}
 

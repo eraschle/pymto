@@ -10,6 +10,7 @@ import logging
 from ezdxf.entities.dxfentity import DXFEntity
 
 from ..models import MediumConfig
+from ..io import DXFReader
 from ..process import entity_handler
 
 log = logging.getLogger(__name__)
@@ -22,7 +23,7 @@ class DXFEntityExtractor:
     delegating object creation to the ObjectDataFactory.
     """
 
-    def __init__(self, dxf_reader):
+    def __init__(self, dxf_reader: DXFReader) -> None:
         """Initialize extractor with DXF reader.
 
         Parameters

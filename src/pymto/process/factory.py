@@ -9,6 +9,7 @@ import logging
 
 from ezdxf.document import Drawing
 from ezdxf.entities.circle import Circle
+from ezdxf.entities.arc import Arc
 from ezdxf.entities.dxfentity import DXFEntity
 from ezdxf.entities.insert import Insert
 
@@ -46,6 +47,7 @@ def is_pipe_or_duct(object_type: ObjectType) -> bool:
         ObjectType.PIPE_GAS,
         ObjectType.PIPE_WASTEWATER,
         ObjectType.PIPE_WATER,
+        ObjectType.PIPE_TELECOM,
     )
 
 
@@ -138,6 +140,8 @@ class ObjectDataFactory:
         try:
             entity_type = entity.dxftype()
 
+            if entity_type == "HATCH":
+                return None  # HATCH entities are not processed here
             if entity_type == "INSERT":
                 return self._create_from_insert(entity, config)
             elif entity_type == "CIRCLE":
@@ -146,6 +150,8 @@ class ObjectDataFactory:
                 return self._create_from_polyline(entity, config)
             elif entity_type == "LINE":
                 return self._create_from_line(entity, config)
+            elif entity_type == "ARC":
+                return self._create_from_arc(entity, config)
             else:
                 log.warning(f"Unsupported entity type: {entity_type}")
                 return None
@@ -315,6 +321,44 @@ class ObjectDataFactory:
             log.error(f"Failed to process LINE entity: {e}")
             return None
 
+    def _create_from_arc(self, entity: DXFEntity, config: MediumConfig) -> ObjectData | None:
+        """Create ObjectData from LINE entity.
+
+        Parameters
+        ----------
+        entity : DXFEntity
+            LINE entity to process
+        config : MediumConfig
+            Configuration for medium processing
+
+        Returns
+        -------
+        Optional[ObjectData]
+            Created ObjectData or None if processing failed
+        """
+        if not isinstance(entity, Arc):
+            log.debug("Expected ARC entity")
+            return None
+        points = dxf.extract_points_from(entity)
+
+        if config.object_type == ObjectType.CABLE_DUCT:
+            return self._create_rect_line_based_object(entity, points, config)
+
+        diameter = dxf.get_default_line_diameter(config.object_type, config)
+        dimensions = RoundDimensions(diameter=diameter)
+
+        return ObjectData(
+            medium=config.medium,
+            object_type=config.object_type,
+            family=config.family,
+            family_type=config.family_type,
+            dimensions=dimensions,
+            layer=_get_layer_name(entity),
+            points=points,
+            color=_get_entity_color(entity),
+            object_id=_get_object_id_from(config),
+        )
+
     def _create_rect_point_based_object(
         self, entity: DXFEntity, points: list[Point3D], config: MediumConfig
     ) -> ObjectData:
@@ -335,12 +379,18 @@ class ObjectDataFactory:
             Created ObjectData with rectangular dimensions
         """
         if dxf.is_rectangular(points):
-            length, width = dxf.calculate_rect_dimensions(points)
+            width, depth = dxf.calculate_rect_dimensions(points)
+            width = width / 1000.0  # Convert to meters
+            depth = depth / 1000.0
         else:
-            length, width = dxf.calculate_bbox_dimensions(points)
+            width, depth = dxf.calculate_bbox_dimensions(points)
+        if config.default_width is not None and (width is None or width == 0.0):
+            width = config.default_width
+        if config.default_depth is not None and (depth is None or depth == 0.0):
+            depth = config.default_depth
 
         position = dxf.calculate_center_point(points)
-        dimensions = RectangularDimensions(length=length / 1000, width=width / 1000, angle=0.0)
+        dimensions = RectangularDimensions(length=width, width=depth, angle=0.0)
 
         return ObjectData(
             medium=config.medium,
@@ -374,10 +424,11 @@ class ObjectDataFactory:
         ObjectData
             Created ObjectData with rectangular dimensions
         """
-        dimensions = RectangularDimensions(length=0.0, width=0.0, angle=0.0)
+        angle = 0.0
+        width, depth = config.default_width or 0.0, config.default_width or 0.0
+        dimensions = RectangularDimensions(length=width, width=depth, angle=angle)
         if config.object_type == ObjectType.CABLE_DUCT:
-            length, width = 300.0, 200.0
-            angle = 0.0
+            length, width = config.default_width or 0.3, config.default_depth or 0.2
             dimensions = RectangularDimensions(length=length, width=width, angle=angle)
 
         return ObjectData(
@@ -411,7 +462,7 @@ class ObjectDataFactory:
         ObjectData
             Created ObjectData with round dimensions
         """
-        diameter = dxf.get_default_line_diameter(config.object_type)
+        diameter = dxf.get_default_line_diameter(config.object_type, config)
 
         return ObjectData(
             medium=config.medium,
@@ -445,7 +496,10 @@ class ObjectDataFactory:
             Created ObjectData with round dimensions
         """
         position = dxf.calculate_center_point(points)
-        diameter = dxf.estimate_diameter_from(points)
+        if config.default_diameter is None:
+            diameter = dxf.estimate_diameter_from(points)
+        else:
+            diameter = config.default_diameter
         dimensions = RoundDimensions(diameter=diameter)
 
         return ObjectData(
@@ -487,8 +541,12 @@ class ObjectDataFactory:
             Created ObjectData with rectangular dimensions (bounding box)
         """
         position = dxf.calculate_center_point(points)
-        length, width = dxf.calculate_bbox_dimensions(points)
-        dimensions = RectangularDimensions(length=length, width=width, angle=0.0)
+        width, depth = dxf.calculate_bbox_dimensions(points)
+        if config.default_width is not None:
+            width = width or config.default_width
+        if config.default_depth is not None:
+            depth = depth or config.default_depth
+        dimensions = RectangularDimensions(length=width, width=depth, angle=0.0)
 
         return ObjectData(
             medium=config.medium,
@@ -521,6 +579,8 @@ class ObjectDataFactory:
             Created ObjectData with default round dimensions
         """
         center, diameter = dxf.get_bulge_center_and_diameter(entity)
+        if diameter == 0.0 and config.default_diameter is not None:
+            diameter = diameter or config.default_diameter
         dimensions = RoundDimensions(diameter=diameter)
 
         return ObjectData(
@@ -552,7 +612,7 @@ class ObjectDataFactory:
         ObjectData
             Created ObjectData with default round dimensions
         """
-        diameter = dxf.get_default_line_diameter(config.object_type)
+        diameter = dxf.get_default_line_diameter(config.object_type, config)
         dimensions = RoundDimensions(diameter=diameter)
 
         return ObjectData(
@@ -584,10 +644,10 @@ class ObjectDataFactory:
         ObjectData
             Created ObjectData with default round dimensions
         """
-        dimensions = RoundDimensions(diameter=1.0)
+        dimensions = RoundDimensions(diameter=config.default_diameter or 1.0)
         if "pipe" in config.object_type.name.lower():
-            diameter = dxf.get_default_line_diameter(config.object_type)
-            dimensions = RoundDimensions(diameter=diameter / 1000)
+            diameter = dxf.get_default_line_diameter(config.object_type, config)
+            dimensions = RoundDimensions(diameter=diameter)
 
         return ObjectData(
             medium=config.medium,

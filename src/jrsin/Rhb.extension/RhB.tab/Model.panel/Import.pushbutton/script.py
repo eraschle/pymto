@@ -5,6 +5,7 @@ Simple extension to read revit_data.json and create elements in Revit
 """
 
 import json
+from pathlib import Path
 
 from Autodesk.Revit.DB import (
     XYZ,
@@ -14,12 +15,10 @@ from Autodesk.Revit.DB import (
     Element,
     ElementId,
     FamilySymbol,
-    FamilyInstance,
     FilteredElementCollector,
     Parameter,
     ReferencePoint,
     StorageType,
-    Transaction,
     UnitTypeId,
     UnitUtils,
 )
@@ -27,6 +26,7 @@ from Autodesk.Revit.DB.Structure import (
     StructuralType,
 )
 from pyrevit import forms
+from pyrevit.revit.db.transaction import Transaction
 
 
 def get_length_value(value, unit=None):
@@ -265,9 +265,7 @@ class RevitImporter(object):
         for medium, elements in json_data.items():
             # Process each category
             print(f"Processing medium: {medium} with {len(elements)} elements")
-            tx = Transaction(self.document, f"Import {medium}")
-            tx.Start()
-            try:
+            with Transaction(doc=self.document, name=f"Import {medium}") as tx:
                 for element in elements:
                     # Create ElementData object from JSON
                     element_data = ElementData(element)
@@ -281,12 +279,12 @@ class RevitImporter(object):
                     for instance in instances:
                         self.set_element_parameters(instance, element_data)
                     created_count += len(instances)
-                tx.Commit()
-            except Exception as ex:
-                print(f"Error processing medium {medium}: {ex}")
-                tx.RollBack()
 
         return created_count
+
+
+def _get_project_root(document: Document):
+    doc_path = Path(document.PathName).parent
 
 
 def main():

@@ -122,7 +122,7 @@ class DXFReader:
         if layer.block is None:
             query = f'*[layer=="{layer.name}"]'
         elif layer.name is None:
-            query = f'*[name=="{layer.block}"]'
+            query = f'INSERT[name=="{layer.block}"]'
         else:
             query = f'INSERT[layer=="{layer.name}" & name=="{layer.block}"]'
         return self._doc.modelspace().query(query).filter(color_filter)

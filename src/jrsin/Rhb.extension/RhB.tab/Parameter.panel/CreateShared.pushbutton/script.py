@@ -25,8 +25,8 @@ Last update:
 __________________________________________________________________
 """
 
-import traceback
 import os
+import traceback
 
 from Autodesk.Revit.DB import (
     BuiltInCategory,
@@ -169,9 +169,9 @@ def create_parameter_definitions(document: Document, definitions_file: str):
     app = document.Application  # pyright: ignore
     created_parameters = []
     with Transaction(doc=document, name="Create Project Parameters"):
-        try:
-            binding_map = document.ParameterBindings
-            for definition in definitions:
+        binding_map = document.ParameterBindings
+        for definition in definitions:
+            try:
                 if binding_map.Contains(definition):
                     print(f"Parameter exists: {definition.Name}")
                     continue
@@ -179,9 +179,9 @@ def create_parameter_definitions(document: Document, definitions_file: str):
                 binding_map.Insert(definition, binding, GroupTypeId.Data)
                 created_parameters.append(definition.Name)
                 print(f"Created parameter: {definition.Name}")
-        except Exception:
-            print(f"Error: creating {definition.Name}: {traceback.format_exc()}")
-            raise
+            except Exception:
+                print(f"Error: creating {definition.Name}: {traceback.format_exc()}")
+                raise
     return created_parameters
 
 

@@ -93,6 +93,8 @@ class MediumObjectCreator(IObjectCreator):
         for entity in entities:
             obj_data = self.factory.create_from_entity(entity, config)
             if obj_data is not None:
+                if not obj_data.has_valid_dimensions:
+                    obj_data.set_default_values(config)
                 objects.append(obj_data)
             else:
                 log.warning(f"Failed to create ObjectData from {entity.dxftype()} entity")

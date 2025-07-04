@@ -5,6 +5,7 @@ for grouping DXF elements and assigning texts to pipes to be
 easily interchangeable following SOLID principles.
 """
 
+from collections.abc import Iterable
 from typing import Protocol
 
 from .models import (
@@ -14,6 +15,7 @@ from .models import (
     Medium,
     MediumConfig,
     ObjectData,
+    Parameter,
 )
 
 
@@ -71,6 +73,38 @@ class IObjectCreator(Protocol):
 class IElevationUpdater(Protocol):
     def update_elements(self, assigment: AssingmentData) -> None:
         """Update elevation of all elements in the assignment data container.
+
+        Parameters
+        ----------
+        assignment : AssingmentData
+            Assignment data containing elements and their assigned texts
+        """
+        ...
+
+
+class IGradientAnalyzer(Protocol):
+    def load_mediums(self, mediums: Iterable[Medium]) -> None:
+        """Load mediums for gradient analysis.
+
+        Parameters
+        ----------
+        mediums : Iterable[Medium]
+            List of mediums to analyze
+        """
+        ...
+
+    def adjust_gradient(self) -> None:
+        """Update gradient of all elements in the assignment data container.
+
+        Parameters
+        ----------
+        assignment : AssingmentData
+            Assignment data containing elements and their assigned texts
+        """
+        ...
+
+    def calculate_shaft_height(self, elements: list[ObjectData]) -> None:
+        """Calculate shaft height for all elements in the assignment data container.
 
         Parameters
         ----------
