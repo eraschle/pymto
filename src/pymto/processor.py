@@ -15,7 +15,7 @@ from pymto.analyze import (
 )
 
 from .config import ConfigurationHandler
-from .models import Medium
+from .models import Medium, ObjectData
 from .protocols import (
     IAssignmentStrategy,
     IDimensionUpdater,
@@ -58,6 +58,24 @@ class DXFProcessor:
         """
         return self.config.mediums.values()
 
+    def _get_unique(self, to_check: list[ObjectData], uniq_points: set[tuple]) -> list[ObjectData]:
+        elements = []
+        for element in to_check:
+            points = tuple(element.points)
+            if points in uniq_points:
+                log.warning(f"Same point element exists already: filtering {element}")
+                continue
+            uniq_points.add(points)
+            elements.append(element)
+        return elements
+
+    def _get_medium_unique(self, to_check: list[list[ObjectData]], uniq_points: set[tuple]) -> list[list[ObjectData]]:
+        elements = []
+        for elems in to_check:
+            uniq_elems = self._get_unique(elems, uniq_points)
+            elements.append(uniq_elems)
+        return elements
+
     def extract_mediums(self, extractor: IObjectCreator) -> None:
         """Process all mediums by extracting and creating objects.
 
@@ -72,11 +90,15 @@ class DXFProcessor:
             If processor is not initialized
         """
         log.info(f"Processing {len(self.config.mediums)} mediums")
+        unique_points = set()
         for name, medium in self.config.mediums.items():
             log.debug(f"Processing medium: {name}")
             geom_elems, text_elems = extractor.create_objects(medium.config.point_based)
+            geom_elems = self._get_medium_unique(geom_elems, unique_points)
             medium.extracted_point.setup(name, geom_elems, text_elems)
+
             geom_elems, text_elems = extractor.create_objects(medium.config.line_based)
+            geom_elems = self._get_medium_unique(geom_elems, unique_points)
             medium.extracted_line.setup(name, geom_elems, text_elems)
 
     def assign_texts_to_mediums(self, assigner: IAssignmentStrategy) -> None:

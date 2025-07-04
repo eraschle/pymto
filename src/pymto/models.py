@@ -28,7 +28,7 @@ class ObjectType(Enum):
     PIPE_GAS = "gas"
     CABLE_DUCT = "cable_duct"  # Kabekanal
     DISTRIBUTION_BOARD = "distribution_board"  # Verteilerkasten
-    PUBLIC_LIGHTING = "public_lighting"  # Oeffentliche Beleuchtung
+    LIGHTING = "lighting"  # Oeffentliche Beleuchtung
     PIPE_TELECOM = "telecom"  # Swisscom Telecom
 
 
