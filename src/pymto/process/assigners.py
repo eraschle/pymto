@@ -34,6 +34,7 @@ class SpatialTextAssigner(IAssignmentStrategy):
         for config, group in zip(medium.config.point_based, groups, strict=True):
             elements, texts = group
             elements = elements.copy()
+            elements = [elem for elem in elements if elem.is_point_based]
             for text in texts:
                 closest_idx = self._find_closest_element(text.position, elements)
                 if closest_idx < 0:
@@ -91,6 +92,7 @@ class SpatialTextAssigner(IAssignmentStrategy):
         for config, group in zip(medium.config.line_based, groups, strict=True):
             elements, texts = group
             elements = elements.copy()
+            elements = [elem for elem in elements if elem.is_line_based]
             # Build spatial index for element segments (only for elements with points)
             element_segments = []
             segment_to_element = []

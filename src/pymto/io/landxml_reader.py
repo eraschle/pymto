@@ -111,9 +111,6 @@ class LandXMLReader:
             for element in elements:
                 if element.points:
                     element.points = self._update_elevation(element.points, config)
-                if element.positions:
-                    positions = self._update_elevation(element.positions, config)
-                    element.positions = tuple(positions)
 
     def _update_elevation(self, points: Iterable[Point3D], config: MediumConfig) -> list[Point3D]:
         """Update Z coordinates for a list of points using elevation data.

@@ -122,15 +122,13 @@ class PipelineGradientAdjuster:
             ObjectType.WATER_SPECIAL,
         }
 
-    def _adjust_single_pipeline(
-        self, pipeline: ObjectData, manholes: list[ObjectData]
-    ) -> PipelineAdjustment | None:
+    def _adjust_single_pipeline(self, pipeline: ObjectData, manholes: list[ObjectData]) -> PipelineAdjustment | None:
         """Adjust elevation for a single pipeline based on compatible manholes."""
         if not pipeline.is_line_based:
             return None
 
         # Handle both simple (2-point) and complex (multi-point) pipelines
-        if len(pipeline.positions) < 2:
+        if len(pipeline.points) < 2:
             return None
 
         start_point = pipeline.point
@@ -386,9 +384,7 @@ class PipelineGradientAdjuster:
 
         return nearest_manhole
 
-    def _find_all_connected_pipes(
-        self, shaft: ObjectData, pipelines: list[ObjectData]
-    ) -> list[ObjectData]:
+    def _find_all_connected_pipes(self, shaft: ObjectData, pipelines: list[ObjectData]) -> list[ObjectData]:
         """Find all pipes connected to a shaft within the search radius."""
         connected_pipes = []
 
@@ -631,14 +627,14 @@ class PipelineGradientAdjuster:
     ) -> None:
         """Apply elevation adjustments to pipeline."""
         # Update positions
-        if len(pipeline.positions) >= 2:
-            start_pos = pipeline.positions[0]
-            end_pos = pipeline.positions[1]
+        if len(pipeline.points) >= 2:
+            start_pos = pipeline.points[0]
+            end_pos = pipeline.points[1]
 
             new_start_pos = Point3D(start_pos.east, start_pos.north, new_start_elevation)
+            pipeline.points[0] = new_start_pos
             new_end_pos = Point3D(end_pos.east, end_pos.north, new_end_elevation)
-
-            pipeline.positions = (new_start_pos, new_end_pos)
+            pipeline.points[-1] = new_end_pos
 
         # Update intermediate points if they exist
         if pipeline.points and len(pipeline.points) > 2:

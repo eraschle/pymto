@@ -390,15 +390,7 @@ class ObjectData:
     object_id: Parameter
     assigned_text: DxfText | None = None
     color: tuple[int, int, int] = field(default_factory=tuple, repr=True, compare=True)
-
-    """points: list[Point3D]
-        List of points for line-based objects."""
     points: list[Point3D] = field(default_factory=list, repr=False, compare=False)
-
-    """positions: tuple[Point3D]
-        Positions for point-based (single-point) objects.
-        and for line-based objects (start- and end-point)."""
-    positions: tuple[Point3D, ...] = field(default_factory=tuple, repr=True, compare=True)
     parameters: list[Parameter] = field(default_factory=list, repr=False, compare=False, init=False)
 
     @property
@@ -410,7 +402,7 @@ class ObjectData:
         Point3D
             Point3D representing the position of the object.
         """
-        return self.positions[0]
+        return self.points[0]
 
     @property
     def has_end_point(self) -> bool:
@@ -421,7 +413,7 @@ class ObjectData:
         bool
             True if the object has an end point, False otherwise.
         """
-        return len(self.positions) > 1
+        return len(self.points) > 1
 
     @property
     def end_point(self) -> Point3D:
@@ -433,9 +425,9 @@ class ObjectData:
         Point3D | None
             Point3D representing the end position of the object, or None.
         """
-        if len(self.positions) == 1:
+        if len(self.points) == 1:
             raise ValueError("Element has no end point. Did you check 'has_end_point'?")
-        return self.positions[-1]
+        return self.points[-1]
 
     @property
     def is_line_based(self) -> bool:
@@ -447,8 +439,8 @@ class ObjectData:
             True if the object is line-based, False otherwise.
         """
         is_oject_type_line = self.object_type in self.line_types
-        has_two_or_more_positions = len(self.positions) >= 2
-        has_end_point = len(self.positions) >= 2 and self.end_point is not None
+        has_two_or_more_positions = len(self.points) >= 2
+        has_end_point = len(self.points) >= 2 and self.end_point is not None
         return is_oject_type_line and has_two_or_more_positions and has_end_point
 
     @property
@@ -461,7 +453,7 @@ class ObjectData:
             True if the object is point-based, False otherwise.
         """
         is_oject_type_point = self.object_type in self.point_types()
-        is_single_position = len(self.positions) == 1
+        is_single_position = len(self.points) == 1
         return is_oject_type_point and is_single_position
 
     def add_parameter(self, name: str, value: Any, *, value_type: str | None = None, unit: str | None = None) -> None:
@@ -683,13 +675,25 @@ class Medium:
             "assigned": assigned_count,
         }
 
-    def get_assignment_elements(self) -> list[ObjectData]:
+    def get_point_elements(self) -> list[ObjectData]:
         """Get all assigned elements for this medium."""
         assigned_elements = []
         for elements, _ in self.point_data.assigned:
             assigned_elements.extend(elements)
+        return assigned_elements
+
+    def get_line_elements(self) -> list[ObjectData]:
+        """Get all assigned elements for this medium."""
+        assigned_elements = []
         for elements, _ in self.line_data.assigned:
             assigned_elements.extend(elements)
+        return assigned_elements
+
+    def get_assignment_elements(self) -> list[ObjectData]:
+        """Get all assigned elements for this medium."""
+        assigned_elements = []
+        assigned_elements.extend(self.get_point_elements())
+        assigned_elements.extend(self.get_line_elements())
         return assigned_elements
 
     def get_point_statistics(self) -> dict[str, int | float]:

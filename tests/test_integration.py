@@ -1,9 +1,10 @@
 """Integration tests for ObjectData factory using real DXF file."""
 
-from pathlib import Path
-
 import ezdxf.filemanagement as ezdxf
 import pytest
+
+from pathlib import Path
+from ezdxf.document import Drawing
 from pymto.models import (
     MediumConfig,
     ObjectData,
@@ -13,7 +14,6 @@ from pymto.models import (
 )
 from pymto.process import factory
 from pymto.process.factory import Insert, ObjectDataFactory
-from ezdxf.document import Drawing
 
 
 class TestIntegration:
@@ -243,8 +243,8 @@ class TestIntegration:
             if obj_data is not None:
                 if is_element:
                     # Elements should have positions
-                    assert obj_data.positions, f"Element {entity.dxftype()} should have positions"
+                    assert obj_data.points, f"Element {entity.dxftype()} should have positions"
                 else:
                     # Lines should have points but no positions
                     assert obj_data.points, f"Line {entity.dxftype()} should have points"
-                    assert len(obj_data.positions) == 2, f"Line {entity.dxftype()} should have 2 positions"
+                    assert len(obj_data.points) == 2, f"Line {entity.dxftype()} should have 2 positions"

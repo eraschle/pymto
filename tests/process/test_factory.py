@@ -4,9 +4,9 @@
 from unittest.mock import Mock, patch
 
 import pytest
+from ezdxf.entities.insert import Insert
 from pymto.models import LayerData, MediumConfig, ObjectType, Parameter
 from pymto.process.factory import ObjectDataFactory
-from ezdxf.entities.insert import Insert
 
 
 @pytest.fixture
@@ -76,9 +76,7 @@ class TestObjectDataFactory:
 
     def _create_circle_entity(self, center=(0, 0, 0), radius=1.0, layer="0", color=1):
         """Create mock circle entity."""
-        return self._create_mock_entity(
-            "CIRCLE", center=center, radius=radius, layer=layer, color=color
-        )
+        return self._create_mock_entity("CIRCLE", center=center, radius=radius, layer=layer, color=color)
 
     def _create_insert_entity(self, insert=(0, 0, 0), name="TEST_BLOCK", layer="0"):
         """Create mock insert entity."""
@@ -160,9 +158,7 @@ class TestFactoryRouting:
 
     def _create_circle_entity(self, center=(0, 0, 0), radius=1.0, layer="0", color=1):
         """Create mock circle entity."""
-        return self._create_mock_entity(
-            "CIRCLE", center=center, radius=radius, layer=layer, color=color
-        )
+        return self._create_mock_entity("CIRCLE", center=center, radius=radius, layer=layer, color=color)
 
     def _create_insert_entity(self, insert=(0, 0, 0), name="TEST_BLOCK", layer="0"):
         """Create mock insert entity."""
@@ -201,8 +197,7 @@ class TestCircleProcessing:
                 family_type=shaft_config.family_type,
                 dimensions=RoundDimensions(diameter=5000),
                 layer="SHAFTS",
-                positions=(Point3D(east=10000, north=20000, altitude=5000),),
-                points=[],
+                points=[Point3D(east=10000, north=20000, altitude=5000)],
                 color=(255, 0, 0),
                 object_id=Parameter(name="object_id", value=shaft_config.object_id),
             )
@@ -241,8 +236,7 @@ class TestInsertProcessing:
                 family_type=shaft_config.family_type,
                 dimensions=RoundDimensions(diameter=3000),
                 layer="BLOCKS",
-                positions=(Point3D(east=15000, north=25000, altitude=0),),
-                points=[],
+                points=[Point3D(east=15000, north=25000, altitude=0)],
                 color=(255, 0, 0),
                 object_id=Parameter(name="object_id", value=shaft_config.object_id),
             )
@@ -279,7 +273,6 @@ class TestLineProcessing:
                 family_type=pipe_config.family_type,
                 dimensions=RoundDimensions(diameter=200),
                 layer="PIPES",
-                positions=(),
                 points=[
                     Point3D(east=0, north=0, altitude=0),
                     Point3D(east=50000, north=0, altitude=0),

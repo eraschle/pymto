@@ -126,17 +126,16 @@ class TestObjectData:
             family_type="Test Type",
             dimensions=dims,
             layer="CIRCLE_LAYER",
-            positions=(position,),
+            points=[position],
             color=(0, 255, 0),
             object_id=Parameter(name="Object ID", value="12345"),
         )
 
         assert obj.dimensions == dims
         assert obj.layer == "CIRCLE_LAYER"
-        assert len(obj.positions) == 1
-        assert obj.positions[0] == position
+        assert len(obj.points) == 1
+        assert obj.points[0] == position
         assert obj.color == (0, 255, 0)
-        assert obj.points == []  # Default empty list
         assert obj.assigned_text is None
 
     def test_object_data_with_rectangular_dimensions(self):
@@ -164,7 +163,6 @@ class TestObjectData:
         assert obj.dimensions == dims
         assert obj.layer == "RECT_LAYER"
         assert obj.points == points
-        assert obj.positions == ()  # Default empty tuple
         assert obj.color == (0, 0, 255)
 
     def test_object_data_with_assigned_text(self):
@@ -288,7 +286,7 @@ class TestAssingmentData:
             family_type="Test Family Type",
             dimensions=dims,
             layer="TEST",
-            positions=(position,),
+            points=[position],
             object_id=Parameter(name="Object ID", value="12345"),
         )
 
