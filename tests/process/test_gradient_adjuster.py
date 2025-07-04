@@ -2,14 +2,18 @@
 
 import pytest
 
-from pymto.models import ObjectData, ObjectType, Parameter, Point3D, RoundDimensions
-from pymto.process.gradient import (
+from pymto.analyze import (
     ExplicitRulesCompatibility,
-    PrefixBasedCompatibility,
-)
-from pymto.process.gradient.adjuster import (
     GradientAdjustmentParams,
     PipelineGradientAdjuster,
+    PrefixBasedCompatibility,
+)
+from pymto.models import (
+    ObjectData,
+    ObjectType,
+    Parameter,
+    Point3D,
+    RoundDimensions,
 )
 
 

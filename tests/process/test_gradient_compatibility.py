@@ -1,6 +1,6 @@
 """Tests for pipeline gradient adjustment with medium compatibility."""
 
-from pymto.process.gradient import (
+from pymto.analyze import (
     ExplicitRulesCompatibility,
     PatternBasedCompatibility,
     PrefixBasedCompatibility,

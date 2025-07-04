@@ -9,8 +9,19 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
-from ...models import Medium, MediumConfig, ObjectData, ObjectType, Point3D, RectangularDimensions, RoundDimensions
-from .compatibilty import IMediumCompatibilityStrategy, PrefixBasedCompatibility
+from ..models import (
+    Medium,
+    MediumConfig,
+    ObjectData,
+    ObjectType,
+    Point3D,
+    RectangularDimensions,
+    RoundDimensions,
+)
+from .compatibilty import (
+    IMediumCompatibilityStrategy,
+    PrefixBasedCompatibility,
+)
 
 log = logging.getLogger(__name__)
 
@@ -208,7 +219,6 @@ class PipelineGradientAdjuster:
 
         # Update pipeline points
         pipeline.points = new_points
-        pipeline.positions = (new_points[0], new_points[-1])
 
         return PipelineAdjustment(
             pipeline=pipeline,

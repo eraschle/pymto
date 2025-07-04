@@ -5,21 +5,23 @@ DXF files with optional LandXML elevation data and exporting to JSON
 format suitable for Revit modeling.
 """
 
+import traceback
 from pathlib import Path
 from pprint import pp
 
 import click
 
+from .analyze import (
+    ConnectionAnalyzerShapely,
+    GradientAdjustmentParams,
+    PipelineGradientAdjuster,
+    PrefixBasedCompatibility,
+)
 from .config import ConfigurationHandler
 from .io import JsonExporter, LandXMLReader
 from .process.assigners import SpatialTextAssigner
 from .process.creator import MediumObjectCreator
 from .process.dimension import DimensionMapper, DimensionUpdater
-from .process.gradient.adjuster import (
-    GradientAdjustmentParams,
-    PipelineGradientAdjuster,
-    PrefixBasedCompatibility,
-)
 from .process.revit_updater import RevitFamilyNameUpdater
 from .processor import DXFProcessor, IExporter
 
@@ -107,26 +109,35 @@ def process_dxf(
         processor.update_dimensions(updater=dimension_updater)
 
         # Process LandXML if provided
-        if landxml:
-            landxml_reader = LandXMLReader(landxml)
-            landxml_reader.load_file()
+        landxml_reader = LandXMLReader(landxml)
+        landxml_reader.load_file()
+        click.echo("Updating points elevation from LandXML...")
+        processor.update_points_elevation(updater=landxml_reader)
 
-            click.echo("Updating points elevation from LandXML...")
-            processor.update_points_elevation(updater=landxml_reader)
+        compatibility = PrefixBasedCompatibility(separator=" ")
+        if adjust_gradient:
+            # Handle gradient processing
+            click.echo("Normalizing pipe gradients using shapely-based analysis...")
+            shapely_analyzer = ConnectionAnalyzerShapely(
+                tolerance=0.1,
+                compatibility=compatibility,
+                elevation_threshold=0.5,  # 0.5m elevation threshold
+            )
+            shapely_analyzer.load_multiple_mediums(processor.mediums)
+            shapely_analyzer.analyze_and_normalize_pipe_gradients()
 
         params = GradientAdjustmentParams(
             manhole_search_radius=1,
             min_gradient_percent=1.0,
             gradient_break_threshold=5,
         )
-        compatibility = PrefixBasedCompatibility(separator=" ")
-        gradient = PipelineGradientAdjuster(mediums=processor.mediums, params=params, compatibility=compatibility)
-        if adjust_gradient:
-            click.echo("Adjusting pipe gradients based on shaft elevations...")
-            processor.adjustment_pipe_gardiant(gradient=gradient)
-
+        gradient_analyzer = PipelineGradientAdjuster(
+            mediums=processor.mediums,
+            params=params,
+            compatibility=compatibility,
+        )
         click.echo("Calculated cover to pipe heights on every shaft:")
-        processor.calculate_cover_to_pipe_height(gradient=gradient)
+        processor.calculate_cover_to_pipe_height(gradient=gradient_analyzer)
 
         click.echo("Adjusting and round parameter values...")
         processor.round_parameter_values(updater=dimension_updater)
@@ -151,7 +162,10 @@ def process_dxf(
             click.echo("")
 
     except Exception as e:
-        raise click.ClickException(f"Processing failed: {e}") from e
+        message = f"Processing failed: {e}"
+        if verbose:
+            message += "\n" + traceback.format_exc()
+        raise click.ClickException(message) from e
 
 
 def _print_assignment_statistic(processor: DXFProcessor):

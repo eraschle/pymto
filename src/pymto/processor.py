@@ -8,7 +8,7 @@ orchestrator pattern.
 import logging
 from collections.abc import Iterable
 
-from pymto.process.gradient.adjuster import (
+from pymto.analyze import (
     CoverToPipeHeight,
     PipelineAdjustment,
     PipelineGradientAdjuster,
