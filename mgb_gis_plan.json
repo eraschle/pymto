@@ -1,0 +1,323 @@
+{
+    "Kabelkanal": {
+        "Line": [
+            {
+                "Unit": "mm",
+                "Family": "Kabelkanal",
+                "FamilyType": "{dimension}",
+                "ObjectType": "DUCT",
+                "FDK_ID": "MGB...",
+                "ElevationOffset": 0.0,
+                "DefaultWidth": 0.3,
+                "DefaultDepth": 0.1,
+                "DefaultHeight": 0.1,
+                "Layer": {
+                    "Geometrie": [
+                        {
+                            "Name": "ele_kanal"
+                        }
+                    ],
+                    "Text": [
+                        {
+                            "Name": "ele_kanal_text"
+                        }
+                    ]
+                }
+            },
+            {
+                "Unit": "mm",
+                "Family": "Kabelrohr",
+                "FamilyType": "{dimension}",
+                "ObjectType": "PIPE",
+                "FDK_ID": "MGB...",
+                "ElevationOffset": 1.0,
+                "DefaultDiameter": 0.1,
+                "Layer": {
+                    "Geometrie": [
+                        {
+                            "Name": "ele_rohr"
+                        }
+                    ],
+                    "Text": [
+                        {
+                            "Name": "ele_rohr_text"
+                        }
+                    ]
+                },
+                "Parameters": {
+                    "Platzhalterprofil": {
+                        "Formula": "{Default Values Set}",
+                        "ValueType": "Boolean"
+                    }
+                }
+            },
+            {
+                "Unit": "mm",
+                "Family": "Kabelanlage (Rohrblock)",
+                "FamilyType": "{dimension}",
+                "ObjectType": "CONDUIT_BANK",
+                "FDK_ID": "MGB...",
+                "ElevationOffset": 1.0,
+                "DefaultWidth": 0.5,
+                "DefaultDepth": 0.5,
+                "Layer": {
+                    "Geometrie": [
+                        {
+                            "Name": "ele_block"
+                        }
+                    ],
+                    "Text": [
+                        {
+                            "Name": "ele_block_text"
+                        }
+                    ]
+                }
+            }
+        ],
+        "Point": [
+            {
+                "Unit": "cm",
+                "Family": "Kabelschacht (LCO)",
+                "FamilyType": "{dimension}",
+                "ObjectType": "SHAFT_RECTANGULAR",
+                "FDK_ID": "MGB...",
+                "DefaultWidth": 0.8,
+                "DefaultDepth": 0.8,
+                "DefaultHeight": 1.0,
+                "Layer": {
+                    "Geometrie": [
+                        {
+                            "Block": "EAK016*"
+                        }
+                    ],
+                    "Text": [
+                        {
+                            "Name": "ele_bauteil_text"
+                        }
+                    ]
+                },
+                "Parameters": {
+                    "Rectengular": {
+                        "Formula": "element.dimension.is_rectangular",
+                        "ValueType": "Boolean"
+                    }
+                }
+            },
+            {
+                "Unit": "cm",
+                "Family": "Kabelverteiler",
+                "FamilyType": "Kabelverteiler {dimension}",
+                "ObjectType": "DISTRIBUTION_BOARD",
+                "DefaultWidth": 1.0,
+                "DefaultDepth": 0.5,
+                "FDK_ID": "MGB...",
+                "Layer": {
+                    "Geometrie": [
+                        {
+                            "Block": "EAK006*"
+                        },
+                        {
+                            "Block": "EAK007*"
+                        },
+                        {
+                            "Block": "EAK008*"
+                        }
+                    ],
+                    "Text": [
+                        {
+                            "Name": "ele_bauteil_text"
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    "Abwasser": {
+        "Line": [
+            {
+                "Unit": "mm",
+                "Family": "Abwasser - Leitung",
+                "FamilyType": "Rinne {dimension}",
+                "ObjectType": "GUTTER",
+                "FDK_ID": "MGB...",
+                "ElevationOffset": 0.0,
+                "DefaultDiameter": 0.3,
+                "Layer": {
+                    "Geometrie": [
+                        {
+                            "Name": "war_rinne"
+                        }
+                    ],
+                    "Text": [
+                        {
+                            "Name": "war_rinne_text"
+                        }
+                    ]
+                },
+                "Parameters": {
+                    "Offenes Profil": {
+                        "Value": true,
+                        "ValueType": "Boolean"
+                    },
+                    "Platzhalterprofil": {
+                        "Value": false,
+                        "ValueType": "Boolean"
+                    }
+                }
+            },
+            {
+                "Unit": "mm",
+                "Family": "Abwasser - Leitung",
+                "FamilyType": "{dimension}",
+                "ObjectType": "PIPE",
+                "FDK_ID": "MGB...",
+                "ElevationOffset": 1.2,
+                "DefaultDiameter": 0.2,
+                "Layer": {
+                    "Geometrie": [
+                        {
+                            "Name": "war_rohr"
+                        }
+                    ],
+                    "Text": [
+                        {
+                            "Name": "war_rohr_text"
+                        }
+                    ]
+                },
+                "Parameters": {
+                    "Platzhalterprofil": {
+                        "Formula": "{Default Values Set}",
+                        "ValueType": "Boolean"
+                    }
+                }
+            }
+        ],
+        "Point": [
+            {
+                "Unit": "cm",
+                "Family": "Abwasser - Schacht",
+                "FamilyType": "{dimension}",
+                "ObjectType": "SHAFT_ROUND",
+                "FDK_ID": "MGB...",
+                "DefaultDiameter": 1.0,
+                "DefaultHeight": 1.0,
+                "Layer": {
+                    "Geometrie": [
+                        {
+                            "Block": "BAU004*"
+                        }
+                    ],
+                    "Text": [
+                        {
+                            "Name": "war_bauteil_text"
+                        }
+                    ]
+                },
+                "Parameters": {
+                    "Rectangular": {
+                        "Formula": "element.dimension.is_rectangular",
+                        "ValueType": "Boolean"
+                    }
+                }
+            },
+            {
+                "Unit": "cm",
+                "Family": "Abwasser - Schacht",
+                "FamilyType": "{dimension}",
+                "ObjectType": "SHAFT_RECTANGULAR",
+                "FDK_ID": "MGB...",
+                "DefaultWidth": 1.0,
+                "DefaultDepth": 1.0,
+                "DefaultHeight": 1.0,
+                "Layer": {
+                    "Geometrie": [
+                        {
+                            "Block": "BAU005*"
+                        }
+                    ],
+                    "Text": [
+                        {
+                            "Name": "war_bauteil_text"
+                        }
+                    ]
+                },
+                "Parameters": {
+                    "Rectangular": {
+                        "Formula": "element.dimension.is_rectangular",
+                        "ValueType": "Boolean"
+                    }
+                }
+            }
+        ]
+    },
+    "Mast": {
+        "Point": [
+            {
+                "Unit": "cm",
+                "Family": "Fundament (FS)",
+                "FamilyType": "keine Angaben",
+                "ObjectType": "MAST",
+                "FDK_ID": "MGB...",
+                "DefaultWidth": 0.5,
+                "DefaultDepth": 0.5,
+                "DefaultHeight": 1.0,
+                "Layer": {
+                    "Geometrie": [
+                        {
+                            "Block": "FLG003*"
+                        }
+                    ],
+                    "Text": [
+                        {
+                            "Name": "FLG_MAST_PUNKTELE_TBL"
+                        }
+                    ]
+                }
+            },
+            {
+                "Unit": "cm",
+                "Family": "Fundament (FS)",
+                "FamilyType": "keine Angaben",
+                "ObjectType": "MAST",
+                "FDK_ID": "MGB...",
+                "DefaultWidth": 0.5,
+                "DefaultDepth": 0.5,
+                "DefaultHeight": 1.0,
+                "Layer": {
+                    "Geometrie": [
+                        {
+                            "Block": "FLG001*"
+                        }
+                    ],
+                    "Text": [
+                        {
+                            "Name": "FLG_MAST_PUNKTELE_TBL"
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    "Versickerung": {
+        "Point": [
+            {
+                "Unit": "cm",
+                "Family": "Abwasser - Versickerungsanlage",
+                "FamilyType": "keine Angaben",
+                "ObjectType": "SHAFT_SPECIAL",
+                "FDK_ID": "MGB...",
+                "DefaultWidth": 1.0,
+                "DefaultDepth": 1.0,
+                "DefaultHeight": 1.0,
+                "Layer": {
+                    "Geometrie": [
+                        {
+                            "Name": "BAU_FLAECHENELEMENT"
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+}

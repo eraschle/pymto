@@ -6,16 +6,15 @@ easily interchangeable following SOLID principles.
 """
 
 from collections.abc import Iterable
-from typing import Protocol
+from typing import Any, Protocol
 
 from .models import (
-    AssingmentData,
-    AssingmentGroup,
+    AssignmentData,
+    AssignmentGroup,
     DxfText,
     Medium,
     MediumConfig,
     ObjectData,
-    Parameter,
 )
 
 
@@ -26,26 +25,26 @@ class IAssignmentStrategy(Protocol):
     spatial proximity and validity rules.
     """
 
-    def texts_to_point_based(self, medium: Medium, groups: list[AssingmentGroup]) -> None:
+    def texts_to_point_based(self, medium: Medium, groups: list[AssignmentGroup]) -> None:
         """Assign texts to elements based on spatial proximity.
 
         Parameters
         ----------
         medium : Medium
             Medium containing elements and texts for assignment
-        groups : list[AssingmentGroup]
+        groups : list[AssignmentGroup]
             List of groups containing elements and texts for assignment
         """
         ...
 
-    def texts_to_line_based(self, medium: Medium, groups: list[AssingmentGroup]) -> None:
+    def texts_to_line_based(self, medium: Medium, groups: list[AssignmentGroup]) -> None:
         """Assign texts to elements based on spatial proximity.
 
         Parameters
         ----------
         medium : Medium
             Medium containing elements and texts for assignment
-        groups : list[AssingmentGroup]
+        groups : list[AssignmentGroup]
             List of groups containing elements and texts for assignment
         """
         ...
@@ -54,7 +53,7 @@ class IAssignmentStrategy(Protocol):
 class IObjectCreator(Protocol):
     """Protocol for creating objects from DXF entities."""
 
-    def create_objects(self, configs: list[MediumConfig]) -> tuple[list[list[ObjectData]], list[list[DxfText]]]:
+    def create_objects(self, configs: list[MediumConfig]) -> list[tuple[list[ObjectData], list[DxfText]]]:
         """Create objects and texts from DXF entities based on configurations.
 
         Parameters
@@ -71,12 +70,12 @@ class IObjectCreator(Protocol):
 
 
 class IElevationUpdater(Protocol):
-    def update_elements(self, assigment: AssingmentData) -> None:
+    def update_elements(self, assignment: AssignmentData) -> None:
         """Update elevation of all elements in the assignment data container.
 
         Parameters
         ----------
-        assignment : AssingmentData
+        assignment : AssignmentData
             Assignment data containing elements and their assigned texts
         """
         ...
@@ -114,10 +113,10 @@ class IGradientAnalyzer(Protocol):
         ...
 
 
-class IDimensionUpdater(Protocol):
+class IParameterUpdater(Protocol):
     """Protocol for updating dimensions of media based on their elements."""
 
-    def update_elements(self, assigment: AssingmentData) -> None:
+    def update_elements(self, assignment: AssignmentData) -> None:
         """Update dimensions of all elements in the assignment data container.
 
         This method should iterate through all elements in the assignment
@@ -125,17 +124,7 @@ class IDimensionUpdater(Protocol):
 
         Parameters
         ----------
-        assignment : AssingmentData
-            Assignment data containing elements and their assigned texts
-        """
-        ...
-
-    def round_parameter_values(self, assigment: AssingmentData) -> None:
-        """Round parameters of all dimensions of a single element.
-
-        Parameters
-        ----------
-        assignment : AssingmentData
+        assignment : AssignmentData
             Assignment data containing elements and their assigned texts
         """
         ...
@@ -144,7 +133,7 @@ class IDimensionUpdater(Protocol):
 class IRevitFamilyNameUpdater(Protocol):
     """Protocol for update family and family type names of medium on their elements."""
 
-    def update_elements(self, assigment: AssingmentData) -> None:
+    def update_elements(self, assignment: AssignmentData) -> None:
         """Update family and family type names of all elements in the assignment data container.
 
         This method should iterate through all elements in the assignment and
@@ -152,8 +141,56 @@ class IRevitFamilyNameUpdater(Protocol):
 
         Parameters
         ----------
-        assignment : AssingmentData
+        assignment : AssignmentData
             Assignment data containing elements and their assigned texts
+        """
+        ...
+
+    def add_parameters(self, assignment: AssignmentData) -> None:
+        """Add parameters to all elements in the assignment data container.
+
+        This method iterate through all elements in the assignment and
+        add parameters based on the medium configuration.
+
+        Parameters
+        ----------
+        assignment : AssignmentData
+            Assignment data containing elements and their assigned texts
+        """
+        ...
+
+    def remove_duplicate_point_based(self, assignment: AssignmentData) -> tuple[list[ObjectData], list[ObjectData]]:
+        """Remove duplicate point-based objects in the assignment data.
+
+        This method should iterate through all point-based elements in the assignment
+        and remove duplicates based on their coordinates.
+
+        Parameters
+        ----------
+        assignment : AssignmentData
+            Assignment data containing elements and their assigned texts
+
+        Returns
+        -------
+        list[ObjectData]
+            List of removed duplicate point-based objects
+        """
+        ...
+
+
+class IDimensionCalculator(Protocol):
+    """Protocol for exporting media data to a specified format."""
+
+    def calculate_dimension(self, elements: list[ObjectData]) -> Any:
+        """Calculate dimensions for a set of elements.
+
+        This method should iterate through all elements and calculate the
+        dimensions of the elements it is responsible for.
+
+        Parameters
+        ----------
+        elements : list[ObjectData]
+            List of elements to calculate shaft height for
         """
         ...
 

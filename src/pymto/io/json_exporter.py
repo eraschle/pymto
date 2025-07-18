@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from ..models import (
-    ADimensions,
+    Dimension,
     Medium,
     MediumConfig,
     ObjectData,
@@ -174,7 +174,7 @@ class JsonExporter:
             List of dictionaries containing parameter information
         """
         parameters = []
-        for param in element.get_parameters():
+        for param in element.get_parameters(update=True):
             parameters.append(param.to_dict())
         return parameters
 
@@ -191,11 +191,10 @@ class JsonExporter:
         dict[str, Any]
             Dictionary containing pipe information
         """
-        element_data = {
+        element_data: dict = {
             "object_type": element.object_type.name.upper(),
             "family": element.family,
             "family_type": element.family_type,
-            "dimensions": self._export_dimensions(element.dimensions),
         }
         if element.is_point_based:
             element_data["insert_point"] = _export_point(element.point)
@@ -204,12 +203,12 @@ class JsonExporter:
         else:
             return None
 
-        parameters = element.get_parameters()
+        parameters = self._get_parameters(element)
         if len(parameters) > 0:
-            element_data["parameters"] = self._get_parameters(element)
+            element_data["parameters"] = parameters
         return element_data
 
-    def _export_dimensions(self, dimensions: ADimensions) -> list[dict[str, Any]]:
+    def _export_dimensions(self, dimensions: Dimension) -> list[dict[str, Any]]:
         """Export dimensions to dictionary format.
 
         Parameters

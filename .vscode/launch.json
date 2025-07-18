@@ -4,15 +4,31 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
+        {
+            "name": "DXF TEST",
+            "type": "debugpy",
+            "request": "launch",
+            "args": [
+                "process-dxf", "C:/workspace/sersa/projekte/1000183600_MBG_Entladestelle Randa/1_Bestandsmodell/11_Grundlagen/GIS/gis_leitungen_test.dxf",
+                "../mgb_gis_plan.json",
+                "C:/workspace/sersa/projekte/1000183600_MBG_Entladestelle Randa/1_Bestandsmodell/11_Grundlagen/DGM/MGB_Randa_DGM_Drohne_reduziert.xml",
+                "--adjust-gradient",
+                "--verbose"
+            ],
+            "cwd": "${workspaceFolder}/src",
+            "module": "pymto.main"
+        },
         {
             "name": "DXF TO",
             "type": "debugpy",
             "request": "launch",
             "args": [
-                "process-dxf", "/mnt/c/workspace/sersa/projekte/1000161406_RhB_Ardez/41_Grundlagen/Werkleitungen/Perimeter_ELE_EE-Energia_Engiadina.dxf",
-                "../dxf_energie.json",
-                "/mnt/c/workspace/sersa/projekte/1000161406_RhB_Ardez/41_Grundlagen/DGM/DGM_Autovermascht_reduziert.xml",
-                "--adjust-gradient"
+                "process-dxf", "C:/workspace/sersa/projekte/1000183600_MBG_Entladestelle Randa/1_Bestandsmodell/11_Grundlagen/GIS/gis_leitungen_current.dxf",
+                "../mgb_gis_plan.json",
+                "C:/workspace/sersa/projekte/1000183600_MBG_Entladestelle Randa/1_Bestandsmodell/11_Grundlagen/DGM/MGB_Randa_DGM_Drohne_reduziert.xml",
+                "--adjust-gradient",
+                "--verbose"
             ],
             "cwd": "${workspaceFolder}/src",
             "module": "pymto.main"

@@ -7,6 +7,8 @@ and unit specifications.
 
 import re
 
+from pymto.models import Unit
+
 ROUND_DIMENSION_PATTERNS = [
     r"[ØøΦφ]\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?",  # Ø123mm, ø123, Φ123cm, φ123
     r"DN\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?",  # DN123, DN123mm
@@ -14,8 +16,21 @@ ROUND_DIMENSION_PATTERNS = [
     r"^(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?$",  # 123mm, 123, 123cm
 ]
 
+UNIT_CONVERSIONS = {
+    "mm": Unit.MILLIMETER,
+    "cm": Unit.CENTIMETER,
+    "m": Unit.METER,
+}
 
-def extract_round(text: str) -> tuple[float, str | None] | None:
+
+def _get_unit_from_text(text: str | None) -> Unit:
+    if text is None:
+        return Unit.UNKNOWN
+    unit_str = text.strip().lower()
+    return UNIT_CONVERSIONS.get(unit_str, Unit.UNKNOWN)
+
+
+def extract_round(text: str) -> tuple[float, Unit] | None:
     """Extract round dimension from text.
 
     Parameters
@@ -37,6 +52,7 @@ def extract_round(text: str) -> tuple[float, str | None] | None:
             continue
         diameter_str = match_result.group(1).replace(",", ".")
         unit = match_result.group(2).lower() if match_result.group(2) else None
+        unit = _get_unit_from_text(unit)
 
         # Zusätzliche Validierung: Stelle sicher, dass es eine gültige Zahl ist
         if diameter_str.startswith(".") or diameter_str.endswith("."):
@@ -56,7 +72,7 @@ RECT_DIMENSION_PATTERNS = [
 ]
 
 
-def extract_rectangular(text: str) -> tuple[tuple[float, float], str | None] | None:
+def extract_rectangular(text: str) -> tuple[tuple[float, float], Unit] | None:
     """Extract rectangular dimensions from text.
 
     Parameters
@@ -80,6 +96,7 @@ def extract_rectangular(text: str) -> tuple[tuple[float, float], str | None] | N
             length_str = match_result.group(1).replace(",", ".")
             width_str = match_result.group(2).replace(",", ".")
             unit = match_result.group(3).lower() if match_result.group(3) else None
+            unit = _get_unit_from_text(unit)
 
             if length_str.startswith("."):
                 length_str = length_str[1:]  # Remove leading dot
@@ -99,7 +116,7 @@ def extract_rectangular(text: str) -> tuple[tuple[float, float], str | None] | N
     return None
 
 
-def convert_to_unit(value: float, unit: str | None, target_unit: str = "mm") -> float:
+def convert_to_unit(value: float, unit: Unit, target_unit: Unit) -> float:
     """Convert dimension value to standard unit.
 
     Parameters
@@ -116,16 +133,12 @@ def convert_to_unit(value: float, unit: str | None, target_unit: str = "mm") -> 
     float
         Converted value in target unit
     """
-    if unit is None:
-        # Assume mm if no unit specified
-        unit = "mm"
-
     # Conversion factors to mm
-    to_mm = {"mm": 1.0, "cm": 10.0, "m": 1000.0}
+    to_mm = {Unit.MILLIMETER: 1.0, Unit.CENTIMETER: 10.0, Unit.METER: 1000.0}
 
     # Conversion factors from mm
-    from_mm = {"mm": 1.0, "cm": 0.1, "m": 0.001}
+    from_mm = {Unit.MILLIMETER: 1.0, Unit.CENTIMETER: 0.1, Unit.METER: 0.001}
 
     # Convert to mm first, then to target unit
-    value_in_mm = value * to_mm.get(unit.lower(), 1.0)
-    return value_in_mm * from_mm.get(target_unit.lower(), 1.0)
+    value_in_mm = value * to_mm.get(unit, 1.0)
+    return value_in_mm * from_mm.get(target_unit, 1.0)

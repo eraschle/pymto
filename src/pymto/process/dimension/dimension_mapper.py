@@ -3,6 +3,7 @@
 import bisect
 from dataclasses import dataclass
 
+from pymto.config import Unit
 from pymto.models import ObjectType
 
 
@@ -13,15 +14,17 @@ class DimensionStandard:
     name: str
     description: str
     dimensions: list[int]
-    tolerance_factor: float = 0.10  # 10% Standard-Toleranz
+    tolerance: float
+    unit: Unit = Unit.MILLIMETER  # Standard-Einheit ist Millimeter
 
 
 # Standard-Dimensionen für Infrastruktur
 INFRASTRUCTURE_STANDARDS = {
     # SCHÄCHTE (Rund und eckig)
-    ObjectType.SHAFT: DimensionStandard(
+    ObjectType.SHAFT_ROUND: DimensionStandard(
         name="Schächte",
         description="Revisionsschächte, Kontrollschächte",
+        tolerance=100,
         dimensions=[
             600,
             800,
@@ -32,12 +35,12 @@ INFRASTRUCTURE_STANDARDS = {
             2500,
             3000,
         ],
-        tolerance_factor=0.05,  # Schächte haben engere Toleranzen
     ),
     # ABWASSERLEITUNGEN
-    ObjectType.PIPE_WASTEWATER: DimensionStandard(
+    ObjectType.PIPE: DimensionStandard(
         name="Abwasserleitungen",
         description="Schmutzwasser, Regenwasser, Mischwasser",
+        tolerance=5,
         dimensions=[
             # Hausanschlüsse
             100,
@@ -75,9 +78,10 @@ INFRASTRUCTURE_STANDARDS = {
         ],
     ),
     # WASSERLEITUNGEN (Trinkwasser)
-    ObjectType.PIPE_WATER: DimensionStandard(
+    ObjectType.PIPE: DimensionStandard(
         name="Wasserleitungen",
         description="Trinkwasserverteilung",
+        tolerance=2,
         dimensions=[
             # Hausanschlüsse
             20,
@@ -120,9 +124,10 @@ INFRASTRUCTURE_STANDARDS = {
         ],
     ),
     # GASLEITUNGEN
-    ObjectType.PIPE_GAS: DimensionStandard(
+    ObjectType.PIPE: DimensionStandard(
         name="Gasleitungen",
         description="Gasverteilungsnetze",
+        tolerance=2,
         dimensions=[
             # Hausanschlüsse
             25,
@@ -151,12 +156,12 @@ INFRASTRUCTURE_STANDARDS = {
             560,
             630,
         ],
-        tolerance_factor=0.05,  # Gas hat engere Toleranzen
     ),
     # KABELKANÄLE
-    ObjectType.CABLE_DUCT: DimensionStandard(
+    ObjectType.DUCT: DimensionStandard(
         name="Kabelkanäle",
         description="Elektro- und Telekommunikationskanäle",
+        tolerance=5,
         dimensions=[
             # Einzelleerrohre
             40,
@@ -221,14 +226,13 @@ class DimensionMapper:
         best_match = min(candidates, key=lambda x: abs(x - measured_value))
 
         # Prüfe Toleranz
-        max_deviation = best_match * standard.tolerance_factor
-        if abs(best_match - measured_value) <= max_deviation:
+        if abs(best_match - measured_value) <= standard.tolerance:
             return best_match
         else:
             return measured_value  # Außerhalb Toleranz
 
-    def round_dimension(self, value: float) -> float:
+    def round_dimension(self, value: float, round_to: int) -> float:
         """Rundet Dimension auf 5er-Schritte"""
         value_in_cm = value * 100
-        value_in_cm = round(value_in_cm / 5) * 5
+        value_in_cm = round(value_in_cm / round_to) * round_to
         return value_in_cm / 100

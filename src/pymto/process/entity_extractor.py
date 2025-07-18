@@ -9,8 +9,8 @@ import logging
 
 from ezdxf.entities.dxfentity import DXFEntity
 
-from ..models import MediumConfig
 from ..io import DXFReader
+from ..models import LayerData, MediumConfig
 from ..process import entity_handler
 
 log = logging.getLogger(__name__)
@@ -46,11 +46,11 @@ class DXFEntityExtractor:
         dict[str, list[DXFEntity]]
             Dictionary with 'elements', 'lines', and 'texts' keys
         """
-        geometries = self._extract_geometry_entities(config)
-        texts = self._extract_text_entities(config)
+        geometries = self._extract_geometry_entities(config.layer_group.geometry)
+        texts = self._extract_text_entities(config.layer_group.text)
         return geometries, texts
 
-    def _extract_geometry_entities(self, config: MediumConfig) -> list[DXFEntity]:
+    def _extract_geometry_entities(self, geometry_layers: list[LayerData]) -> list[DXFEntity]:
         """Extract geometry entities from specified layers.
 
         Parameters
@@ -64,18 +64,14 @@ class DXFEntityExtractor:
             List of entities to be processed as lines
         """
         entities = []
-
-        for layer_data in config.geometry:
+        for layer_data in geometry_layers:
             for entity in self.reader.query_layer(layer_data):
                 if entity_handler.is_text_entity(entity):
                     continue
-
                 entities.append(entity)
-
-        log.debug(f"Extracted {len(entities)} geometry entities")
         return entities
 
-    def _extract_text_entities(self, config: MediumConfig) -> list[DXFEntity]:
+    def _extract_text_entities(self, text_layers: list[LayerData]) -> list[DXFEntity]:
         """Extract text entities from specified layers.
 
         Parameters
@@ -90,11 +86,9 @@ class DXFEntityExtractor:
         """
         entities = []
 
-        for layer_data in config.text:
+        for layer_data in text_layers:
             for entity in self.reader.query_layer(layer_data):
                 if not entity_handler.is_text_entity(entity):
                     continue
                 entities.append(entity)
-
-        log.debug(f"Extracted {len(entities)} text entities")
         return entities

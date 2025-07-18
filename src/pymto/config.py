@@ -3,11 +3,16 @@ import logging
 from pathlib import Path
 
 from .models import (
+    FormulaParameter,
     LayerData,
+    LayerGroup,
     Medium,
     MediumConfig,
     MediumMasterConfig,
     ObjectType,
+    Parameter,
+    Unit,
+    ValueType,
 )
 
 log = logging.getLogger(__name__)
@@ -43,7 +48,13 @@ class ConfigurationHandler:
             )
         return layers
 
-    def _create_default_unit(self, unit: str) -> str:
+    def _create_layer_group(self, layer: dict) -> LayerGroup:
+        return LayerGroup(
+            geometry=self._create_layer_data(layer.get("Geometrie", [])),
+            text=self._create_layer_data(layer.get("Text", [])),
+        )
+
+    def _create_default_unit(self, unit_value: str) -> Unit:
         """Create default unit based on string representation.
 
         Parameters
@@ -55,11 +66,48 @@ class ConfigurationHandler:
         str
             Corresponding unit string
         """
-        valid_units = {"mm", "cm", "m"}
-        if unit.lower() in valid_units:
-            return unit.lower()
-        log.warning(f"Unknown unit type: {unit}, defaulting to 'mm'")
-        return "mm"
+        valid_units = {
+            "mm": Unit.MILLIMETER,
+            "cm": Unit.CENTIMETER,
+            "m": Unit.METER,
+        }
+        unit = valid_units.get(unit_value.lower())
+        if unit is None:
+            log.warning(f"Unknown unit type: {unit}, defaulting to 'mm'")
+            unit = Unit.UNKNOWN
+        return unit
+
+    def _create_parameters(self, parameter_dict: dict) -> list[Parameter]:
+        """Create parameters from a list of parameter dictionaries.
+
+        Parameters
+        ----------
+        parameter_values : list[dict]
+            List of parameter dictionaries
+        Returns
+        -------
+        list[Parameter]
+            List of Parameter objects
+        """
+        parameters = []
+        for name, param in parameter_dict.items():
+            formula = param.get("Formula")
+            if formula is None:
+                parameter = Parameter(
+                    name=name,
+                    value=param.get("Value", "UNKNOWN"),
+                    value_type=ValueType(param.get("ValueType", "STRING").upper()),
+                    unit=Unit(param.get("Unit", "UNKNOWN").upper()),
+                )
+            else:
+                parameter = FormulaParameter(
+                    name=name,
+                    formula=formula,
+                    value_type=ValueType(param.get("ValueType", "UNKNOWN").upper()),
+                    unit=Unit(param.get("Unit", "UNKNOWN").upper()),
+                )
+            parameters.append(parameter)
+        return parameters
 
     def _create_default_shape(self, shape: str) -> ObjectType:
         """Create default shape based on string representation.
@@ -88,11 +136,10 @@ class ConfigurationHandler:
 
         return MediumConfig(
             medium=medium_name,
-            geometry=self._create_layer_data(config.get("Geometrie", [])),
-            text=self._create_layer_data(config.get("Text", [])),
+            layer_group=self._create_layer_group(config.get("Layer", {})),
             family=config.get("Family", "NO FAMILY"),
             family_type=config.get("FamilyType", "NO FAMILY TYPE"),
-            object_type=self._create_default_shape(config.get("Category", "NONE")),
+            object_type=self._create_default_shape(config.get("ObjectType", "NONE")),
             default_unit=self._create_default_unit(config.get("Unit", "mm")),
             object_id=object_id,
             default_width=config.get("DefaultWidth", None),
@@ -100,6 +147,7 @@ class ConfigurationHandler:
             default_height=config.get("DefaultHeight", None),
             default_diameter=config.get("DefaultDiameter", None),
             elevation_offset=config.get("ElevationOffset", 0.0),
+            parameters=self._create_parameters(config.get("Parameters", {})),
         )
 
     def _create_medium_configs(self, medium: str, configs: list[dict]) -> list[MediumConfig]:
@@ -111,8 +159,8 @@ class ConfigurationHandler:
     def _create_master_config(self, medium: str, medium_master: dict) -> MediumMasterConfig:
         return MediumMasterConfig(
             medium=medium,
-            point_based=self._create_medium_configs(medium, medium_master.get("Element", [])),
-            line_based=self._create_medium_configs(medium, medium_master.get("Leitung", [])),
+            point_based=self._create_medium_configs(medium, medium_master.get("Point", [])),
+            line_based=self._create_medium_configs(medium, medium_master.get("Line", [])),
         )
 
     def load_config(self) -> None:

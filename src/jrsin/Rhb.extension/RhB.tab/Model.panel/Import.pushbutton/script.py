@@ -10,6 +10,7 @@ from pathlib import Path
 from Autodesk.Revit.DB import (
     XYZ,
     AdaptiveComponentInstanceUtils,
+    BasePoint,
     BuiltInCategory,
     Document,
     Element,
@@ -42,6 +43,16 @@ def get_length_value(value, unit=None):
         raise ValueError(f"Unknown unit type: {unit}")
 
 
+def get_shared_project_point(document: Document):
+    base_point = BasePoint.GetProjectBasePoint(document)
+    position = base_point.SharedPosition
+    return {
+        "east": UnitUtils.ConvertFromInternalUnits(position.X, UnitTypeId.Meters),
+        "north": UnitUtils.ConvertFromInternalUnits(position.Y, UnitTypeId.Meters),
+        "altitude": UnitUtils.ConvertFromInternalUnits(position.Z, UnitTypeId.Meters),
+    }
+
+
 class ElementData(object):
     """Represents element data from JSON with support for both point-based and line-based elements"""
 
@@ -51,7 +62,6 @@ class ElementData(object):
         self.object_type = json_data.get("object_type", "")
         self.family = json_data.get("family", "")
         self.family_type = json_data.get("family_type", "")
-        self.dimensions = json_data.get("dimensions", {})
         self.parameters = json_data.get("parameters", [])
 
         # Handle both insert_point and line_points
@@ -78,15 +88,14 @@ class ElementData(object):
 class RevitImporter(object):
     """Simple importer for DXF data from JSON"""
 
-    def __init__(self, document: Document, project_zero):
+    def __init__(self, document: Document):
         # type: (Document, dict) -> None
         self.document = document
-        self.project_zero = project_zero
 
     def load_json_data(self, json_path):
         # type: (str) -> dict
         """Load JSON data from file"""
-        with open(json_path, "r") as f:
+        with open(json_path) as f:
             return json.load(f)
 
     def get_family_collector(self):
@@ -127,12 +136,12 @@ class RevitImporter(object):
         if family_symbol is None:
             family_name = element_data.family
             type_name = element_data.family_type
-            raise ValueError("Family symbol not found: {}, {}".format(family_name, type_name))
+            raise ValueError(f"Family symbol not found: {family_name}, {type_name}")
         family_symbol = family_symbol.Duplicate(element_data.family_type)
         if not isinstance(family_symbol, FamilySymbol):
             family_name = element_data.family
             type_name = element_data.family_type
-            raise ValueError("Failed to duplicate family symbol: {}, {}".format(family_name, type_name))
+            raise ValueError(f"Failed to duplicate family symbol: {family_name}, {type_name}")
         if not family_symbol.IsActive:
             family_symbol.Activate()
         return family_symbol
@@ -140,13 +149,14 @@ class RevitImporter(object):
     def create_xyz_from_point(self, point_data):
         # type: (dict) -> XYZ
         """Convert point data to Revit XYZ"""
-        east_coord = point_data.get("east", 0.0) - self.project_zero["East"]
-        east = UnitUtils.ConvertToInternalUnits(east_coord, UnitTypeId.Meters)
-        north_coord = point_data.get("north", 0.0) - self.project_zero["North"]
-        north = UnitUtils.ConvertToInternalUnits(north_coord, UnitTypeId.Meters)
-        alt_coord = point_data.get("altitude", 0.0) - self.project_zero["Altitude"]
-        alt = UnitUtils.ConvertToInternalUnits(alt_coord, UnitTypeId.Meters)
-        return XYZ(east, north, alt)
+        project_zero = get_shared_project_point(self.document)
+        coords []
+        for attr, value in point_data.items():
+            coord = point_data.get(attr, 0.0) - project_zero.get(attr, 0.0)
+            if attr != 0:
+                coord = UnitUtils.ConvertToInternalUnits(east_coord, UnitTypeId.Meters)
+            coords.append(coord)
+        return XYZ(*coords)
 
     def create_element(self, element_data: ElementData, family_symbol: FamilySymbol):
         # type: (ElementData, FamilySymbol) -> list[Element]
@@ -155,7 +165,7 @@ class RevitImporter(object):
             return self.create_point_based_element(element_data, family_symbol)
         elif element_data.is_line_based():
             return self.create_line_based_element(element_data, family_symbol)
-        raise ValueError("Element is neither point or line-based, got: {}".format(element_data.json_data))
+        raise ValueError(f"Element is neither point or line-based, got: {element_data.object_type}")
 
     def create_point_based_element(self, element_data: ElementData, family_symbol: FamilySymbol):
         # type: (ElementData, FamilySymbol) -> list[Element]
@@ -175,7 +185,7 @@ class RevitImporter(object):
         """Get reference point from element ID"""
         ref_point = self.document.GetElement(element_id)
         if not isinstance(ref_point, ReferencePoint):
-            raise ValueError("ElementId {} is not a ReferencePoint".format(element_id))
+            raise ValueError(f"ElementId {element_id} is not a ReferencePoint")
         return ref_point
 
     def create_line_based_element(self, element_data: ElementData, family_symbol: FamilySymbol):
@@ -186,7 +196,7 @@ class RevitImporter(object):
         if len(all_points) < 2:
             raise ValueError(
                 "ElementData is not line-based, Did you check is_line_based() first? "
-                "Expected at least 2 points, got: {}".format(len(all_points))
+                f"Expected at least 2 points, got: {len(all_points)}"
             )
         for idx, point in enumerate(all_points):
             if idx == 0:
@@ -218,21 +228,21 @@ class RevitImporter(object):
         if value is None:
             return None
 
-        unit_type = parameter_data.get("unit", None)
         if parameter.StorageType == StorageType.ElementId:
             raise NotImplementedError("ElementId parameters are not supported in this script")
+        unit_type = parameter_data.get("unit", "").lower()
         if parameter.StorageType == StorageType.Double:
             if unit_type is None:
                 return float(value)
-            if unit_type.lower() in ["mm", "cm", "m"]:
+            if unit_type in ["mm", "cm", "m"]:
                 value = get_length_value(value, unit=unit_type)
                 return UnitUtils.ConvertToInternalUnits(float(value), UnitTypeId.Meters)
-            if unit_type.lower() in ["degree", "grad"]:
+            if unit_type in ["degree", "grad"]:
                 return UnitUtils.ConvertToInternalUnits(float(value), UnitTypeId.Degrees)
             raise ValueError(f"Unknown unit type: {unit_type}")
         if parameter.StorageType == StorageType.Integer:
-            if parameter_data.get("value_type", None) == "bool":
-                return 1 if bool(value) else 0
+            if parameter_data.get("value_type", None) == "BOOLEAN":
+                return 1 if value else 0
             return int(value)
         return str(value)
 
@@ -283,10 +293,6 @@ class RevitImporter(object):
         return created_count
 
 
-def _get_project_root(document: Document):
-    doc_path = Path(document.PathName).parent
-
-
 def main():
     # type: () -> None
     """Main function"""
@@ -297,7 +303,7 @@ def main():
         return
 
     # Select JSON file
-    json_file = forms.pick_file(file_ext="json", title="revit_data.json Datei auswählen")
+    json_file = forms.pick_file(file_ext="json", title="JSON Datei mit Element Daten auswählen")
     if isinstance(json_file, list):
         json_file = json_file[0]
 
@@ -305,22 +311,10 @@ def main():
         forms.alert("Keine JSON Datei ausgewählt")
         return
 
-    # Select JSON file
-    project_zero_path = forms.pick_file(file_ext="json", title="Project Koordinaten Datei auswählen")
-    if isinstance(project_zero_path, list):
-        project_zero_path = project_zero_path[0]
-
-    if project_zero_path is None:
-        forms.alert("Keine Projekt Koordinaten Datei ausgewählt")
-        return
-
-    project_zero = json.loads(open(project_zero_path, "r").read())
-    project_zero = project_zero["Projektnullpunkt"]
-
-    importer = RevitImporter(document=doc, project_zero=project_zero)
+    importer = RevitImporter(document=doc)
     count = importer.import_data(json_file)
 
-    forms.alert("Import completed! Created {} elements".format(count))
+    forms.alert(f"Import completed! Created {count} elements")
 
 
 if __name__ == "__main__":

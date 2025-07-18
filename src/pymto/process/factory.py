@@ -8,117 +8,104 @@ dimension calculation.
 import logging
 
 from ezdxf.document import Drawing
-from ezdxf.entities.circle import Circle
 from ezdxf.entities.arc import Arc
+from ezdxf.entities.circle import Circle
 from ezdxf.entities.dxfentity import DXFEntity
 from ezdxf.entities.insert import Insert
+from ezdxf.entities.lwpolyline import LWPolyline
+from ezdxf.entities.polyline import Polyline
 
 from ..models import (
+    Dimension,
     MediumConfig,
     ObjectData,
-    ObjectType,
     Parameter,
     Point3D,
-    RectangularDimensions,
-    RoundDimensions,
+    ShapeType,
+    ValueType,
 )
 from . import entity_handler as dxf
 
 log = logging.getLogger(__name__)
 
 
-def is_pipe_or_duct(object_type: ObjectType) -> bool:
-    """Check if the object type is PIPE or DUCT.
+def _get_default_line_dimension(config: MediumConfig, fallback_diameter: float = 0.1) -> Dimension:
+    if config.default_diameter is None:
+        log.debug(f"No default diameter set in {config.medium}-config, using fallback {fallback_diameter} m")
+        diameter = fallback_diameter
+    else:
+        diameter = config.default_diameter
+    return Dimension(diameter=diameter, height=config.default_height, shape=ShapeType.ROUND)
 
-    Parameters
-    ----------
-    object_type : ShapeType
-        The type of the object to check
 
-    Returns
-    -------
-    bool
-        True if the object type is PIPE or DUCT, False otherwise
-    """
-    if object_type.name.lower().startswith("pipe"):
-        return True
-    return object_type in (
-        ObjectType.CABLE_DUCT,
-        ObjectType.PIPE_GAS,
-        ObjectType.PIPE_WASTEWATER,
-        ObjectType.PIPE_WATER,
-        ObjectType.PIPE_TELECOM,
+def _get_default_rectangular_dimension(
+    config: MediumConfig, fallback_width: float = 0.1, fallback_depth: float = 0.1, angle: float = 0.0
+) -> Dimension:
+    if config.default_width is None:
+        log.debug(f"No default diameter set in {config.medium}-config, using fallback {fallback_width} m")
+        width = fallback_width
+    else:
+        width = config.default_diameter
+    if config.default_depth is None:
+        log.debug(f"No default depth set in {config.medium}-config, using fallback {fallback_depth} m")
+        depth = fallback_depth
+    else:
+        depth = config.default_depth
+    return Dimension(
+        width=width,
+        depth=depth,
+        height=config.default_height,
+        angle=angle,
+        shape=ShapeType.RECTANGULAR,
     )
 
 
-def _get_layer_name(entity: DXFEntity) -> str:
-    """Get the layer name from a DXF entity.
+def get_object(entity: DXFEntity, config: MediumConfig, dimension: Dimension, points: list[Point3D]) -> ObjectData:
+    """Get the object ID from the configuration.
 
     Parameters
     ----------
     entity : DXFEntity
-        The DXF entity to extract the layer name from
+        The DXF entity to process
+    config : MediumConfig
+        Configuration for medium processing
+    dimension : Dimension
+        Dimension of the object
+    points : List[Point3D]
+        Points defining the object geometry
 
     Returns
     -------
-    str
-        The layer name, or "0" if not specified
+    ObjectData
+        Created ObjectData with the specified parameters
     """
-    return getattr(entity.dxf, "layer", "0")
-
-
-def _get_entity_color(entity: DXFEntity) -> tuple[int, int, int]:
-    """Get RGB color of a DXF entity.
-
-    Parameters
-    ----------
-    entity : DXFEntity
-        Entity to get color from
-
-    Returns
-    -------
-    tuple[int, int, int]
-        RGB color values
-    """
-    try:
-        color_index = getattr(entity.dxf, "color", 7)
-
-        # Simple AutoCAD color index to RGB mapping
-        color_map = {
-            1: (255, 0, 0),  # Red
-            2: (255, 255, 0),  # Yellow
-            3: (0, 255, 0),  # Green
-            4: (0, 255, 255),  # Cyan
-            5: (0, 0, 255),  # Blue
-            6: (255, 0, 255),  # Magenta
-            7: (0, 0, 0),  # Black/White
-        }
-
-        return color_map.get(color_index, (0, 0, 0))
-
-    except Exception:
-        return (0, 0, 0)
-
-
-def _get_object_id_from(config: MediumConfig) -> Parameter:
-    value = config.object_id
-    if len(value) == 0:
-        log.warning("Object-ID is empty, defaulting to 'UNKNOWN'")
-        value = "UNKNOWN"
-    return Parameter(name="FDK_ID", value=value)
+    return ObjectData(
+        uuid=str(entity.uuid),
+        medium=config.medium,
+        object_type=config.object_type,
+        family=config.family,
+        family_type=config.family_type,
+        dimension=dimension,
+        points=points,
+        parameters=[
+            Parameter(
+                name="FDK_ID",
+                value=config.object_id,
+                value_type=ValueType.STRING,
+            ),
+            Parameter(
+                name="Layer-Name",
+                value=getattr(entity.dxf, "layer", "0"),
+                value_type=ValueType.STRING,
+            ),
+        ],
+    )
 
 
 class ObjectDataFactory:
     """Factory for creating ObjectData from DXF entities."""
 
     def __init__(self, dxf_document: Drawing):
-        """Initialize factory with DXF document.
-
-        Parameters
-        ----------
-        dxf_document : Drawing
-            DXF document for block resolution
-        """
         self.dxf_doc = dxf_document
         self._block_cache = {}
 
@@ -146,8 +133,10 @@ class ObjectDataFactory:
                 return self._create_from_insert(entity, config)
             elif entity_type == "CIRCLE":
                 return self._create_from_circle(entity, config)
-            elif entity_type in ("POLYLINE", "LWPOLYLINE"):
+            elif entity_type in "POLYLINE":
                 return self._create_from_polyline(entity, config)
+            elif entity_type in "LWPOLYLINE":
+                return self._create_from_lw_polyline(entity, config)
             elif entity_type == "LINE":
                 return self._create_from_line(entity, config)
             elif entity_type == "ARC":
@@ -179,52 +168,27 @@ class ObjectDataFactory:
             log.error("Expected INSERT entity for block reference")
             return None
         try:
-            # Get insertion point
             insert_point = entity.dxf.insert
             position = Point3D(east=insert_point.x, north=insert_point.y, altitude=0.0)
 
-            # Analyze block geometry
             block_entities = self._get_block_entities(entity)
             shape_analysis = self._analyze_block_shape(entity, block_entities)
 
             if shape_analysis is None:
                 return None
 
-            dimensions, geometry_points = shape_analysis
-            transformed_points = self._transform_block_geometry(geometry_points, entity)
-
-            return ObjectData(
-                medium=config.medium,
-                object_type=config.object_type,
-                family=config.family,
-                family_type=config.family_type,
-                dimensions=dimensions,
-                layer=_get_layer_name(entity),
+            dimension, _ = shape_analysis
+            return get_object(
+                config=config,
+                entity=entity,
+                dimension=dimension,
                 points=[position],
-                # points=transformed_points,
-                color=_get_entity_color(entity),
-                object_id=_get_object_id_from(config),
             )
-
         except Exception as e:
             log.error(f"Failed to process INSERT entity: {e}")
             return None
 
     def _create_from_circle(self, entity: DXFEntity, config: MediumConfig) -> ObjectData | None:
-        """Create ObjectData from CIRCLE entity.
-
-        Parameters
-        ----------
-        entity : Circle
-            CIRCLE entity to process
-        config : MediumConfig
-            Configuration for medium processing
-
-        Returns
-        -------
-        Optional[ObjectData]
-            Created ObjectData or None if processing failed
-        """
         if not isinstance(entity, Circle):
             log.error("Expected CIRCLE entity")
             return None
@@ -234,18 +198,13 @@ class ObjectDataFactory:
 
             position = Point3D(east=center.x, north=center.y, altitude=0.0)
             diameter = radius * 2.0
-            dimensions = RoundDimensions(diameter=diameter / 1000.0)
+            dimension = Dimension(diameter=diameter / 1000.0, shape=ShapeType.ROUND, angle=0.0)
 
-            return ObjectData(
-                medium=config.medium,
-                object_type=config.object_type,
-                family=config.family,
-                family_type=config.family_type,
-                dimensions=dimensions,
-                layer=_get_layer_name(entity),
+            return get_object(
+                config=config,
+                entity=entity,
+                dimension=dimension,
                 points=[position],
-                color=_get_entity_color(entity),
-                object_id=_get_object_id_from(config),
             )
 
         except Exception as e:
@@ -253,12 +212,12 @@ class ObjectDataFactory:
             return None
 
     def _create_from_polyline(self, entity: DXFEntity, config: MediumConfig) -> ObjectData | None:
-        """Create ObjectData from POLYLINE or LWPOLYLINE entity.
+        """Create ObjectData from POLYLINE entity.
 
         Parameters
         ----------
         entity : DXFEntity
-            POLYLINE or LWPOLYLINE entity to process
+            POLYLINE entity to process
         config : MediumConfig
             Configuration for medium processing
 
@@ -267,252 +226,193 @@ class ObjectDataFactory:
         Optional[ObjectData]
             Created ObjectData or None if processing failed
         """
+        if not isinstance(entity, Polyline):
+            log.error("Expected POLYLINE entity")
+            return None
+        try:
+            points = dxf.extract_points_from(entity)
+            if not points:
+                log.warning("No points extracted from POLYLINE entity")
+                return None
+            if config.is_round_line_based():
+                log.debug("Creating DEFAULT round line-based object from POLYLINE")
+                return self._default_round_line_based(entity, points, config)
+            if config.is_rectangular_line_based():
+                log.debug("Creating DEFAULT rectangular line-based object from POLYLINE")
+                return self._default_rectangular_line_based(entity, points, config)
+            largest_point = self._get_largest_rectangle([entity])
+            if largest_point is not None:
+                dimension, _ = self._analyze_rectangular_sided_block(largest_point, 0)
+                center_point = dxf.calculate_center_point(points)
+                return get_object(
+                    entity=entity,
+                    config=config,
+                    dimension=dimension,
+                    points=[center_point],
+                )
+            shape_type = dxf.detect_shape_type(points)
+            if config.is_point_based():
+                return self._create_round_point_based(entity, points, config)
+            if config.is_line_based():
+                return self._create_round_line_based(entity, points, config)
+            log.error(f" Create object from POLYLINE: Unknown shape {shape_type}, {entity}")
+            return None
+
+        except Exception as e:
+            log.error(f"Failed to process polyline entity: {e}")
+            return None
+
+    def _create_from_lw_polyline(self, entity: DXFEntity, config: MediumConfig) -> ObjectData | None:
+        """Create ObjectData from LWPOLYLINE entity.
+
+        Parameters
+        ----------
+        entity : DXFEntity
+            LWPOLYLINE entity to process
+        config : MediumConfig
+            Configuration for medium processing
+
+        Returns
+        -------
+        Optional[ObjectData]
+            Created ObjectData or None if processing failed
+        """
+        if not isinstance(entity, LWPolyline):
+            log.error("Expected LWPOLYLINE entity")
+            return None
         try:
             points = dxf.extract_points_from(entity)
             if not points:
                 return None
-            if config.object_type.name.lower().startswith("pipe"):
-                return self._create_round_line_based_from_polyine(entity, points, config)
-            elif config.object_type == ObjectType.CABLE_DUCT:
-                return self._create_rect_line_based_object(entity, points, config)
+            if config.is_round_line_based():
+                return self._default_round_line_based(entity, points, config)
+            if config.is_rectangular_line_based():
+                return self._default_rectangular_line_based(entity, points, config)
+
+            largest_point = self._get_largest_rectangle([entity])
+            if largest_point is not None:
+                dimension, _ = self._analyze_rectangular_sided_block(largest_point, 0)
+                center_point = dxf.calculate_center_point(points)
+                return get_object(
+                    entity=entity,
+                    config=config,
+                    dimension=dimension,
+                    points=[center_point],
+                )
             shape_type = dxf.detect_shape_type(points)
             if shape_type == "rectangular":
                 return self._create_rect_point_based_object(entity, points, config)
             elif shape_type == "round":
                 return self._create_round_point_based_from_polyline(entity, points, config)
+            elif shape_type == "triangle":
+                return self._create_round_point_based_from_polyline(entity, points, config)
             elif shape_type == "multi_sided":
                 return self._create_multi_sided_object(entity, points, config)
             elif shape_type == "linear":
                 return self._create_round_point_based(entity, points, config)
-            if shape_type == "bulge" and dxf.has_bulge_value(entity):
+            elif shape_type == "bulge":
                 return self._create_bulge_point_based_object(entity, config)
-            else:
-                print(f"Unknown shape: {shape_type}, {entity}, {points}")
-                print(f"Defaulting to line object creation for {entity.dxftype()}")
+            elif config.is_point_based():
                 return self._create_round_point_based(entity, points, config)
+            elif config.is_line_based():
+                return self._create_round_line_based(entity, points, config)
+            log.warning(f" Create object from LWPOLINE: Unknown shape {shape_type}, {entity}")
+            return None
 
         except Exception as e:
             log.error(f"Failed to process polyline entity: {e}")
             return None
 
     def _create_from_line(self, entity: DXFEntity, config: MediumConfig) -> ObjectData | None:
-        """Create ObjectData from LINE entity.
-
-        Parameters
-        ----------
-        entity : DXFEntity
-            LINE entity to process
-        config : MediumConfig
-            Configuration for medium processing
-
-        Returns
-        -------
-        Optional[ObjectData]
-            Created ObjectData or None if processing failed
-        """
         try:
             points = dxf.extract_points_from(entity)
-            if is_pipe_or_duct(config.object_type):
-                if config.object_type == ObjectType.CABLE_DUCT:
-                    return self._create_rect_line_based_object(entity, points, config)
+            if config.is_rectangular_line_based():
+                return self._default_rectangular_line_based(entity, points, config)
+            elif config.is_round_line_based():
                 return self._create_round_line_based(entity, points, config)
-            return self._create_round_point_based(entity, points, config)
+            else:
+                return self._create_round_point_based(entity, points, config)
         except Exception as e:
             log.error(f"Failed to process LINE entity: {e}")
             return None
 
     def _create_from_arc(self, entity: DXFEntity, config: MediumConfig) -> ObjectData | None:
-        """Create ObjectData from LINE entity.
-
-        Parameters
-        ----------
-        entity : DXFEntity
-            LINE entity to process
-        config : MediumConfig
-            Configuration for medium processing
-
-        Returns
-        -------
-        Optional[ObjectData]
-            Created ObjectData or None if processing failed
-        """
         if not isinstance(entity, Arc):
             log.debug("Expected ARC entity")
             return None
         points = dxf.extract_points_from(entity)
 
-        if config.object_type == ObjectType.CABLE_DUCT:
-            return self._create_rect_line_based_object(entity, points, config)
+        if config.is_rectangular_line_based():
+            return self._default_rectangular_line_based(entity, points, config)
 
-        diameter = dxf.get_default_line_diameter(config.object_type, config)
-        dimensions = RoundDimensions(diameter=diameter)
-
-        return ObjectData(
-            medium=config.medium,
-            object_type=config.object_type,
-            family=config.family,
-            family_type=config.family_type,
-            dimensions=dimensions,
-            layer=_get_layer_name(entity),
+        dimension = _get_default_line_dimension(config)
+        return get_object(
+            entity=entity,
+            config=config,
+            dimension=dimension,
             points=points,
-            color=_get_entity_color(entity),
-            object_id=_get_object_id_from(config),
         )
 
     def _create_rect_point_based_object(
         self, entity: DXFEntity, points: list[Point3D], config: MediumConfig
     ) -> ObjectData:
-        """Create rectangular ObjectData from points.
-
-        Parameters
-        ----------
-        entity : DXFEntity
-            Source entity
-        points : List[Point3D]
-            Points defining the rectangle
-        object_type : ShapeType
-            Type of object (PIPE, DUCT, etc.)
-
-        Returns
-        -------
-        ObjectData
-            Created ObjectData with rectangular dimensions
-        """
         if dxf.is_rectangular(points):
             width, depth = dxf.calculate_rect_dimensions(points)
-            width = width / 1000.0  # Convert to meters
+            width = width / 1000.0
             depth = depth / 1000.0
         else:
             width, depth = dxf.calculate_bbox_dimensions(points)
+
         if config.default_width is not None and (width is None or width == 0.0):
             width = config.default_width
         if config.default_depth is not None and (depth is None or depth == 0.0):
             depth = config.default_depth
 
         position = dxf.calculate_center_point(points)
-        dimensions = RectangularDimensions(length=width, width=depth, angle=0.0)
+        angle = dxf.calculate_angle_from_points(points)
+        dimension = Dimension(length=width, width=depth, angle=angle, shape=ShapeType.RECTANGULAR)
 
-        return ObjectData(
-            medium=config.medium,
-            object_type=config.object_type,
-            family=config.family,
-            family_type=config.family_type,
-            dimensions=dimensions,
-            layer=_get_layer_name(entity),
+        return get_object(
+            entity=entity,
+            config=config,
+            dimension=dimension,
             points=[position],
-            # points=points,
-            color=_get_entity_color(entity),
-            object_id=_get_object_id_from(config),
         )
 
-    def _create_rect_line_based_object(
-        self, entity: DXFEntity, points: list[Point3D], config: MediumConfig
+    def _default_rectangular_line_based(
+        self, entity: DXFEntity, points: list[Point3D], config: MediumConfig, angle: float = 0.0
     ) -> ObjectData:
-        """Create rectangular ObjectData from points.
-
-        Parameters
-        ----------
-        entity : DXFEntity
-            Source entity
-        points : List[Point3D]
-            Points defining the rectangle
-        object_type : ShapeType
-            Type of object (PIPE, DUCT, etc.)
-
-        Returns
-        -------
-        ObjectData
-            Created ObjectData with rectangular dimensions
-        """
-        angle = 0.0
-        width, depth = config.default_width or 0.0, config.default_width or 0.0
-        dimensions = RectangularDimensions(length=width, width=depth, angle=angle)
-        if config.object_type == ObjectType.CABLE_DUCT:
-            length, width = config.default_width or 0.3, config.default_depth or 0.2
-            dimensions = RectangularDimensions(length=length, width=width, angle=angle)
-
-        return ObjectData(
-            medium=config.medium,
-            object_type=config.object_type,
-            family=config.family,
-            family_type=config.family_type,
-            dimensions=dimensions,
-            layer=_get_layer_name(entity),
+        dimension = _get_default_rectangular_dimension(config=config, angle=angle)
+        return get_object(
+            entity=entity,
+            config=config,
+            dimension=dimension,
             points=points,
-            color=_get_entity_color(entity),
-            object_id=_get_object_id_from(config),
         )
 
-    def _create_round_line_based_from_polyine(
-        self, entity: DXFEntity, points: list[Point3D], config: MediumConfig
-    ) -> ObjectData:
-        """Create round ObjectData for line-based entities from polygonal points.
-
-        Parameters
-        ----------
-        entity : DXFEntity
-            Source entity
-        points : List[Point3D]
-            Points defining the near-circular shape
-        config : MediumConfig
-            Configuration for medium processing
-
-        Returns
-        -------
-        ObjectData
-            Created ObjectData with round dimensions
-        """
-        diameter = dxf.get_default_line_diameter(config.object_type, config)
-
-        return ObjectData(
-            medium=config.medium,
-            object_type=config.object_type,
-            family=config.family,
-            family_type=config.family_type,
-            dimensions=RoundDimensions(diameter=diameter),
-            layer=_get_layer_name(entity),
+    def _default_round_line_based(self, entity: DXFEntity, points: list[Point3D], config: MediumConfig) -> ObjectData:
+        dimension = _get_default_line_dimension(config)
+        return get_object(
+            entity=entity,
+            config=config,
+            dimension=dimension,
             points=points,
-            color=_get_entity_color(entity),
-            object_id=_get_object_id_from(config),
         )
 
     def _create_round_point_based_from_polyline(
         self, entity: DXFEntity, points: list[Point3D], config: MediumConfig
     ) -> ObjectData:
-        """Create round ObjectData from polygonal points.
-
-        Parameters
-        ----------
-        entity : DXFEntity
-            Source entity
-        points : List[Point3D]
-            Points defining the near-circular shape
-        config : MediumConfig
-            Configuration for medium processing
-
-        Returns
-        -------
-        ObjectData
-            Created ObjectData with round dimensions
-        """
         position = dxf.calculate_center_point(points)
         if config.default_diameter is None:
             diameter = dxf.estimate_diameter_from(points)
         else:
             diameter = config.default_diameter
-        dimensions = RoundDimensions(diameter=diameter)
 
-        return ObjectData(
-            medium=config.medium,
-            object_type=config.object_type,
-            family=config.family,
-            family_type=config.family_type,
-            dimensions=dimensions,
-            layer=_get_layer_name(entity),
+        return get_object(
+            entity=entity,
+            config=config,
+            dimension=Dimension(diameter=diameter, shape=ShapeType.ROUND),
             points=[position],
-            # points=points,
-            color=_get_entity_color(entity),
-            object_id=_get_object_id_from(config),
         )
 
     def _create_multi_sided_object(
@@ -521,188 +421,70 @@ class ObjectDataFactory:
         points: list[Point3D],
         config: MediumConfig,
     ) -> ObjectData:
-        """Create multi-sided ObjectData from points.
-
-        For multi-sided shapes, we use bounding box dimensions but keep
-        the original geometry for reference.
-
-        Parameters
-        ----------
-        entity : DXFEntity
-            Source entity
-        points : List[Point3D]
-            Points defining the multi-sided shape
-        config : MediumConfig
-            Configuration for medium processing
-
-        Returns
-        -------
-        ObjectData
-            Created ObjectData with rectangular dimensions (bounding box)
-        """
         position = dxf.calculate_center_point(points)
         width, depth = dxf.calculate_bbox_dimensions(points)
         if config.default_width is not None:
             width = width or config.default_width
         if config.default_depth is not None:
             depth = depth or config.default_depth
-        dimensions = RectangularDimensions(length=width, width=depth, angle=0.0)
+        dimensions = Dimension(length=width, width=depth, angle=0.0, shape=ShapeType.RECTANGULAR)
 
-        return ObjectData(
-            medium=config.medium,
-            object_type=config.object_type,
-            family=config.family,
-            family_type=config.family_type,
-            dimensions=dimensions,
-            layer=_get_layer_name(entity),
+        return get_object(
+            entity=entity,
+            config=config,
+            dimension=dimensions,
             points=[position],
-            # points=points,
-            color=_get_entity_color(entity),
-            object_id=_get_object_id_from(config),
         )
 
     def _create_bulge_point_based_object(self, entity: DXFEntity, config: MediumConfig) -> ObjectData:
-        """Create line-based ObjectData from points.
-
-        Parameters
-        ----------
-        entity : DXFEntity
-            Source entity
-        points : List[Point3D]
-            Points defining the line
-        config : MediumConfig
-            Configuration for medium processing
-
-        Returns
-        -------
-        ObjectData
-            Created ObjectData with default round dimensions
-        """
         center, diameter = dxf.get_bulge_center_and_diameter(entity)
         if diameter == 0.0 and config.default_diameter is not None:
             diameter = diameter or config.default_diameter
-        dimensions = RoundDimensions(diameter=diameter)
+        dimensions = Dimension(diameter=diameter, shape=ShapeType.ROUND)
 
-        return ObjectData(
-            medium=config.medium,
-            object_type=config.object_type,
-            family=config.family,
-            family_type=config.family_type,
-            dimensions=dimensions,
-            layer=_get_layer_name(entity),
+        return get_object(
+            entity=entity,
+            config=config,
+            dimension=dimensions,
             points=[center],
-            color=_get_entity_color(entity),
-            object_id=_get_object_id_from(config),
         )
 
     def _create_round_line_based(self, entity: DXFEntity, points: list[Point3D], config: MediumConfig) -> ObjectData:
-        """Create line-based ObjectData from points.
+        dimension = _get_default_line_dimension(config)
 
-        Parameters
-        ----------
-        entity : DXFEntity
-            Source entity
-        points : List[Point3D]
-            Points defining the line
-        config : MediumConfig
-            Configuration for medium processing
-
-        Returns
-        -------
-        ObjectData
-            Created ObjectData with default round dimensions
-        """
-        diameter = dxf.get_default_line_diameter(config.object_type, config)
-        dimensions = RoundDimensions(diameter=diameter)
-
-        return ObjectData(
-            medium=config.medium,
-            object_type=config.object_type,
-            family=config.family,
-            family_type=config.family_type,
-            dimensions=dimensions,
-            layer=_get_layer_name(entity),
+        return get_object(
+            entity=entity,
+            config=config,
+            dimension=dimension,
             points=points,
-            color=_get_entity_color(entity),
-            object_id=_get_object_id_from(config),
         )
 
     def _create_round_point_based(self, entity: DXFEntity, points: list[Point3D], config: MediumConfig) -> ObjectData:
-        """Create line-based ObjectData from points.
-
-        Parameters
-        ----------
-        entity : DXFEntity
-            Source entity
-        points : List[Point3D]
-            Points defining the line
-        config : MediumConfig
-            Configuration for medium processing
-
-        Returns
-        -------
-        ObjectData
-            Created ObjectData with default round dimensions
-        """
-        dimensions = RoundDimensions(diameter=config.default_diameter or 1.0)
-        if "pipe" in config.object_type.name.lower():
-            diameter = dxf.get_default_line_diameter(config.object_type, config)
-            dimensions = RoundDimensions(diameter=diameter)
-
-        return ObjectData(
-            medium=config.medium,
-            object_type=config.object_type,
-            family=config.family,
-            family_type=config.family_type,
-            dimensions=dimensions,
-            layer=_get_layer_name(entity),
+        dimension = Dimension(diameter=config.default_diameter or 1.0, shape=ShapeType.ROUND)
+        return get_object(
+            entity=entity,
+            config=config,
+            dimension=dimension,
             points=points,
-            color=_get_entity_color(entity),
-            object_id=_get_object_id_from(config),
         )
 
     def _get_block_entities(self, insert_entity: Insert) -> list[DXFEntity]:
-        """Get entities from block definition.
-
-        Parameters
-        ----------
-        insert_entity : Insert
-            INSERT entity
-
-        Returns
-        -------
-        List[DXFEntity]
-            List of entities from block definition
-        """
         block_name = insert_entity.dxf.name
 
         if block_name not in self._block_cache:
             entities = list(self.dxf_doc.blocks[block_name])
+            entities = [e for e in entities if e.dxftype() not in ["HATCH"]]
             self._block_cache[block_name] = entities
         return self._block_cache[block_name]
 
     def _analyze_block_shape(self, insert_entity: Insert, block_entities: list[DXFEntity]) -> tuple | None:
-        """Analyze block geometry to determine shape and dimensions.
-
-        Parameters
-        ----------
-        insert_entity : Insert
-            INSERT entity
-        block_entities : List[DXFEntity]
-            Entities from block definition
-
-        Returns
-        -------
-        Optional[tuple]
-            Tuple of (dimensions, geometry_points) or None if analysis failed
-        """
         angle = dxf.get_angle_from_entity(insert_entity)
         if not block_entities:
-            return self._default_block_dimensions(insert_entity)
+            return self._default_block_dimensions(insert_entity, angle)
 
         # Check for circular blocks (containing circles)
         circles = [e for e in block_entities if e.dxftype() == "CIRCLE"]
-        if circles:
+        if len(circles) == len(block_entities):
             return self._analyze_circular_block(circles)
 
         # Extract all geometry points from block entities
@@ -712,41 +494,42 @@ class ObjectDataFactory:
             all_points.extend(entity_points)
 
         if not all_points:
-            return self._default_block_dimensions(insert_entity)
+            raise ValueError(f"No points found in block entities {insert_entity.dxf.name}")
+
+        largest_rectangle = self._get_largest_rectangle(block_entities)
+        if largest_rectangle is not None:
+            return self._analyze_rectangular_sided_block(largest_rectangle, angle)
 
         # Detect shape type
         shape_type = dxf.detect_shape_type(all_points)
 
         if shape_type == "rectangular":
             if dxf.is_rectangular(all_points):
-                length, width = dxf.calculate_rect_dimensions(all_points)
+                width, depth = dxf.calculate_rect_dimensions(all_points)
             else:
-                length, width = dxf.calculate_bbox_dimensions(all_points)
-            dimensions = RectangularDimensions(length=length, width=width, angle=angle)
+                width, depth = dxf.calculate_bbox_dimensions(all_points)
+            dimensions = Dimension(
+                width=width,
+                depth=depth,
+                angle=angle,
+                shape=ShapeType.RECTANGULAR,
+            )
         elif shape_type == "round":
             diameter = dxf.estimate_diameter_from(all_points)
-            dimensions = RoundDimensions(diameter=diameter)
+            dimensions = Dimension(diameter=diameter, shape=ShapeType.ROUND)
         else:
             # Multi-sided or complex - use bounding box
-            length, width = dxf.calculate_bbox_dimensions(all_points)
-            dimensions = RectangularDimensions(length=length, width=width, angle=angle)
+            width, depth = dxf.calculate_bbox_dimensions(all_points)
+            dimensions = Dimension(
+                width=width,
+                depth=depth,
+                angle=angle,
+                shape=ShapeType.RECTANGULAR,
+            )
 
         return dimensions, all_points
 
-    def _analyze_circular_block(self, circles: list[DXFEntity]) -> tuple:
-        """Analyze block containing circles to determine dimensions.
-
-        Parameters
-        ----------
-        circles : List[DXFEntity]
-            List of CIRCLE entities from block
-
-        Returns
-        -------
-        tuple
-            Tuple of (dimensions, geometry_points)
-        """
-        # Find the largest circle (outer diameter)
+    def _analyze_circular_block(self, circles: list[DXFEntity]) -> tuple[Dimension, list[Point3D]]:
         max_diameter = 0.0
         center_point = None
 
@@ -759,32 +542,48 @@ class ObjectDataFactory:
                 center = circle.dxf.center
                 center_point = Point3D(east=center.x, north=center.y, altitude=0.0)
 
-        dimensions = RoundDimensions(diameter=max_diameter)
+        dimensions = Dimension(diameter=max_diameter, shape=ShapeType.ROUND)
         geometry_points = [center_point] if center_point else []
 
         return dimensions, geometry_points
 
-    def _default_block_dimensions(self, insert_entity: Insert) -> tuple:
-        """Provide default dimensions for unknown block types.
+    def _get_largest_rectangle(self, entities: list[DXFEntity]) -> list[DXFEntity] | None:
+        """Find the largest rectangle from a set of lines."""
+        lines = dxf.get_dxf_lines(entities)
+        line_groups = dxf.group_lines_by_points(lines, threshold=0.01)
+        rectangles = dxf.find_rectangles_from_groups(line_groups)
 
-        Parameters
-        ----------
-        insert_entity : Insert
-            INSERT entity
+        if len(rectangles) == 0:
+            return None
+        if len(rectangles) == 1:
+            return rectangles[0]  # pyright: ignore[reportReturnType]
+        # Find the rectangle with the largest line
+        group_extents = [dxf.get_group_extent(rectangle) for rectangle in rectangles]
+        largest_rectangle = max(group_extents)
+        largest_index = group_extents.index(largest_rectangle)
+        return rectangles[largest_index]  # pyright: ignore[reportReturnType]
 
-        Returns
-        -------
-        tuple
-            Tuple of (dimensions, geometry_points)
-        """
+    def _analyze_rectangular_sided_block(self, lines: list[DXFEntity], angle: float) -> tuple[Dimension, list[Point3D]]:
+        points = []
+        for line in lines:
+            points.extend(dxf.extract_points_from(line))
+        if len(points) != 4:
+            raise ValueError(f"Expected 4 points for rectangular block, got {len(points)}")
+        width, depth = dxf.calculate_rect_dimensions(points)
+        dimension = Dimension(width=width, depth=depth, angle=angle, shape=ShapeType.RECTANGULAR)
+        return dimension, points
+
+    def _default_block_dimensions(self, insert_entity: Insert, angle: float) -> tuple[Dimension, list[Point3D]]:
         block_name = insert_entity.dxf.name.lower()
-
-        # Try to guess from block name
         if any(keyword in block_name for keyword in ["round", "circle", "rund"]):
-            dimensions = RoundDimensions(diameter=0.8)
+            dimensions = Dimension(diameter=0.8, shape=ShapeType.ROUND)
         else:
-            angle = dxf.get_angle_from_entity(insert_entity)
-            dimensions = RectangularDimensions(length=1.0, width=0.6, angle=angle)
+            dimensions = Dimension(
+                width=1.0,
+                depth=0.6,
+                angle=angle,
+                shape=ShapeType.RECTANGULAR,
+            )
 
         return dimensions, []
 
@@ -825,18 +624,3 @@ class ObjectDataFactory:
         except Exception as e:
             log.error(f"Failed to transform block geometry: {e}")
             return points
-
-    def should_process_as_element(self, entity: DXFEntity) -> bool:
-        """Determine if entity should be processed as element or line.
-
-        Parameters
-        ----------
-        entity : DXFEntity
-            Entity to classify
-
-        Returns
-        -------
-        bool
-            True if should be processed as element
-        """
-        return dxf.is_element_entity(entity)

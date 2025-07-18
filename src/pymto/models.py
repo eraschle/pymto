@@ -5,34 +5,59 @@ processed from DXF files: shafts (Schächte), pipes (Leitungen), and texts.
 """
 
 import logging
+import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, ClassVar
+from typing import Any, Generic, TypeGuard, TypeVar
 
 import numpy as np
 
 log = logging.getLogger(__name__)
 
 
+class ShapeType(Enum):
+    UNKNOWN = "UNKNOWN"
+    ROUND = "ROUND"
+    RECTANGULAR = "RECTANGULAR"
+
+
 class ObjectType(Enum):
-    """Shape types for pipes and shafts."""
-
-    UNKNOWN = "unknown"
-    SHAFT = "shaft"  # Schacht (Abwasser)
-    PIPE_WATER = "water"  # Wasser Leitung
-    PIPE_WASTEWATER = "waste_water"  # Abwasser Leitung
-    WATER_SPECIAL = "water_special"  # Wasser Spezialbauwerk
-    WASTE_WATER_SPECIAL = "waser_water_special"  # Abwasser Spezialbauwerk
-    CATE_VALUE = "gate_value"  # Schieber
-    HYDRANT = "hydrant"  # Hydrant
-    PIPE_GAS = "gas"
-    CABLE_DUCT = "cable_duct"  # Kabekanal
-    DISTRIBUTION_BOARD = "distribution_board"  # Verteilerkasten
-    LIGHTING = "lighting"  # Oeffentliche Beleuchtung
-    PIPE_TELECOM = "telecom"  # Swisscom Telecom
+    UNKNOWN = "UNKNOWN"
+    PIPE = "PIPE"  # Alle Leitungen unabhängig vom Medium
+    DUCT = "DUCT"  # Kanal (Rechteckig) wie für Kabel oder Luft
+    CONDUIT_BANK = "CONDUIT_BANK"  # Kabelrohr-Block
+    GUTTER = "GUTTER"  # Rinne wie für Regenwasser
+    SHAFT = "SHAFT"  # Either round or rectangular shaft
+    SHAFT_ROUND = "SHAFT_ROUND"  # Schacht (Abwasser)
+    SHAFT_RECTANGULAR = "SHAFT_RECTANGULAR"  # Schacht Rechteckig
+    SHAFT_SPECIAL = "SHAFT_SPECIAL"  # Wasser Spezialbauwerk
+    VALUE = "VALUE"  # Armatur als Ueberbegriff
+    DISTRIBUTION_BOARD = "DISTRIBUTION_BOARD"  # Verteilerkasten
+    CONSUMER = "CONSUMER"  # Verbraucher wie Hydrant oder leuchten
+    MAST = "MAST"  # Masten wie für Strassenbeleuchtung
 
 
-def is_int(val: Any) -> bool:
+class ValueType(Enum):
+    UNKNOWN = "UNKNOWN"
+    STRING = "STRING"
+    INT = "INT"
+    FLOAT = "FLOAT"
+    BOOLEAN = "BOOLEAN"
+    DATETIME = "DATETIME"
+    ENUM = "ENUM"
+
+
+class Unit(Enum):
+    UNKNOWN = "UNKNOWN"
+    MILLIMETER = "MM"
+    CENTIMETER = "CM"
+    METER = "M"
+    KILOMETER = "KM"
+    DEGREE = "DEGREE"
+    PERCENT = "%"
+
+
+def is_int(val: Any) -> TypeGuard[int]:
     """Check if val is a float."""
     if isinstance(val, int):
         return True
@@ -45,7 +70,21 @@ def is_int(val: Any) -> bool:
         return False
 
 
-def is_float(val: Any) -> bool:
+def to_int(val: Any) -> int:
+    """Convert value to int."""
+    if isinstance(val, int):
+        return val
+    if is_float(val):
+        return int(val)
+    if not isinstance(val, str):
+        val = str(val)
+    try:
+        return int(val)
+    except ValueError:
+        return 0
+
+
+def is_float(val: Any) -> TypeGuard[float]:
     """Check if val is a float."""
     if isinstance(val, float):
         return True
@@ -56,6 +95,20 @@ def is_float(val: Any) -> bool:
         return True
     except ValueError:
         return False
+
+
+def to_float(val: Any) -> float:
+    """Convert value to float."""
+    if isinstance(val, float):
+        return val
+    if is_int(val):
+        return float(val)
+    if not isinstance(val, str):
+        val = str(val)
+    try:
+        return float(val)
+    except ValueError:
+        return 0.0
 
 
 def is_boolean(val: Any) -> bool:
@@ -84,37 +137,45 @@ def to_bool(val: Any) -> bool:
     return val in ("true", "1", "yes", "ja")
 
 
-def _get_value_type(value: Any, value_type: str | None) -> tuple[Any, str]:
-    """Determine the type of value."""
-    if value_type is not None:
-        return value, value_type.upper()
-    if is_boolean(value) and len(str(value)) > 0:
-        return to_bool(value), "BOOL"
+def get_value_type(value: Any, value_type: ValueType | str) -> tuple[Any, ValueType]:
+    """Get the value and its type."""
+    if isinstance(value_type, str):
+        value_type = ValueType(value_type.upper())
+    if value_type != ValueType.UNKNOWN:
+        return value, value_type
+    if is_boolean(value):
+        return to_bool(value), ValueType.BOOLEAN
     if is_int(value):
-        return int(value), "INT"
+        return to_int(value), ValueType.INT
     if is_float(value):
-        return float(value), "FLOAT"
-    return str(value).strip(), "STRING"
+        return to_float(value), ValueType.FLOAT
+    return str(value).strip(), ValueType.STRING
 
 
 class Parameter:
-    def __init__(self, name: str, value: Any, value_type: str | None = None, unit: str | None = None) -> None:
+    def __init__(
+        self, name: str, value: Any, value_type: ValueType = ValueType.UNKNOWN, unit: Unit = Unit.UNKNOWN
+    ) -> None:
         """Initialize a parameter with name, value, type and optional unit."""
+        value, value_type = get_value_type(value, value_type)
         self.name = name
-        value, value_type = _get_value_type(value, value_type)
         self.value = value
         self.value_type = value_type
-        self.unit = unit
+        self.unit = unit if isinstance(unit, Unit) else Unit(str(unit).upper())
+
+    @property
+    def has_value(self) -> bool:
+        return self.value is not None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert parameter to dictionary format."""
         param_dict = {
             "name": self.name,
-            "value": self.value,
-            "value_type": self.value_type.upper(),
+            "value": self.value.value if isinstance(self.value, Enum) else self.value,
+            "value_type": self.value_type.value,
         }
-        if self.unit is not None:
-            param_dict["unit"] = self.unit
+        if self.unit != Unit.UNKNOWN:
+            param_dict["unit"] = self.unit.value
         return param_dict
 
     def __str__(self) -> str:
@@ -125,28 +186,59 @@ class Parameter:
     def __repr__(self) -> str:
         return self.__str__()
 
+    def __eq__(self, value: object, /) -> bool:
+        if not isinstance(value, Parameter):
+            return False
+        return self.name == value.name
 
-@dataclass(frozen=True)
-class DxfColor:
-    """Represents a color in RGB format.
+    def __hash__(self) -> int:
+        return hash(self.name)
 
-    Parameters
-    ----------
-    r : int
-        Red component (0-255)
-    g : int
-        Green component (0-255)
-    b : int
-        Blue component (0-255)
+
+class FormulaParameter(Parameter):
+    """Parameter with a formula to calculate its value.
+
+    This class extends the Parameter class to include a formula for calculating
+    the value of the parameter. The formula is a string that can be evaluated
+    to get the value of the parameter.
     """
 
-    red: int
-    green: int
-    blue: int
+    placeholder_pattern = re.compile(r"\{.*?\}")
 
-    def to_tuple(self) -> tuple[int, int, int]:
-        """Convert color to RGB tuple."""
-        return self.red, self.green, self.blue
+    def __init__(
+        self,
+        name: str,
+        formula: str,
+        value_type: ValueType = ValueType.UNKNOWN,
+        unit: Unit = Unit.UNKNOWN,
+    ):
+        super().__init__(name=name, value=None, value_type=value_type, unit=unit)
+        self.formula = formula
+
+    def _find_parameter_placeholders(self) -> list[str]:
+        """Get a dictionary of parameter names and their values for the element."""
+        placeholders = self.placeholder_pattern.findall(self.formula)
+        return [placeholder.strip("{}") for placeholder in placeholders]
+
+    def _get_parameter_value_dict(self, element: "ObjectData") -> dict[str, Any]:
+        """Get a dictionary of parameter names and their values for the element."""
+        values_map = {}
+        for param_name in self._find_parameter_placeholders():
+            param = element.parameter_by(param_name)
+            value = "None"
+            if param and param.has_value:
+                value = str(param.value)
+            values_map[param_name] = value
+        return values_map
+
+    def calculate_value(self, element: "ObjectData") -> None:
+        """Calculate the value using the formula."""
+        param_values = self._get_parameter_value_dict(element)
+        formula = self.formula
+        for param_name, value in param_values.items():
+            placeholder = f"{{{param_name}}}"
+            formula = formula.replace(placeholder, str(value))
+        self.value = eval(formula)
 
 
 @dataclass(frozen=True)
@@ -186,6 +278,37 @@ class Point3D:
         dy = self.north - orher.north
         return np.sqrt(dx**2 + dy**2)
 
+    def is_within(self, other: "Point3D", tolerance: float) -> bool:
+        """Check if this point is within a tolerance of another point.
+
+        Parameters
+        ----------
+        other : Point3D
+            The other point to compare with
+        tolerance : float
+            The tolerance distance to consider as "within"
+
+        Returns
+        -------
+        bool
+            True if this point is within the tolerance of the other point, False otherwise
+        """
+        distance = self.distance_2d(other)
+        return distance <= tolerance
+
+    def __eq__(self, value: object, /) -> bool:
+        if not isinstance(value, Point3D):
+            return False
+        return (
+            np.isclose(self.east, value.east)
+            and np.isclose(self.north, value.north)
+            and np.isclose(self.altitude, value.altitude)
+        )
+
+    def __hash__(self) -> int:
+        """Get hash value for the point."""
+        return hash((self.east, self.north, self.altitude))
+
 
 def _get_parameters(instance: object) -> list[Parameter]:
     """Get parameters from an object.
@@ -202,28 +325,194 @@ def _get_parameters(instance: object) -> list[Parameter]:
     """
     params = []
     for _, param in instance.__dict__.items():
-        if not isinstance(param, Parameter):
+        if not isinstance(param, Parameter) or not param.has_value:
             continue
         params.append(param)
-    return sorted(params, key=lambda p: p.name)
+    return params
 
 
-class ADimensions:
-    def __init__(self, height: float | None = None) -> None:
-        height = height if height is not None else 0.0
-        self._height = Parameter(name="Height", value=height, value_type="float", unit="m")
+TValue = TypeVar("TValue")
+
+
+class ParameterDescriptor(Generic[TValue]):
+    """Descriptor for parameters in a class.
+
+    This descriptor allows access to parameters as attributes.
+    It is used to define parameters in classes that inherit from it.
+    """
+
+    def __init__(self, value_type: type[TValue]):
+        self.value_type = value_type
+
+    def __set_name__(self, owner: type, attr_name: str) -> None:
+        """Set the name of the parameter."""
+        self.attr_name = "_" + attr_name
+
+    def _get_parameter(self, instance: object) -> Parameter:
+        """Get the parameter from the instance."""
+        parameter = getattr(instance, self.attr_name, None)
+        if parameter is None:
+            message = f"Parameter '{self.attr_name}' is not set in {instance.__class__.__name__}."
+            raise ValueError(message)
+        return parameter
+
+    def __get__(self, instance: object, owner: type) -> TValue:
+        """Get the parameter value."""
+        parameter = self._get_parameter(instance)
+        value = parameter.value
+        if value is None:
+            message = f"Parameter '{self.attr_name}' has no value set."
+            raise ValueError(message)
+        return value
+
+    def __set__(self, instance: object, value: Any) -> None:
+        """Set the parameter value."""
+        if value is None:
+            return
+        if self.value_type is bool and not is_boolean(value):
+            value = to_bool(value)
+        if self.value_type is int and not is_int(value):
+            value = to_int(value)
+        if self.value_type is float and not is_float(value):
+            value = to_float(value)
+        parameter = self._get_parameter(instance)
+        parameter.value = value
+
+
+class Dimension:
+    depth = ParameterDescriptor(float)
+    width = ParameterDescriptor(float)
+    length = ParameterDescriptor(float)
+    angle = ParameterDescriptor(float)
+    diameter = ParameterDescriptor(float)
+
+    height = ParameterDescriptor(float)
+
+    def __init__(
+        self,
+        shape: ShapeType,
+        height: float | None = None,
+        diameter: float | None = None,
+        depth: float | None = None,
+        width: float | None = None,
+        length: float | None = None,
+        angle: float | None = None,
+    ) -> None:
+        self._height = Parameter(name="Height", value=height, value_type=ValueType.FLOAT, unit=Unit.METER)
+        self._diameter = Parameter(name="Diameter", value=diameter, value_type=ValueType.FLOAT, unit=Unit.METER)
+        self._depth = Parameter(name="Depth", value=depth, value_type=ValueType.FLOAT, unit=Unit.METER)
+        self._width = Parameter(name="Width", value=width, value_type=ValueType.FLOAT, unit=Unit.METER)
+        self._length = Parameter(name="Length", value=length, value_type=ValueType.FLOAT, unit=Unit.METER)
+        self._angle = Parameter(name="XY rotation (azimuth)", value=angle, value_type=ValueType.FLOAT, unit=Unit.DEGREE)
+        self._shape_type = Parameter(name="Shape Type", value=shape, value_type=ValueType.ENUM)
+        self._default_values = Parameter(name="Default Values Set", value=False, value_type=ValueType.BOOLEAN)
 
     @property
-    def height(self) -> float:
-        """Get the height of the rectangular shape."""
-        return self._height.value
+    def is_round(self) -> bool:
+        """Check if the shape is round."""
+        return self._shape_type.value == ShapeType.ROUND
 
-    @height.setter
-    def height(self, value: float | None) -> None:
-        """Set the height of the rectangular shape."""
-        if value is None or value < 0:
-            value = 0.0
-        self._height.value = float(value)
+    @property
+    def is_rectangular(self) -> bool:
+        """Check if the shape is rectangular."""
+        return self._shape_type.value == ShapeType.RECTANGULAR
+
+    @property
+    def has_diameter(self) -> bool:
+        try:
+            return self.diameter > 0.0
+        except ValueError:
+            return False
+
+    @property
+    def has_depth(self) -> bool:
+        try:
+            return self.depth > 0.0
+        except ValueError:
+            return False
+
+    @property
+    def has_width(self) -> bool:
+        try:
+            return self.width > 0.0
+        except ValueError:
+            return False
+
+    @property
+    def has_height(self) -> bool:
+        try:
+            return self.height > 0.0
+        except ValueError:
+            return False
+
+    @property
+    def has_angle(self) -> bool:
+        try:
+            return self.angle > 0.0
+        except ValueError:
+            return False
+
+    @property
+    def has_length(self) -> bool:
+        try:
+            return self.length > 0.0
+        except ValueError:
+            return False
+
+    def has_valid_values(self) -> bool:
+        """Check if the object has valid dimension values.
+
+        Returns
+        -------
+        bool
+            True if valid values are set, False otherwise.
+        """
+        if self.is_round:
+            return self.has_diameter and self.has_height
+        if self.is_rectangular:
+            return self.has_depth and self.has_width and self.has_height
+        return self._shape_type != ShapeType.UNKNOWN
+
+    def _set_round_defaults(self, config: "MediumConfig") -> None:
+        if config.default_diameter is not None and not self.has_diameter:
+            self.diameter = config.default_diameter
+        self._shape_type.value = ShapeType.ROUND
+        self._angle.value = None
+
+    def _set_rectangular_defaults(self, config: "MediumConfig") -> None:
+        if config.default_width is not None and not self.has_width:
+            self.width = config.default_width
+        if config.default_depth is not None and not self.has_depth:
+            self.depth = config.default_depth
+        self._shape_type.value = ShapeType.RECTANGULAR
+
+    def set_default_values(self, config: "MediumConfig") -> None:
+        """Set default values for the dimensions."""
+        if self._default_values.value is True:
+            return
+        if self.is_round and config.has_round_default():
+            self._set_round_defaults(config)
+        elif self.is_rectangular and config.has_rectangular_default():
+            self._set_rectangular_defaults(config)
+
+        if config.default_height is not None and not self.has_height:
+            self.height = config.default_height
+        self._default_values.value = True
+
+    def dimensions_updated(self) -> None:
+        self._default_values.value = False
+
+    def reset_round_dimension(self) -> None:
+        """Reset dimensions for round shape."""
+        self._diameter.value = None
+
+    def reset_rectangular_dimension(self) -> None:
+        """Reset dimensions for rectangular shape."""
+        self._depth.value = None
+        self._width.value = None
+
+    def set_shape_type(self, shape_type: ShapeType) -> None:
+        self._shape_type.value = shape_type
 
     def to_parameters(self) -> list[Parameter]:
         """Get parameters as a dictionary."""
@@ -231,101 +520,6 @@ class ADimensions:
 
     def __repr__(self) -> str:
         return self.__str__()
-
-
-class RectangularDimensions(ADimensions):
-    """Dimensions for rectangular shapes.
-
-    Parameters
-    ----------
-    length : float
-        Length of the rectangular shape
-    width : float
-        Width of the rectangular shape
-    angle : float
-        Rotation angle in degrees
-    height : float | None
-        Height of the rectangular shape (optional)
-    """
-
-    def __init__(self, length: float, width: float, angle: float, height: float | None = None) -> None:
-        super().__init__(height)
-        self._length = Parameter(name="Width", value=length, value_type="float", unit="m")
-        self._width = Parameter(name="Depth", value=width, value_type="float", unit="m")
-        self._angle = Parameter(name="XY rotation (azimuth)", value=angle % 360, value_type="float", unit="Degree")
-
-    @property
-    def length(self) -> float:
-        """Get the length of the rectangular shape."""
-        return self._length.value
-
-    @length.setter
-    def length(self, value: float) -> None:
-        """Set the length of the rectangular shape."""
-        if value < 0:
-            raise ValueError(f"Length must be a positive value. Got: {value}")
-        if value == 0 and self._length.value > 0:
-            log.debug(f"Not overriding length to 0.0, keeping previous value {self.length}.")
-            return
-        self._length.value = float(value)
-
-    @property
-    def width(self) -> float:
-        """Get the width of the rectangular shape."""
-        return self._width.value
-
-    @width.setter
-    def width(self, value: float) -> None:
-        """Set the width of the rectangular shape."""
-        if value < 0:
-            raise ValueError(f"Width must be a positive value. Got: {value}")
-        if value == 0 and self._width.value > 0:
-            log.debug(f"Not overriding width to 0.0, keeping previous value {self.width}.")
-            return
-        self._width.value = float(value)
-
-    @property
-    def angle(self) -> float:
-        """Get the rotation angle of the rectangular shape."""
-        return self._angle.value
-
-    @angle.setter
-    def angle(self, value: float) -> None:
-        self._angle.value = float(value) % 360  # Normalize angle to [0, 360)
-
-    def __str__(self) -> str:
-        return f"RectangularDimensions(length={self.length}, width={self.width}, height={self.height})"
-
-
-class RoundDimensions(ADimensions):
-    """Dimensions for round shapes.
-
-    Parameters
-    ----------
-    diameter : float
-        Diameter of the round shape
-    height : float | None
-        Height of the round shape (optional)
-    """
-
-    def __init__(self, diameter: float, height: float | None = None) -> None:
-        super().__init__(height)
-        """Initialize RoundDimensions with diameter and optional height."""
-        self._diameter = Parameter(name="Diameter", value=diameter, value_type="float", unit="m")
-
-    @property
-    def diameter(self) -> float:
-        return self._diameter.value
-
-    @diameter.setter
-    def diameter(self, value: float) -> None:
-        """Set the diameter of the round shape."""
-        if value <= 0:
-            value = 0.0
-        self._diameter.value = float(value)
-
-    def __str__(self) -> str:
-        return f"RoundDimensions(diameter={self.diameter}, height={self.height})"
 
 
 class DxfText:
@@ -343,12 +537,18 @@ class DxfText:
         RGB color values
     """
 
-    def __init__(self, medium: str, content: str, position: Point3D, layer: str, color: tuple[int, int, int]) -> None:
+    def __init__(self, uuid: str, medium: str, content: str, position: Point3D, layer: str) -> None:
+        self._uuid = uuid
         self.medium = medium
-        self._content = Parameter(name="Text", value=content, value_type="string")
+        self._content = Parameter(name="Kommentare", value=content, value_type=ValueType.STRING)
         self.position: Point3D = position
         self.layer = layer
-        self.color = color
+        # self.color = color
+
+    @property
+    def uuid(self) -> str:
+        """Get the unique identifier of the text."""
+        return self._uuid
 
     @property
     def content(self) -> str:
@@ -365,6 +565,44 @@ class DxfText:
         return [self._content]
 
 
+@dataclass(slots=True)
+class LayerData:
+    name: str | None = field(repr=True, compare=True)
+    color: str | int | tuple[int, int, int] | None = field(repr=True, compare=True)
+    block: str | None = field(default=None, repr=True, compare=True)
+
+    @property
+    def is_block_query(self) -> bool:
+        """Check if this layer is a block query."""
+        if self.is_block_name_query:
+            return True
+        if self.is_block_startswith_query:
+            return True
+        return self.is_block_endswith_query
+
+    @property
+    def is_block_name_query(self) -> bool:
+        """Check if this layer is a block query."""
+        if not _is_block_query(self.block):
+            return False
+        return not _is_start_or_endswith_query(self.block)
+
+    @property
+    def is_block_startswith_query(self) -> bool:
+        """Check if this layer is a block query."""
+        return _is_startswith_query(self.block)
+
+    @property
+    def is_block_endswith_query(self) -> bool:
+        """Check if this layer is a block query."""
+        return _is_endswith_query(self.block)
+
+    @property
+    def is_block_start_or_endswith_query(self) -> bool:
+        """Check if this layer is a block query."""
+        return _is_start_or_endswith_query(self.block)
+
+
 @dataclass(unsafe_hash=True)
 class ObjectData:
     """Base class for all DXF objects.
@@ -373,185 +611,176 @@ class ObjectData:
     It can be extended with common properties or methods in the future.
     """
 
-    @classmethod
-    def point_types(cls) -> set[ObjectType]:
-        """Get set of point-based object types."""
-        point_based = set()
-        for obj_type in ObjectType:
-            if obj_type in cls.line_types:
-                continue
-            point_based.add(obj_type)
-        return point_based
-
-    line_types: ClassVar[set[ObjectType]] = {
-        ObjectType.PIPE_WASTEWATER,
-        ObjectType.PIPE_WATER,
-        ObjectType.PIPE_GAS,
-        ObjectType.CABLE_DUCT,
-        ObjectType.PIPE_TELECOM,
-    }
-
+    uuid: str  # from ezdxf
     medium: str
     object_type: ObjectType
+    dimension: Dimension
     family: str
     family_type: str
-    dimensions: RectangularDimensions | RoundDimensions
-    layer: str
-    object_id: Parameter
+
     assigned_text: DxfText | None = None
-    color: tuple[int, int, int] = field(default_factory=tuple, repr=True, compare=True)
     points: list[Point3D] = field(default_factory=list, repr=False, compare=False)
-    parameters: list[Parameter] = field(default_factory=list, repr=False, compare=False, init=False)
-
-    @property
-    def has_valid_dimensions(self) -> bool:
-        """Check if dimensions are valid."""
-        if isinstance(self.dimensions, RectangularDimensions):
-            return self.dimensions.length > 0 and self.dimensions.width > 0
-        if isinstance(self.dimensions, RoundDimensions):
-            return self.dimensions.diameter > 0
-        return False
-
-    def set_default_values(self, config: "MediumConfig") -> None:
-        """Check if dimensions are valid."""
-        if isinstance(self.dimensions, RectangularDimensions):
-            self.dimensions.length = config.default_width or 0.0
-            self.dimensions.width = config.default_depth or 0.0
-            log.debug(f"Setting default: {self.object_type}: {self.dimensions.length} x {self.dimensions.width}")
-        if isinstance(self.dimensions, RoundDimensions):
-            self.dimensions.diameter = config.default_diameter or 0.0
-            log.debug(f"Setting default: {self.object_type}: {self.dimensions.diameter} diameter")
+    parameters: list[Parameter] = field(default_factory=list, repr=False, compare=False)
 
     @property
     def point(self) -> Point3D:
-        """Single or Start point of the object.
-
-        Returns
-        -------
-        Point3D
-            Point3D representing the position of the object.
-        """
+        """Single or Start point of the object."""
         return self.points[0]
 
     @property
     def has_end_point(self) -> bool:
-        """Check if the object has an end point.
-
-        Returns
-        -------
-        bool
-            True if the object has an end point, False otherwise.
-        """
+        """Check if the object has an end point."""
         return len(self.points) > 1
 
     @property
     def end_point(self) -> Point3D:
-        """End point of the line-based object.
-        Point-based objects return None
-
-        Returns
-        -------
-        Point3D | None
-            Point3D representing the end position of the object, or None.
-        """
+        """End point of the line-based object. Point-based objects return None"""
         if len(self.points) == 1:
             raise ValueError("Element has no end point. Did you check 'has_end_point'?")
         return self.points[-1]
 
     @property
     def is_line_based(self) -> bool:
-        """Check if the object is line-based (e.g., pipe, cable duct).
-
-        Returns
-        -------
-        bool
-            True if the object is line-based, False otherwise.
-        """
-        is_oject_type_line = self.object_type in self.line_types
-        has_two_or_more_positions = len(self.points) >= 2
-        has_end_point = len(self.points) >= 2 and self.end_point is not None
-        return is_oject_type_line and has_two_or_more_positions and has_end_point
+        """Check if the object is line-based (e.g., pipe, cable duct)."""
+        return self.has_end_point
 
     @property
     def is_point_based(self) -> bool:
-        """Check if the object is point-based (e.g., shaft).
+        """Check if the object is point-based (e.g., shaft)."""
+        return len(self.points) == 1
 
-        Returns
-        -------
-        bool
-            True if the object is point-based, False otherwise.
-        """
-        is_oject_type_point = self.object_type in self.point_types()
-        is_single_position = len(self.points) == 1
-        return is_oject_type_point and is_single_position
+    def add_parameter(self, parameter: Parameter) -> None:
+        if parameter in self.parameters:
+            return
+        self.parameters.append(parameter)
 
-    def add_parameter(self, name: str, value: Any, *, value_type: str | None = None, unit: str | None = None) -> None:
-        """Add a parameter to the object.
+    def parameter_by(self, name: str) -> Parameter | None:
+        """Get a parameter by its name."""
+        for param in self.get_parameters(update=False):
+            if param.name == name:
+                return param
+        return None
+
+    def get_parameters(self, update: bool) -> list[Parameter]:
+        """Get all parameters of the object.
 
         Parameters
         ----------
-        parameter
-            Parameter to add.
-        """
-        if value_type is None:
-            if is_boolean(value):
-                value_type = "bool"
-                value = to_bool(value)
-            elif is_int(value):
-                value_type = "int"
-                value = int(value)
-            elif is_float(value):
-                value_type = "float"
-                value = float(value)
-            else:
-                value_type = "string"
-                value = str(value)
-        parameter = Parameter(
-            name=name,
-            value=value,
-            value_type=value_type,
-            unit=unit,
-        )
-        self.parameters.append(parameter)
-
-    def get_parameters(self) -> list[Parameter]:
-        """Get parameters for the object.
+        update : bool
+            If True, update the values of FormulaParameters before returning
 
         Returns
         -------
         list[Parameter]
-            List of parameters associated with the object.
+            List of parameters sorted by name
         """
-        params = [self.object_id]
+        params = []
         if self.assigned_text is not None:
             params.extend(self.assigned_text.to_parameters())
-        params.extend(self.dimensions.to_parameters())
+        params.extend(self.dimension.to_parameters())
         params.extend(self.parameters)
+        if update:
+            for param in params:
+                if not isinstance(param, FormulaParameter):
+                    continue
+                param.calculate_value(self)
         return sorted(params, key=lambda param: param.name)
 
 
+def _is_block_query(block_query: str | None) -> TypeGuard[str]:
+    """Check if the layer is a block query."""
+    if block_query is None or not isinstance(block_query, str):
+        return False
+    return len(block_query.strip()) > 0
+
+
+def _is_startswith_query(query: str | None) -> TypeGuard[str]:
+    """Check if the layer is a block query."""
+    if not _is_block_query(query):
+        return False
+    return query.endswith("*")
+
+
+def _is_endswith_query(query: str | None) -> TypeGuard[str]:
+    """Check if the layer is a block query."""
+    if not _is_block_query(query):
+        return False
+    return query.startswith("*")
+
+
+def _is_start_or_endswith_query(query: str | None) -> TypeGuard[str]:
+    """Check if the layer is a block query."""
+    if not _is_block_query(query):
+        return False
+    return _is_startswith_query(query) or _is_endswith_query(query)
+
+
 @dataclass(slots=True)
-class LayerData:
-    name: str | None = field(repr=True, compare=True)
-    color: str | int | tuple[int, int, int] | None = field(repr=True, compare=True)
-    block: str | None = field(default=None, repr=True, compare=True)
+class LayerGroup:
+    geometry: list[LayerData] = field(default_factory=list, repr=True, compare=True)
+    text: list[LayerData] = field(default_factory=list, repr=True, compare=True)
 
 
 @dataclass(slots=True)
 class MediumConfig:
     medium: str
-    geometry: list[LayerData]
-    text: list[LayerData]
+    layer_group: LayerGroup
+    default_unit: Unit
     family: str
     family_type: str
-    default_unit: str
     object_type: ObjectType
     object_id: str
     elevation_offset: float = 0.0
     default_width: float | None = None
     default_depth: float | None = None
-    default_height: float | None = None
     default_diameter: float | None = None
+    default_height: float | None = None
+    parameters: list[Parameter] = field(default_factory=list, repr=False, compare=False)
+
+    def _is_default(self, value) -> bool:
+        """Check if the configuration has a round default."""
+        if value is None:
+            return False
+        if isinstance(value, (int | float)):
+            return value > 0.0
+        return False
+
+    def has_round_default(self) -> bool:
+        """Check if the configuration has a round default."""
+        return self._is_default(self.default_diameter)
+
+    def has_rectangular_default(self) -> bool:
+        """Check if the configuration has a rectangular default."""
+        return all(self._is_default(attr) for attr in (self.default_width, self.default_depth))
+
+    def has_height_default(self) -> bool:
+        """Check if the configuration has a height default."""
+        return self._is_default(self.default_height)
+
+    def is_line_based(self) -> bool:
+        """Check if the medium configuration is line-based."""
+        return self.object_type in (
+            ObjectType.PIPE,
+            ObjectType.DUCT,
+            ObjectType.CONDUIT_BANK,
+            ObjectType.GUTTER,
+        )
+
+    def is_round_line_based(self) -> bool:
+        """Check if the medium configuration is round line-based."""
+        if not self.is_line_based():
+            return False
+        return self.object_type in (ObjectType.PIPE, ObjectType.GUTTER)
+
+    def is_rectangular_line_based(self) -> bool:
+        """Check if the medium configuration is rectangular line-based."""
+        if not self.is_line_based():
+            return False
+        return self.object_type in (ObjectType.DUCT, ObjectType.CONDUIT_BANK)
+
+    def is_point_based(self) -> bool:
+        """Check if the medium configuration is point-based."""
+        return not self.is_line_based()
 
 
 @dataclass(frozen=True)
@@ -560,7 +789,7 @@ class MediumMasterConfig:
 
     Contains separate configurations for point-based and line-based elements.
     Each configuration includes a list of geometry and text layers to assign,
-    inluding default values for unit and object type.
+    including default values for unit and object type.
 
     Parameters
     ----------
@@ -594,7 +823,7 @@ class MediumMasterConfig:
         return None
 
 
-AssingmentGroup = tuple[list[ObjectData], list[DxfText]]
+AssignmentGroup = tuple[list[ObjectData], list[DxfText]]
 
 
 class ExtractedData:
@@ -606,14 +835,14 @@ class ExtractedData:
     """
 
     def __init__(self) -> None:
-        self._extracted: list[AssingmentGroup] = []
+        self._extracted: list[AssignmentGroup] = []
 
     @property
-    def extracted(self) -> list[AssingmentGroup]:
+    def extracted(self) -> list[AssignmentGroup]:
         """Get all extracted data."""
         return self._extracted
 
-    def setup(self, medium: str, elements: list[list[ObjectData]], texts: list[list[DxfText]]) -> None:
+    def setup(self, medium: str, groups: list[tuple[list[ObjectData], list[DxfText]]]) -> None:
         """Setup assignment data for a medium.
 
         Parameters
@@ -625,10 +854,10 @@ class ExtractedData:
         texts : list[list[DxfText]]
             List of texts assigned to this medium
         """
-        for elem_group, text_group in zip(elements, texts, strict=True):
+        for elem_group, text_group in groups:
             if not isinstance(elem_group, list) or not isinstance(text_group, list):
                 log.error(f"Invalid data format for medium '{medium}': {elem_group}, {text_group}")
-                continue
+                return
             for elem_data in elem_group:
                 elem_data.medium = medium
             for text_data in text_group:
@@ -636,7 +865,7 @@ class ExtractedData:
             self._extracted.append((elem_group, text_group))
 
 
-class AssingmentData:
+class AssignmentData:
     """Configuration per medium of DXF elements.
 
     Parameters
@@ -690,8 +919,8 @@ class Medium:
     extracted_point: ExtractedData = field(default_factory=ExtractedData, repr=False, compare=False)
     extracted_line: ExtractedData = field(default_factory=ExtractedData, repr=False, compare=False)
 
-    point_data: AssingmentData = field(default_factory=AssingmentData, repr=False, compare=False)
-    line_data: AssingmentData = field(default_factory=AssingmentData, repr=False, compare=False)
+    point_data: AssignmentData = field(default_factory=AssignmentData, repr=False, compare=False)
+    line_data: AssignmentData = field(default_factory=AssignmentData, repr=False, compare=False)
 
     def _get_statistics(
         self,

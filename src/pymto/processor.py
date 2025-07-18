@@ -9,7 +9,6 @@ import logging
 from collections.abc import Iterable
 
 from pymto.analyze import (
-    CoverToPipeHeight,
     PipelineAdjustment,
     PipelineGradientAdjuster,
 )
@@ -18,10 +17,11 @@ from .config import ConfigurationHandler
 from .models import Medium, ObjectData
 from .protocols import (
     IAssignmentStrategy,
-    IDimensionUpdater,
+    IDimensionCalculator,
     IElevationUpdater,
     IExporter,
     IObjectCreator,
+    IParameterUpdater,
     IRevitFamilyNameUpdater,
 )
 
@@ -58,24 +58,6 @@ class DXFProcessor:
         """
         return self.config.mediums.values()
 
-    def _get_unique(self, to_check: list[ObjectData], uniq_points: set[tuple]) -> list[ObjectData]:
-        elements = []
-        for element in to_check:
-            points = tuple(element.points)
-            if points in uniq_points:
-                log.warning(f"Same point element exists already: filtering {element}")
-                continue
-            uniq_points.add(points)
-            elements.append(element)
-        return elements
-
-    def _get_medium_unique(self, to_check: list[list[ObjectData]], uniq_points: set[tuple]) -> list[list[ObjectData]]:
-        elements = []
-        for elems in to_check:
-            uniq_elems = self._get_unique(elems, uniq_points)
-            elements.append(uniq_elems)
-        return elements
-
     def extract_mediums(self, extractor: IObjectCreator) -> None:
         """Process all mediums by extracting and creating objects.
 
@@ -90,16 +72,13 @@ class DXFProcessor:
             If processor is not initialized
         """
         log.info(f"Processing {len(self.config.mediums)} mediums")
-        unique_points = set()
         for name, medium in self.config.mediums.items():
             log.debug(f"Processing medium: {name}")
-            geom_elems, text_elems = extractor.create_objects(medium.config.point_based)
-            geom_elems = self._get_medium_unique(geom_elems, unique_points)
-            medium.extracted_point.setup(name, geom_elems, text_elems)
+            point_groups = extractor.create_objects(medium.config.point_based)
+            medium.extracted_point.setup(name, point_groups)
 
-            geom_elems, text_elems = extractor.create_objects(medium.config.line_based)
-            geom_elems = self._get_medium_unique(geom_elems, unique_points)
-            medium.extracted_line.setup(name, geom_elems, text_elems)
+            line_groups = extractor.create_objects(medium.config.line_based)
+            medium.extracted_line.setup(name, line_groups)
 
     def assign_texts_to_mediums(self, assigner: IAssignmentStrategy) -> None:
         """Assign extracted texts to mediums.
@@ -120,7 +99,7 @@ class DXFProcessor:
             line_data = medium.extracted_line.extracted
             assigner.texts_to_line_based(medium, line_data)
 
-    def update_dimensions(self, updater: IDimensionUpdater) -> None:
+    def update_parameters(self, updater: IParameterUpdater) -> None:
         """Update dimensions of elements and lines in mediums.
 
         Parameters
@@ -128,23 +107,11 @@ class DXFProcessor:
         updater : IDimensionUpdater
             Dimension updater to apply to elements and lines
         """
-        for medium in self.config.mediums.values():
+        for medium in self.mediums:
             updater.update_elements(medium.point_data)
             updater.update_elements(medium.line_data)
 
-    def round_parameter_values(self, updater: IDimensionUpdater) -> None:
-        """Update dimensions of elements and lines in mediums.
-
-        Parameters
-        ----------
-        updater : IDimensionUpdater
-            Dimension updater to apply to elements and lines
-        """
-        for medium in self.config.mediums.values():
-            updater.round_parameter_values(medium.point_data)
-            updater.round_parameter_values(medium.line_data)
-
-    def adjustment_pipe_gardiant(self, gradient: PipelineGradientAdjuster) -> list[PipelineAdjustment]:
+    def adjustment_pipe_gradient(self, gradient: PipelineGradientAdjuster) -> list[PipelineAdjustment]:
         """Adjust elements in mediums based on compatibility strategy.
 
         Parameters
@@ -153,37 +120,26 @@ class DXFProcessor:
             Configuration for the medium to adjust elements"""
         elements = []
         for medium in self.mediums:
-            for elems, _ in medium.point_data.assigned:
-                elements.extend(elems)
-            for elems, _ in medium.line_data.assigned:
-                elements.extend(elems)
+            elements.extend(medium.get_assignment_elements())
 
         asjustment_result = []
         reports = gradient.adjust_gradients_by(elements=elements)
         asjustment_result.extend(reports)
         return asjustment_result
 
-    def calculate_cover_to_pipe_height(self, gradient: PipelineGradientAdjuster) -> list[CoverToPipeHeight]:
-        """Calculate and adjust shaft heights based on the manhole altitudes and deepest point of the pipe.
+    def calculate_dimensions(self, calculators: list[IDimensionCalculator]) -> None:
+        """Add configuration parameters to all mediums.
 
         Parameters
         ----------
-        gradient : PipelineGradientAdjuster
-            Gradient adjuster to apply shaft height adjustments
-
-        Returns
-        -------
-        list[CoverToPipeHeight]
-            List of adjustments made to cover heights based on pipe depths
+        updater : IRevitFamilyNameUpdater
+            Revit family name updater to apply configuration parameters
         """
-        elements = []
+        all_elements = []
         for medium in self.mediums:
-            for elems, _ in medium.point_data.assigned:
-                elements.extend(elems)
-            for elems, _ in medium.line_data.assigned:
-                elements.extend(elems)
-
-        return gradient.calculate_cover_to_pipe_heights(elements=elements)
+            all_elements.extend(medium.get_assignment_elements())
+        for calculator in calculators:
+            calculator.calculate_dimension(all_elements)
 
     def update_points_elevation(self, updater: IElevationUpdater) -> None:
         """Assign extracted texts to mediums.
@@ -208,6 +164,36 @@ class DXFProcessor:
         for medium in self.mediums:
             updater.update_elements(medium.point_data)
             updater.update_elements(medium.line_data)
+
+    def add_config_parameters(self, updater: IRevitFamilyNameUpdater) -> None:
+        """Add configuration parameters to all mediums.
+
+        Parameters
+        ----------
+        updater : IRevitFamilyNameUpdater
+            Revit family name updater to apply configuration parameters
+        """
+        for medium in self.mediums:
+            updater.add_parameters(medium.point_data)
+            updater.add_parameters(medium.line_data)
+
+    def remove_duplicate_point_objects(
+        self, updater: IRevitFamilyNameUpdater
+    ) -> dict[str, tuple[list[ObjectData], list[ObjectData]]]:
+        """Add configuration parameters to all mediums.
+
+        Parameters
+        ----------
+        updater : IRevitFamilyNameUpdater
+            Revit family name updater to apply configuration parameters
+        """
+        removed_objects = {}
+        for medium in self.mediums:
+            original, removed = updater.remove_duplicate_point_based(medium.point_data)
+            if len(removed) == 0:
+                continue
+            removed_objects[medium.name] = (original, removed)
+        return removed_objects
 
     def export_data(self, exporter: IExporter) -> None:
         """Export processed data using the provided exporter.

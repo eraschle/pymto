@@ -4,14 +4,17 @@ This module provides functions to analyze DXF entities and determine their
 shape characteristics (round, rectangular, multi-sided) and processing type.
 """
 
+import itertools
 import logging
 import math
+from typing import TypeGuard
 
 import numpy as np
 from ezdxf import math as ezmath
 from ezdxf.entities.arc import Arc
 from ezdxf.entities.circle import Circle
 from ezdxf.entities.dxfentity import DXFEntity
+from ezdxf.entities.insert import Insert
 from ezdxf.entities.line import Line
 from ezdxf.entities.lwpolyline import LWPolyline
 from ezdxf.entities.polyline import Polyline
@@ -98,17 +101,6 @@ def split_arc_to_points(arc: Arc, num_points: int | None = None, spacing: float 
     return points
 
 
-def get_default_line_diameter(object_type: ObjectType, config: MediumConfig) -> float:
-    diameter = config.default_diameter or 0.0
-    if object_type == ObjectType.PIPE_WATER:
-        diameter = 0.05
-    elif object_type == ObjectType.PIPE_GAS:
-        diameter = 0.05
-    elif object_type == ObjectType.PIPE_WASTEWATER:
-        diameter = 0.15
-    return diameter
-
-
 def get_default_point_diameter(object_type: ObjectType, config: MediumConfig) -> float:
     diameter = config.default_diameter or 0.0
     if diameter == 0 and object_type == ObjectType.SHAFT:
@@ -179,6 +171,244 @@ def is_closed_polyline(entity: DXFEntity) -> bool:
     return False
 
 
+DXFLine = Line | LWPolyline | Polyline
+
+
+def is_dxf_line(entity: DXFEntity) -> TypeGuard[DXFLine]:
+    """Check if a DXF entity is a line or polyline.
+
+    Parameters
+    ----------
+    entity : DXFEntity
+        Entity to check
+
+    Returns
+    -------
+    bool
+        True if entity is a Line or LWPolyline
+    """
+    return isinstance(entity, (Line | LWPolyline | Polyline))
+
+
+def get_dxf_lines(entities: list[DXFEntity]) -> list[DXFLine]:
+    """Get all DXF lines from a list of entities.
+
+    Parameters
+    ----------
+    entities : List[DXFEntity]
+        List of DXF entities to filter
+
+    Returns
+    -------
+    List[DXFLine]
+        List of DXF lines (Line or LWPolyline)
+    """
+    return [entity for entity in entities if is_dxf_line(entity)]
+
+
+def get_group_extent(group: list[DXFLine]) -> float:
+    """Calculate the extent of a group of DXF lines.
+
+    Parameters
+    ----------
+    group : List[DXFLine]
+        Group of DXF lines to calculate extent for
+
+    Returns
+    -------
+    float
+        Extent of the group in 2D space
+    """
+    extent = 0.0
+    for line in group:
+        if isinstance(line, Line):
+            extent += get_distance(line.dxf.start, line.dxf.end)
+        elif isinstance(line, LWPolyline):
+            extent += get_lwpolyline_length(line)
+        elif isinstance(line, Polyline):
+            extent += get_polyline_length(line)
+    return extent
+
+
+def _is_within_point(point: Vec2, other: Vec2, threshold: float) -> bool:
+    """Check if two points are within a specified distance threshold.
+
+    Parameters
+    ----------
+    point : Vec2
+        First point to check
+    other : Vec2
+        Second point to check against the first
+    threshold : float
+        Distance threshold to consider the points "at" each other
+
+    Returns
+    -------
+    bool
+        True if the points are within the threshold distance
+    """
+    return point.distance(other) <= threshold
+
+
+def _is_line_start_or_end(line: DXFLine, point: Vec2, threshold: float) -> bool:
+    """Check if a line starts or ends at a specific point within a threshold.
+
+    Parameters
+    ----------
+    line : DXFLine
+        Line entity to check
+    point : Vec2
+        Point to check against the line
+    threshold : float, optional
+        Distance threshold to consider the point "at" the line
+
+    Returns
+    -------
+    bool
+        True if the line is at the specified point within the threshold
+    """
+    start, end = _get_start_end_endpoint(line)
+    return _is_within_point(start, point, threshold) or _is_within_point(end, point, threshold)
+
+
+def _next_group_line(lines: list[DXFLine], point: Vec2, used_lines: set[DXFLine], threshold: float) -> DXFLine | None:
+    """Find the next line that starts or ends at a specific point.
+
+    Parameters
+    ----------
+    lines : List[DXFLine]
+        List of DXF lines to search
+    point : Vec2
+        Point to check against the lines
+    used_lines : set[DXFLine]
+        Set of already used lines to avoid duplicates
+    threshold : float
+        Distance threshold to consider the point "at" the line
+
+    Returns
+    -------
+    DXFLine | None
+        The next line that starts or ends at the specified point, or None if not found
+    """
+    for line in lines:
+        if line in used_lines:
+            continue
+        if not _is_line_start_or_end(line, point, threshold):
+            continue
+        used_lines.add(line)
+        return line
+    return None
+
+
+def _get_start_end_endpoint(line: DXFLine) -> tuple[Vec2, Vec2]:
+    """Get the start and end points of a DXF line.
+
+    Parameters
+    ----------
+    line : DXFLine
+        Line entity to extract points from
+
+    Returns
+    -------
+    Tuple[Vec2, Vec2]
+        Start and end points of the line
+    """
+    if isinstance(line, Line):
+        return Vec2(line.dxf.start), Vec2(line.dxf.end)
+    elif isinstance(line, LWPolyline):
+        points = line.get_points("xy")
+        return Vec2(points[0]), Vec2(points[-1])
+    elif isinstance(line, Polyline):
+        points = list(line.points())
+        return points[0].vec2, points[-1].vec2
+    raise TypeError("Unsupported line type. Expected Line or LWPolyline.")
+
+
+def group_lines_by_points(lines: list[DXFLine], threshold: float) -> list[list[DXFLine]]:
+    """Group lines by their start and end points.
+
+    Parameters
+    ----------
+    lines : List[DXFLine]
+        List of DXF lines to group
+    threshold : float
+        Distance threshold to consider the point "at" the line
+
+    Returns
+    -------
+    List[List[DXFLine]]
+        List of grouped lines
+    """
+    grouped_lines = []
+    used_lines = set()
+
+    for line in lines:
+        if line in used_lines:
+            continue
+
+        group = [line]
+        used_lines.add(line)
+
+        _, end_point = _get_start_end_endpoint(line)
+        while next_line := _next_group_line(lines, end_point, used_lines, threshold):
+            group.append(next_line)
+            used_lines.add(next_line)
+            next_start, next_end = _get_start_end_endpoint(next_line)
+            if _is_within_point(end_point, next_start, threshold):
+                end_point = next_end
+            else:
+                end_point = next_start
+
+        grouped_lines.append(group)
+
+    return grouped_lines
+
+
+def _is_rectangular_group(group: list[DXFLine]) -> bool:
+    """Check if a group of lines forms a rectangular shape.
+
+    Parameters
+    ----------
+    group : List[DXFLine]
+        Group of DXF lines to check
+    threshold : float
+        Distance threshold to consider the point "at" the line
+
+    Returns
+    -------
+    bool
+        True if the group forms a rectangle, False otherwise
+    """
+    points = set()
+    for line in group:
+        points.update(extract_points_from(line))
+    return len(points) == 4
+
+
+def find_rectangles_from_groups(groups: list[list[DXFLine]]) -> list[list[DXFLine]]:
+    """Find rectangles from grouped lines.
+
+    Parameters
+    ----------
+    groups : List[List[DXFLine]]
+        List of grouped lines
+    threshold : float
+        Distance threshold to consider the point "at" the line
+
+    Returns
+    -------
+    List[List[DXFLine]]
+        List of groups that form rectangles
+    """
+    rectangles = []
+    for group in groups:
+        if not _is_rectangular_group(group):
+            continue
+        rectangles.append(group)
+
+    return rectangles
+
+
 def detect_shape_type(points: list[Point3D]) -> str:
     """Detect the geometric shape type from a list of points.
 
@@ -198,8 +428,11 @@ def detect_shape_type(points: list[Point3D]) -> str:
         return "point"
     elif num_points == 2:
         return "linear"
-    elif num_points < 4:
-        return "bulge"  # Assume 3 points must be a bulge or arc
+    elif num_points == 3:
+        if has_bulge_value(points):
+            return "bulge"  # Assume 3 points must be a bulge or arc
+        else:
+            return "triangle"  # 3 points can only form a triangle
     elif is_near_circular(points):
         return "round"
     elif num_points == 4 and is_rectangular(points):
@@ -209,7 +442,7 @@ def detect_shape_type(points: list[Point3D]) -> str:
     raise ValueError(f"Cannot determine shape type from points: {num_points} points provided, expected at least 2.")
 
 
-def get_angle_from_entity(entity: DXFEntity) -> float:
+def get_angle_from_entity(entity: Insert) -> float:
     """Get the angle of a DXF entity if available.
 
     Parameters
@@ -229,20 +462,49 @@ def get_angle_from_entity(entity: DXFEntity) -> float:
         return 0.0
 
 
-def get_polyline_length(self, polyline: LWPolyline) -> float:
+def get_distance(p1: tuple[float, float], p2: tuple[float, float]) -> float:
+    """Calculate the distance between two points in 2D space.
+
+    Parameters
+    ----------
+    p1 : Tuple[float, float]
+        First point (x1, y1)
+    p2 : Tuple[float, float]
+        Second point (x2, y2)
+
+    Returns
+    -------
+    float
+        Distance between the two points
+    """
+    return math.sqrt((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2)
+
+
+def get_lwpolyline_length(polyline: LWPolyline) -> float:
     """Calculate the length of a polyline"""
     length = 0.0
     points = polyline.get_points("xy")
     for idx, point in enumerate(points):
         if idx == 0:
             continue
-
-        length += self.distance_between_points(points[idx - 1], point)  # type: ignore
+        length += get_distance(points[idx - 1], point)  # type: ignore
 
     return length
 
 
-def get_polyline_angle(self, polyline: LWPolyline) -> float:
+def get_polyline_length(polyline: Polyline) -> float:
+    """Calculate the length of a polyline"""
+    length = 0.0
+    points = polyline.points()
+    for idx, point in enumerate(points):
+        if idx == 0:
+            continue
+        length += get_distance(points[idx - 1], point)  # type: ignore
+
+    return length
+
+
+def get_lw_polyline_angle(self, polyline: LWPolyline) -> float:
     """get angle of two points in polyline"""
     with polyline.points() as points:
         p1 = (points[0][0], points[0][1])
@@ -309,6 +571,17 @@ def get_angle_to_line(self, dxf_layers: list[str], dfa_dict: dict, threshold: fl
     nearest_entity = self.find_nearest_line_polyline(entities, point, threshold=threshold)
     if not nearest_entity:
         return None
+
+
+def calculate_angle_from_points(points: list[Point3D]) -> float:
+    point_pairs = []
+    for start, end in itertools.pairwise(points):
+        point_pairs.append((start, end))
+
+    lengths = [start.distance_2d(end) for start, end in point_pairs]
+    max_length_index = lengths.index(max(lengths))
+    start_point, end_point = point_pairs[max_length_index]
+    return get_points_angle(start_point.to_tuple(), end_point.to_tuple())
 
 
 def is_rectangular(points: list[Point3D]) -> bool:
@@ -455,9 +728,6 @@ def calculate_bbox_dimensions(points: list[Point3D]) -> tuple[float, float]:
     Tuple[float, float]
         Length and width of bounding box
     """
-    if not points:
-        return 0.0, 0.0
-
     east_min = min(p.east for p in points)
     east_max = max(p.east for p in points)
     north_min = min(p.north for p in points)
@@ -482,18 +752,15 @@ def calculate_rect_dimensions(points: list[Point3D]) -> tuple[float, float]:
     Tuple[float, float]
         Length and width of rectangle
     """
-    if len(points) != 4:
-        return calculate_bbox_dimensions(points)
+    point_pairs = []
+    for point, other in itertools.pairwise(points):
+        point_pairs.append((point, other))
 
-    # Calculate side lengths
-    side1 = points[0].distance_2d(points[1])
-    side2 = points[1].distance_2d(points[2])
-
-    # Return length (max) and width (min)
-    length = max(side1, side2)
-    width = min(side1, side2)
-
-    return length, width
+    side_lengths = []
+    for point, other in point_pairs:
+        side_length = point.distance_2d(other)
+        side_lengths.append(side_length)
+    return max(side_lengths), min(side_lengths)
 
 
 def calculate_center_point(points: list[Point3D]) -> Point3D:

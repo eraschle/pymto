@@ -12,7 +12,7 @@ from pathlib import Path
 import numpy as np
 from scipy.spatial import KDTree
 
-from ..models import AssingmentData, MediumConfig, Point3D
+from ..models import AssignmentData, MediumConfig, Point3D
 
 
 class LandXMLReader:
@@ -104,10 +104,10 @@ class LandXMLReader:
         )
         return float(interpolated_z)
 
-    def update_elements(self, assigment: AssingmentData) -> None:
-        # Texts are assigned to elemtents and onbly the elements data are exported, which
+    def update_elements(self, assignment: AssignmentData) -> None:
+        # Texts are assigned to elements and only the elements data are exported, which
         # means that texts are not updated here.
-        for elements, config in assigment.assigned:
+        for elements, config in assignment.assigned:
             for element in elements:
                 if element.points:
                     element.points = self._update_elevation(element.points, config)

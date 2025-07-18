@@ -9,7 +9,7 @@ import numpy as np
 
 from pymto.protocols import IAssignmentStrategy
 
-from ..models import AssingmentGroup, Medium, ObjectData, Point3D
+from ..models import AssignmentGroup, DxfText, Medium, ObjectData, Point3D
 
 
 class SpatialTextAssigner(IAssignmentStrategy):
@@ -29,8 +29,9 @@ class SpatialTextAssigner(IAssignmentStrategy):
             Maximum distance for text-to-pipe assignment
         """
         self.max_distance = max_distance
+        self.assigned_elements: dict[str, list[ObjectData]] = {}
 
-    def texts_to_point_based(self, medium: Medium, groups: list[AssingmentGroup]) -> None:
+    def texts_to_point_based(self, medium: Medium, groups: list[AssignmentGroup]) -> None:
         for config, group in zip(medium.config.point_based, groups, strict=True):
             elements, texts = group
             elements = elements.copy()
@@ -41,8 +42,15 @@ class SpatialTextAssigner(IAssignmentStrategy):
                     continue
                 element = elements[closest_idx]
                 element.assigned_text = text
+                self._add_assignment(text, element)
 
             medium.point_data.add_assignment(config, elements)
+
+    def _add_assignment(self, text: DxfText, element: ObjectData) -> None:
+        """Add assignment to medium's point data."""
+        if text.uuid not in self.assigned_elements:
+            self.assigned_elements[text.uuid] = []
+        self.assigned_elements[text.uuid].append(element)
 
     def _find_closest_element(self, text_position: Point3D, elements: list[ObjectData]) -> int:
         """Find the closest element position to a text position.
@@ -75,7 +83,7 @@ class SpatialTextAssigner(IAssignmentStrategy):
 
         return closest_idx
 
-    def texts_to_line_based(self, medium: Medium, groups: list[AssingmentGroup]) -> None:
+    def texts_to_line_based(self, medium: Medium, groups: list[AssignmentGroup]) -> None:
         """Assign texts to pipes based on spatial proximity.
 
         Each text can be assigned to at most one pipe segment.
@@ -86,7 +94,7 @@ class SpatialTextAssigner(IAssignmentStrategy):
         ----------
         medium : Medium
             Medium containing pipe data and configuration
-        groups : list[AssingmentGroup]
+        groups : list[AssignmentGroup]
             List of assignment groups containing pipes and texts
         """
         for config, group in zip(medium.config.line_based, groups, strict=True):
@@ -113,13 +121,13 @@ class SpatialTextAssigner(IAssignmentStrategy):
                     text.position, element_segments, segment_to_element
                 )
 
-                # Assign text if within maximum distance and element doesn't have text yet
                 if (
                     distance <= self.max_distance
                     and closest_idx is not None
                     and elements[closest_idx].assigned_text is None
                 ):
                     elements[closest_idx].assigned_text = text
+                    self._add_assignment(text, elements[closest_idx])
 
             medium.line_data.add_assignment(config, elements)
 

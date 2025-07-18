@@ -15,8 +15,6 @@ from ..models import (
     ObjectData,
     ObjectType,
     Point3D,
-    RectangularDimensions,
-    RoundDimensions,
 )
 from .compatibilty import (
     IMediumCompatibilityStrategy,
@@ -127,11 +125,11 @@ class PipelineGradientAdjuster:
 
     def _is_manhole(self, obj: ObjectData) -> bool:
         """Check if object is a manhole/shaft."""
-        return obj.object_type in {
-            ObjectType.SHAFT,
-            ObjectType.WASTE_WATER_SPECIAL,
-            ObjectType.WATER_SPECIAL,
-        }
+        return "shaft" in obj.object_type.value.lower()
+
+    def _is_pipe(self, obj: ObjectData) -> bool:
+        """Check if object is a manhole/shaft."""
+        return obj.object_type in (ObjectType.PIPE)
 
     def _adjust_single_pipeline(self, pipeline: ObjectData, manholes: list[ObjectData]) -> PipelineAdjustment | None:
         """Adjust elevation for a single pipeline based on compatible manholes."""
@@ -255,8 +253,10 @@ class PipelineGradientAdjuster:
             grad_next = ((next_point.altitude - curr_point.altitude) / dist_next) * 100
 
             # Detect significant downward break using configurable threshold
-            gradient_change = grad_next - grad_prev
-            if gradient_change < -self.params.gradient_break_threshold:
+            # gradient_change = grad_next - grad_prev
+            # if gradient_change < -self.params.gradient_break_threshold:
+            gradient_change = abs(grad_next - grad_prev)
+            if gradient_change > self.params.gradient_break_threshold:
                 gradient_breaks.append(idx)
 
         return gradient_breaks
@@ -416,7 +416,7 @@ class PipelineGradientAdjuster:
 
         return connected_pipes
 
-    def calculate_cover_to_pipe_heights(self, elements: list[ObjectData]) -> list[CoverToPipeHeight]:
+    def calculate_dimension(self, elements: list[ObjectData]) -> list[CoverToPipeHeight]:
         """Calculate cover-to-lowest-pipe height differences for all shafts."""
         medium_groups = self._group_objects_by(elements)
 
@@ -429,15 +429,16 @@ class PipelineGradientAdjuster:
         return cover_heights
 
     def _get_line_element_height(self, element: ObjectData) -> float:
-        if isinstance(element.dimensions, RoundDimensions):
-            return element.dimensions.diameter
-        if isinstance(element.dimensions, RectangularDimensions):
-            return element.dimensions.height
+        dimension = element.dimension
+        if dimension.is_round:
+            return dimension.diameter
+        if dimension.is_rectangular:
+            return dimension.depth
         return 0.0
 
     def _calculate_group_cover_heights(self, objects: list[ObjectData]) -> list[CoverToPipeHeight]:
         """Calculate cover heights for objects in the same compatibility group."""
-        pipelines = [obj for obj in objects if obj.is_line_based]
+        pipelines = [obj for obj in objects if obj.is_line_based and self._is_pipe(obj)]
         manholes = [obj for obj in objects if obj.is_point_based and self._is_manhole(obj)]
 
         cover_heights = []
@@ -446,23 +447,11 @@ class PipelineGradientAdjuster:
             connected_pipes = self._find_all_connected_pipes(shaft, pipelines)
 
             if len(connected_pipes) == 0:
-                # No connected pipes found
-                cover_heights.append(
-                    CoverToPipeHeight(
-                        shaft=shaft,
-                        connected_pipes=[],
-                        lowest_pipe=None,
-                        cover_elevation=shaft.point.altitude,
-                        lowest_pipe_elevation=None,
-                        height_difference=None,
-                        medium_compatibility=f"No compatible pipes found for {shaft.medium}",
-                    )
-                )
                 continue
 
             # Find the lowest pipe elevation
             lowest_pipe = None
-            lowest_elev = float("inf")
+            lowest_altitude = float("inf")
 
             for pipe in connected_pipes:
                 if not pipe.has_end_point:
@@ -471,35 +460,20 @@ class PipelineGradientAdjuster:
                 start_distance = shaft.point.distance_2d(pipe.point)
                 end_distance = shaft.point.distance_2d(pipe.end_point)
 
-                dimension = self._get_line_element_height(pipe)
+                height = self._get_line_element_height(pipe)
                 if start_distance <= end_distance:
-                    pipe_elev = pipe.point.altitude - dimension
+                    pipe_altitude = pipe.point.altitude - height
                 elif end_distance < start_distance:
-                    pipe_elev = pipe.end_point.altitude - dimension
+                    pipe_altitude = pipe.end_point.altitude - height
                 else:
                     continue
 
-                if pipe_elev < lowest_elev:
-                    lowest_elev = pipe_elev
+                if pipe_altitude < lowest_altitude or lowest_pipe is None:
+                    lowest_altitude = pipe_altitude
                     lowest_pipe = pipe
 
-            if lowest_pipe is None:
-                # No valid lowest pipe found
-                cover_heights.append(
-                    CoverToPipeHeight(
-                        shaft=shaft,
-                        connected_pipes=connected_pipes,
-                        lowest_pipe=None,
-                        cover_elevation=shaft.point.altitude,
-                        lowest_pipe_elevation=None,
-                        height_difference=None,
-                        medium_compatibility=f"No valid lowest pipe found for {shaft.medium}",
-                    )
-                )
-                continue
-
-            height_diff = shaft.point.altitude - lowest_elev
-            shaft.dimensions.height = max(self.min_height, height_diff)
+            height_diff = shaft.point.altitude - lowest_altitude
+            shaft.dimension.height = max(self.min_height, height_diff)
 
             compatibility_desc = self._describe_shaft_pipe_compatibility(shaft, connected_pipes)
             cover_heights.append(
@@ -508,7 +482,7 @@ class PipelineGradientAdjuster:
                     connected_pipes=connected_pipes,
                     lowest_pipe=lowest_pipe,
                     cover_elevation=shaft.point.altitude,
-                    lowest_pipe_elevation=lowest_elev if lowest_pipe else None,
+                    lowest_pipe_elevation=lowest_altitude,
                     height_difference=height_diff,
                     medium_compatibility=compatibility_desc,
                 )
