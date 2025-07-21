@@ -4,8 +4,7 @@ import numpy as np
 import pytest
 
 from pymto.models import (
-    AssingmentData,
-    DxfColor,
+    AssignmentData,
     DxfText,
     LayerData,
     Medium,
@@ -15,8 +14,10 @@ from pymto.models import (
     ObjectType,
     Parameter,
     Point3D,
-    RectangularDimensions,
-    RoundDimensions,
+    Dimension,
+    ShapeType,
+    LayerGroup,
+    Unit,
 )
 
 
@@ -55,40 +56,41 @@ class TestPoint3D:
         assert abs(distance - expected) < 1e-10
 
 
-class TestRectangularDimensions:
-    """Test RectangularDimensions class."""
+class TestDimension:
+    """Test Dimension class."""
 
     def test_rectangular_dimensions_creation(self):
-        """Test RectangularDimensions creation."""
-        dims = RectangularDimensions(length=10.0, width=5.0, angle=45.0, height=3.0)
+        """Test Dimension creation with rectangular shape."""
+        dims = Dimension(shape=ShapeType.RECTANGULAR, length=10.0, width=5.0, angle=45.0, height=3.0)
         assert dims.length == 10.0
         assert dims.width == 5.0
         assert dims.angle == 45.0
         assert dims.height == 3.0
+        assert dims.is_rectangular
 
     def test_rectangular_dimensions_no_height(self):
-        """Test RectangularDimensions without height."""
-        dims = RectangularDimensions(length=8.0, width=4.0, angle=0.0)
+        """Test Dimension without height."""
+        dims = Dimension(shape=ShapeType.RECTANGULAR, length=8.0, width=4.0, angle=0.0)
         assert dims.length == 8.0
         assert dims.width == 4.0
         assert dims.angle == 0.0
         assert dims.height == 0.0  # Default height is 0.0
+        assert dims.is_rectangular
 
-
-class TestRoundDimensions:
-    """Test RoundDimensions class."""
 
     def test_round_dimensions_creation(self):
-        """Test RoundDimensions creation."""
-        dims = RoundDimensions(diameter=6.0, height=2.0)
+        """Test Dimension creation with round shape."""
+        dims = Dimension(shape=ShapeType.ROUND, diameter=6.0, height=2.0)
         assert dims.diameter == 6.0
         assert dims.height == 2.0
+        assert dims.is_round
 
     def test_round_dimensions_no_height(self):
-        """Test RoundDimensions without height."""
-        dims = RoundDimensions(diameter=8.0)
+        """Test Dimension without height."""
+        dims = Dimension(shape=ShapeType.ROUND, diameter=8.0)
         assert dims.diameter == 8.0
         assert dims.height == 0.0  # Default height is 0.0
+        assert dims.is_round
 
 
 class TestDxfText:
@@ -98,17 +100,17 @@ class TestDxfText:
         """Test DxfText creation."""
         position = Point3D(east=10.0, north=20.0, altitude=0.0)
         text = DxfText(
+            uuid="test-uuid",
             medium="Test Medium",
             content="Test Text",
             position=position,
             layer="TEXT_LAYER",
-            color=(255, 0, 0),
         )
 
         assert text.content == "Test Text"
         assert text.position == position
         assert text.layer == "TEXT_LAYER"
-        assert text.color == (255, 0, 0)
+        assert text.uuid == "test-uuid"
 
 
 class TestObjectData:
@@ -116,31 +118,27 @@ class TestObjectData:
 
     def test_object_data_with_round_dimensions(self):
         """Test ObjectData with round dimensions."""
-        dims = RoundDimensions(diameter=5.0)
+        dims = Dimension(shape=ShapeType.ROUND, diameter=5.0)
         position = Point3D(east=10.0, north=20.0, altitude=0.0)
 
         obj = ObjectData(
+            uuid="test-uuid",
             medium="Test Medium",
             object_type=ObjectType.UNKNOWN,
             family="Test Family",
             family_type="Test Type",
-            dimensions=dims,
-            layer="CIRCLE_LAYER",
+            dimension=dims,
             points=[position],
-            color=(0, 255, 0),
-            object_id=Parameter(name="Object ID", value="12345"),
         )
 
-        assert obj.dimensions == dims
-        assert obj.layer == "CIRCLE_LAYER"
+        assert obj.dimension == dims
         assert len(obj.points) == 1
         assert obj.points[0] == position
-        assert obj.color == (0, 255, 0)
         assert obj.assigned_text is None
 
     def test_object_data_with_rectangular_dimensions(self):
         """Test ObjectData with rectangular dimensions."""
-        dims = RectangularDimensions(length=10.0, width=5.0, angle=0.0)
+        dims = Dimension(shape=ShapeType.RECTANGULAR, length=10.0, width=5.0, angle=0.0)
         points = [
             Point3D(east=0.0, north=0.0, altitude=0.0),
             Point3D(east=10.0, north=0.0, altitude=0.0),
@@ -149,72 +147,43 @@ class TestObjectData:
         ]
 
         obj = ObjectData(
+            uuid="test-uuid",
             medium="Test Medium",
             object_type=ObjectType.UNKNOWN,
             family="Test Family",
             family_type="Test Type",
-            dimensions=dims,
-            layer="RECT_LAYER",
+            dimension=dims,
             points=points,
-            color=(0, 0, 255),
-            object_id=Parameter(name="Object ID", value="12345"),
         )
 
-        assert obj.dimensions == dims
-        assert obj.layer == "RECT_LAYER"
+        assert obj.dimension == dims
         assert obj.points == points
-        assert obj.color == (0, 0, 255)
 
     def test_object_data_with_assigned_text(self):
         """Test ObjectData with assigned text."""
-        dims = RoundDimensions(diameter=3.0)
+        dims = Dimension(shape=ShapeType.ROUND, diameter=3.0)
         text_pos = Point3D(east=5.0, north=10.0, altitude=0.0)
         assigned_text = DxfText(
+            uuid="text-uuid",
             medium="Test Medium",
             content="SHAFT_01",
             position=text_pos,
             layer="TEXT",
-            color=(0, 0, 0),
         )
 
         obj = ObjectData(
+            uuid="test-uuid",
             medium="Test Medium",
             object_type=ObjectType.UNKNOWN,
             family="Test Family",
             family_type="Test Type",
-            dimensions=dims,
-            layer="SHAFT_LAYER",
+            dimension=dims,
             assigned_text=assigned_text,
-            object_id=Parameter(name="Object ID", value="12345"),
         )
 
         assert obj.assigned_text == assigned_text
         assert obj.assigned_text is not None
         assert obj.assigned_text.content == "SHAFT_01"
-
-
-class TestDxfColor:
-    """Test DxfColor class."""
-
-    def test_dxf_color_creation(self):
-        """Test DxfColor creation."""
-        color = DxfColor(red=255, green=128, blue=0)
-        assert color.red == 255
-        assert color.green == 128
-        assert color.blue == 0
-
-    def test_to_tuple(self):
-        """Test color conversion to tuple."""
-        color = DxfColor(red=100, green=200, blue=50)
-        tuple_color = color.to_tuple()
-        assert tuple_color == (100, 200, 50)
-
-    def test_frozen_dataclass(self):
-        """Test that DxfColor is frozen (immutable)."""
-        color = DxfColor(red=255, green=0, blue=0)
-
-        with pytest.raises(AttributeError):
-            color.red = 128  # Should not be allowed #pyright:ignore
 
 
 class TestLayerData:
@@ -239,10 +208,10 @@ class TestLayerData:
         assert layer.color == "red"
 
 
-class TestAssignmentConfig:
-    """Test AssignmentConfig class."""
+class TestMediumConfig:
+    """Test MediumConfig class."""
 
-    def test_assignment_config_creation(self):
+    def test_medium_config_creation(self):
         """Test MediumConfig creation."""
         geometry_layers = [
             LayerData(name="PIPES", color=(0, 255, 0)),
@@ -251,58 +220,60 @@ class TestAssignmentConfig:
         text_layers = [
             LayerData(name="TEXT", color=(0, 0, 0)),
         ]
+        layer_group = LayerGroup(geometry=geometry_layers, text=text_layers)
 
         config = MediumConfig(
             medium="Test Medium",
-            geometry=geometry_layers,
-            text=text_layers,
+            layer_group=layer_group,
             family="Test Family",
             family_type="Test Type",
             elevation_offset=0.0,
-            default_unit="mm",
+            default_unit=Unit.MILLIMETER,
             object_type=ObjectType.UNKNOWN,
             object_id="12345",
         )
-        assert config.geometry == geometry_layers
-        assert config.text == text_layers
+        assert config.layer_group.geometry == geometry_layers
+        assert config.layer_group.text == text_layers
 
 
-class TestAssingmentData:
-    """Test AssingmentData class."""
+class TestAssignmentData:
+    """Test AssignmentData class."""
 
     def test_assignment_data_creation(self):
-        """Test AssingmentData creation."""
-        assignment = AssingmentData()
+        """Test AssignmentData creation."""
+        assignment = AssignmentData()
         assert assignment.assigned == []
 
     def test_add_element(self):
         """Test adding element to assignment data."""
-        dims = RoundDimensions(diameter=5.0)
+        dims = Dimension(shape=ShapeType.ROUND, diameter=5.0)
         position = Point3D(east=0.0, north=0.0, altitude=0.0)
         element = ObjectData(
+            uuid="test-uuid",
             medium="Test Medium",
             object_type=ObjectType.UNKNOWN,
             family="Test Family",
             family_type="Test Family Type",
-            dimensions=dims,
-            layer="TEST",
+            dimension=dims,
             points=[position],
-            object_id=Parameter(name="Object ID", value="12345"),
         )
 
-        config = MediumConfig(
-            medium="Test Medium",
+        layer_group = LayerGroup(
             geometry=[LayerData(name="TEST", color=(255, 0, 0))],
             text=[LayerData(name="TEXT", color=(0, 0, 0))],
+        )
+        config = MediumConfig(
+            medium="Test Medium",
+            layer_group=layer_group,
             family="Test Family",
             family_type="Test Family Type",
             elevation_offset=0.0,
-            default_unit="mm",
+            default_unit=Unit.MILLIMETER,
             object_type=ObjectType.UNKNOWN,
             object_id="12345",
         )
 
-        assignment = AssingmentData()
+        assignment = AssignmentData()
         assignment.add_assignment(config, [element])
 
         assert len(assignment.assigned) == 1
@@ -311,19 +282,22 @@ class TestAssingmentData:
 
     def test_add_text(self):
         """Test adding text to assignment data."""
-        config = MediumConfig(
-            medium="Test Medium",
+        layer_group = LayerGroup(
             geometry=[LayerData(name="GEOM", color=(255, 0, 0))],
             text=[LayerData(name="TEXT", color=(0, 0, 0))],
+        )
+        config = MediumConfig(
+            medium="Test Medium",
+            layer_group=layer_group,
             family="Test Family",
             family_type="Test Type",
             elevation_offset=0.0,
-            default_unit="mm",
+            default_unit=Unit.MILLIMETER,
             object_type=ObjectType.UNKNOWN,
             object_id="12345",
         )
 
-        assignment = AssingmentData()
+        assignment = AssignmentData()
         assignment.add_assignment(config, [])
 
         assert len(assignment.assigned) == 1
@@ -338,12 +312,12 @@ class TestMedium:
         """Test Medium creation."""
         geometry_layers = [LayerData(name="PIPES", color=(0, 255, 0))]
         text_layers = [LayerData(name="TEXT", color=(0, 0, 0))]
+        layer_group = LayerGroup(geometry=geometry_layers, text=text_layers)
 
         elements_config = MediumConfig(
             medium="Test Medium",
-            geometry=geometry_layers,
-            text=text_layers,
-            default_unit="mm",
+            layer_group=layer_group,
+            default_unit=Unit.MILLIMETER,
             object_type=ObjectType.UNKNOWN,
             elevation_offset=0.0,
             family="Test Family",
@@ -352,9 +326,8 @@ class TestMedium:
         )
         lines_config = MediumConfig(
             medium="Test Medium",
-            geometry=geometry_layers,
-            text=text_layers,
-            default_unit="mm",
+            layer_group=layer_group,
+            default_unit=Unit.MILLIMETER,
             object_type=ObjectType.UNKNOWN,
             elevation_offset=0.0,
             family="Test Family",
@@ -374,5 +347,5 @@ class TestMedium:
         assert medium.config.point_based[0] == elements_config
         assert len(medium.config.line_based) == 1
         assert medium.config.line_based[0] == lines_config
-        assert isinstance(medium.point_data, AssingmentData)
-        assert isinstance(medium.line_data, AssingmentData)
+        assert isinstance(medium.point_data, AssignmentData)
+        assert isinstance(medium.line_data, AssignmentData)

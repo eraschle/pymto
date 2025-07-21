@@ -150,11 +150,11 @@ class RevitImporter(object):
         # type: (dict) -> XYZ
         """Convert point data to Revit XYZ"""
         project_zero = get_shared_project_point(self.document)
-        coords []
+        coords = []
         for attr, value in point_data.items():
             coord = point_data.get(attr, 0.0) - project_zero.get(attr, 0.0)
             if attr != 0:
-                coord = UnitUtils.ConvertToInternalUnits(east_coord, UnitTypeId.Meters)
+                coord = UnitUtils.ConvertToInternalUnits(value, UnitTypeId.Meters)
             coords.append(coord)
         return XYZ(*coords)
 

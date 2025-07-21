@@ -13,7 +13,8 @@ from pymto.models import (
     ObjectType,
     Parameter,
     Point3D,
-    RoundDimensions,
+    Dimension,
+    ShapeType,
 )
 
 
@@ -29,10 +30,8 @@ class TestPipelineGradientAdjuster:
             object_type=ObjectType.WASTE_WATER_SPECIAL,
             family="Schacht",
             family_type="Test",
-            dimensions=RoundDimensions(diameter=1.0),
-            layer="test",
+            dimension=Dimension(diameter=1.0, shape=ShapeType.ROUND),
             points=[Point3D(east=0.0, north=0.0, altitude=100.0)],
-            object_id=Parameter(name="object_id", value="manhole_id"),
         )
 
         manhole2 = ObjectData(

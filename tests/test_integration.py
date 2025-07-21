@@ -9,8 +9,10 @@ from pymto.models import (
     MediumConfig,
     ObjectData,
     ObjectType,
-    RectangularDimensions,
-    RoundDimensions,
+    Dimension,
+    ShapeType,
+    LayerGroup,
+    Unit,
 )
 from pymto.process import factory
 from pymto.process.factory import Insert, ObjectDataFactory
@@ -37,13 +39,12 @@ class TestIntegration:
         """Load test DXF document."""
         return MediumConfig(
             medium="TestMedium",
-            geometry=[],
-            text=[],
+            layer_group=LayerGroup(geometry=[], text=[]),
             family="TestFamily",
             family_type="TestType",
             elevation_offset=0.0,
-            default_unit="mm",
-            object_type=ObjectType.PIPE_WATER,
+            default_unit=Unit.MILLIMETER,
+            object_type=ObjectType.PIPE,
             object_id="TestObject",
         )
 
@@ -101,10 +102,11 @@ class TestIntegration:
         assert len(circle_objects) >= 2  # At least 2 circles in test file
 
         for obj in circle_objects:
-            assert isinstance(obj.dimensions, RoundDimensions)
+            assert isinstance(obj.dimensions, Dimension)
+            assert obj.dimensions.is_round
             assert obj.dimensions.diameter > 0
-            assert len(obj.positions) == 1
-            assert obj.positions[0] is not None
+            assert len(obj.points) == 1
+            assert obj.points[0] is not None
 
     def test_insert_entities(self, factory: ObjectDataFactory, dxf_doc: Drawing, config: MediumConfig):
         """Test processing of INSERT entities (blocks)."""
@@ -120,8 +122,8 @@ class TestIntegration:
 
         for obj in insert_objects:
             assert obj.dimensions is not None
-            assert len(obj.positions) == 1
-            assert obj.positions[0] is not None
+            assert len(obj.points) == 1
+            assert obj.points[0] is not None
 
     def test_polyline_entities(self, factory: ObjectDataFactory, dxf_doc: Drawing, config: MediumConfig):
         """Test processing of POLYLINE/LWPOLYLINE entities."""
@@ -136,8 +138,8 @@ class TestIntegration:
         assert len(polyline_objects) >= 3  # At least 3 polylines in test file
 
         # Check for both element-type and line-type polylines
-        element_polylines = [obj for obj in polyline_objects if obj.positions]
-        line_polylines = [obj for obj in polyline_objects if obj.points and obj.positions]
+        element_polylines = [obj for obj in polyline_objects if obj.is_point_based]
+        line_polylines = [obj for obj in polyline_objects if obj.is_line_based]
 
         assert len(element_polylines) >= 2  # Complex polylines as elements
         assert len(line_polylines) >= 1  # Simple polylines as lines
@@ -155,10 +157,10 @@ class TestIntegration:
         assert len(line_objects) >= 5  # At least 5 lines in test file
 
         for obj in line_objects:
-            assert isinstance(obj.dimensions, RoundDimensions)
+            assert isinstance(obj.dimensions, Dimension)
+            assert obj.dimensions.is_round
             assert obj.dimensions.diameter == 50.0 / 1000  # ObjectType.PIPE_WATER default is 50mm
             assert len(obj.points) == 2  # Lines have 2 points
-            assert len(obj.positions) == 2  # Lines should have 2 positions
 
     def test_rectangular_shape_detection(self, factory: ObjectDataFactory, dxf_doc: Drawing, config: MediumConfig):
         """Test detection of rectangular shapes."""
@@ -167,12 +169,14 @@ class TestIntegration:
         for entity in dxf_doc.modelspace():
             if entity.dxftype() in ("POLYLINE", "LWPOLYLINE", "INSERT"):
                 obj_data = factory.create_from_entity(entity, config)
-                if obj_data is not None and isinstance(obj_data.dimensions, RectangularDimensions):
+                if obj_data is not None and obj_data.dimensions.is_rectangular:
                     rectangular_objects.append(obj_data)
 
         assert len(rectangular_objects) >= 2  # At least 2 rectangular objects
 
         for obj in rectangular_objects:
+            assert obj.dimensions.has_length
+            assert obj.dimensions.has_width
             assert obj.dimensions.length > 0
             assert obj.dimensions.width > 0
             # Length may be either >= or <= width depending on orientation
@@ -183,7 +187,7 @@ class TestIntegration:
 
         for entity in dxf_doc.modelspace():
             obj_data = factory.create_from_entity(entity, config)
-            if obj_data is not None and isinstance(obj_data.dimensions, RoundDimensions):
+            if obj_data is not None and obj_data.dimensions.is_round:
                 round_objects.append(obj_data)
 
         assert len(round_objects) >= 6  # Circles, round blocks, and some polygons
@@ -242,9 +246,9 @@ class TestIntegration:
 
             if obj_data is not None:
                 if is_element:
-                    # Elements should have positions
-                    assert obj_data.points, f"Element {entity.dxftype()} should have positions"
+                    # Elements should be point-based
+                    assert obj_data.is_point_based, f"Element {entity.dxftype()} should be point-based"
                 else:
-                    # Lines should have points but no positions
-                    assert obj_data.points, f"Line {entity.dxftype()} should have points"
-                    assert len(obj_data.points) == 2, f"Line {entity.dxftype()} should have 2 positions"
+                    # Lines should be line-based
+                    assert obj_data.is_line_based, f"Line {entity.dxftype()} should be line-based"
+                    assert len(obj_data.points) == 2, f"Line {entity.dxftype()} should have 2 points"
