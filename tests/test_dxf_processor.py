@@ -11,6 +11,7 @@ from pymto.processor import DXFProcessor
 from pymto.protocols import (
     IAssignmentStrategy,
     IParameterUpdater,
+    IDimensionCalculator,
     IElevationUpdater,
     IExporter,
     IObjectCreator,
@@ -70,8 +71,8 @@ class TestDXFProcessor:
 
     def test_update_dimensions(self, processor: DXFProcessor):
         """Test updating dimensions."""
-        updater = Mock(spec=IParameterUpdater)
-        processor.update_dimensions(updater)
+        updater = Mock(spec=IDimensionCalculator)
+        processor.calculate_dimensions(updater)
 
         # Verify updater was called for each medium's point and line data
         expected_calls = len(processor.config.mediums) * 2

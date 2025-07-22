@@ -1,10 +1,10 @@
-# jrsin - JSON Revit Import Package
+# Dxf2Rvt - JSON Revit Import Package
 
 Eine vereinfachte PyRevit Extension zum Importieren von DXF-Daten aus JSON-Dateien in Autodesk Revit, kompatibel mit IronPython 3.
 
 ## Übersicht
 
-Die `jrsin` Extension liest JSON-Daten aus der `revit_data.json` Datei und erstellt entsprechende Revit-Elemente als Generic Models.
+Die `Dxf2Rvt` Extension liest JSON-Daten aus der `revit_data.json` Datei und erstellt entsprechende Revit-Elemente als Generic Models.
 
 ## Funktionen
 
@@ -16,8 +16,8 @@ Die `jrsin` Extension liest JSON-Daten aus der `revit_data.json` Datei und erste
 ## Struktur
 
 ```
-src/jrsin/DxfImporter.extension/
-├── DxfImporter.tab/
+src/Dxf2Rvt.extension/
+├── Dxf2Rvt.tab/
 │   └── Import.panel/
 │       └── Import DXF Data.pushbutton/
 │           ├── bundle.yaml
